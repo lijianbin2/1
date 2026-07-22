@@ -37,9 +37,9 @@ function main(config) {
     validProxies = [groups[0]?.name || "DIRECT"];
   }
 
-  // 构建并插入 javdb 策略组
+  // 构建并插入 JavDB 策略组
   groups.splice(1, 0, {
-    name: "javdb",
+    name: "JavDB",
     type: "select",
     proxies: validProxies
   });
@@ -48,7 +48,7 @@ function main(config) {
   const customRules = [
     "DOMAIN,cpa.wisdomsatan.de,DIRECT",
     "DOMAIN-SUFFIX,bingosoft.net,DIRECT",
-    "DOMAIN-SUFFIX,javdb.com,javdb"
+    "DOMAIN-SUFFIX,javdb.com,JavDB"
   ];
 
   config["rules"] = [...customRules, ...(config["rules"] || [])];
