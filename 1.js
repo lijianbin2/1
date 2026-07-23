@@ -1,7 +1,17 @@
+// 脚本 2：还原 DNS 并应用 JavDB 规则
 function main(config) {
-  // 1. 完全删除 DNS 配置
-  delete config["dns"];
+  // ----------------------------------------------------
+  // 1. 从全局变量还原初始备份的 DNS 设置
+  // ----------------------------------------------------
+  if (globalThis.__ORIGINAL_DNS_BACKUP__) {
+    config["dns"] = JSON.parse(JSON.stringify(globalThis.__ORIGINAL_DNS_BACKUP__));
+  } else {
+    delete config["dns"];
+  }
 
+  // ----------------------------------------------------
+  // 2. 策略组处理 (JavDB)
+  // ----------------------------------------------------
   if (!config["proxy-groups"]) {
     config["proxy-groups"] = [];
   }
@@ -10,7 +20,7 @@ function main(config) {
   const existingGroups = (config["proxy-groups"] || []).map(g => g.name);
   const existingProxies = (config["proxies"] || []).map(p => p.name);
 
-  // 2. 地区智能匹配规则（已优化排除 Twitch / Twitter）
+  // 地区智能匹配规则（已优化排除 Twitch / Twitter）
   const regionRules = [
     { name: "香港", regex: /香港|Hong\s*Kong|🇭🇰|\bHK\b/i },
     { name: "台湾", regex: /台湾|臺灣|Taiwan|🇹🇼|\bTW\b/i },
@@ -42,7 +52,7 @@ function main(config) {
     validProxies = [fallbackGroup];
   }
 
-  // 构建 JavDB 策略组（组名改为 JavDB）
+  // 构建 JavDB 策略组
   const javdbGroup = {
     name: "JavDB",
     type: "select",
@@ -52,7 +62,9 @@ function main(config) {
   // 插入到策略组的第 2 行（索引位置为 1）
   config["proxy-groups"].splice(1, 0, javdbGroup);
 
-  // 3. 将自定义分流规则插入到规则集最前端（同步修改规则指向为 JavDB）
+  // ----------------------------------------------------
+  // 3. 将自定义分流规则插入到规则集最前端
+  // ----------------------------------------------------
   const customRules = [
     "DOMAIN,cpa.wisdomsatan.de,DIRECT",
     "DOMAIN-SUFFIX,bingosoft.net,DIRECT",
