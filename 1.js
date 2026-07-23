@@ -1,16 +1,27 @@
-// 脚本 2：还原 DNS 并应用 JavDB 规则
+// 脚本 2：还原 DNS & Hosts 并应用 JavDB 规则
 function main(config) {
+  const backup = globalThis.__CONFIG_BACKUP__ || {};
+
   // ----------------------------------------------------
-  // 1. 从全局变量还原初始备份的 DNS 设置
+  // 1. 还原初始备份的 DNS 设置
   // ----------------------------------------------------
-  if (globalThis.__ORIGINAL_DNS_BACKUP__) {
-    config["dns"] = JSON.parse(JSON.stringify(globalThis.__ORIGINAL_DNS_BACKUP__));
+  if (backup["dns"]) {
+    config["dns"] = JSON.parse(JSON.stringify(backup["dns"]));
   } else {
     delete config["dns"];
   }
 
   // ----------------------------------------------------
-  // 2. 策略组处理 (JavDB)
+  // 2. 还原初始备份的 Hosts 设置
+  // ----------------------------------------------------
+  if (backup["hosts"]) {
+    config["hosts"] = JSON.parse(JSON.stringify(backup["hosts"]));
+  } else {
+    delete config["hosts"];
+  }
+
+  // ----------------------------------------------------
+  // 3. 策略组处理 (JavDB)
   // ----------------------------------------------------
   if (!config["proxy-groups"]) {
     config["proxy-groups"] = [];
@@ -20,7 +31,7 @@ function main(config) {
   const existingGroups = (config["proxy-groups"] || []).map(g => g.name);
   const existingProxies = (config["proxies"] || []).map(p => p.name);
 
-  // 地区智能匹配规则（已优化排除 Twitch / Twitter）
+  // 地区智能匹配规则（精确定位，排除 Twitch / Twitter）
   const regionRules = [
     { name: "香港", regex: /香港|Hong\s*Kong|🇭🇰|\bHK\b/i },
     { name: "台湾", regex: /台湾|臺灣|Taiwan|🇹🇼|\bTW\b/i },
@@ -63,7 +74,7 @@ function main(config) {
   config["proxy-groups"].splice(1, 0, javdbGroup);
 
   // ----------------------------------------------------
-  // 3. 将自定义分流规则插入到规则集最前端
+  // 4. 将自定义分流规则插入到规则集最前端
   // ----------------------------------------------------
   const customRules = [
     "DOMAIN,cpa.wisdomsatan.de,DIRECT",
