@@ -30,7 +30,7 @@ function main(config) {
   const existingGroups = (config["proxy-groups"] || []).map(g => g.name);
   const existingProxies = (config["proxies"] || []).map(p => p.name);
 
-  // 地区智能匹配规则（已剔除韩国，排除 Twitch / Twitter）
+  // 地区智能匹配规则（港、台、新、美）
   const regionRules = [
     { name: "香港", regex: /香港|Hong\s*Kong|🇭🇰|\bHK\b/i },
     { name: "台湾", regex: /台湾|臺灣|Taiwan|🇹🇼|\bTW\b/i },
@@ -53,7 +53,6 @@ function main(config) {
 
   let validProxies = Array.from(new Set(matchedItems));
 
-  // 防错兜底：若没有任何匹配到的节点，默认使用第 1 个策略组
   if (validProxies.length === 0) {
     const fallbackGroup = config["proxy-groups"][0]?.name || "DIRECT";
     validProxies = [fallbackGroup];
@@ -69,12 +68,13 @@ function main(config) {
   config["proxy-groups"].splice(1, 0, javdbGroup);
 
   // ----------------------------------------------------
-  // 4. 将自定义分流规则插入到最前端
+  // 4. 将自定义分流规则插入到最前端（注意顺序！）
   // ----------------------------------------------------
   const customRules = [
     "DOMAIN,cpa.wisdomsatan.de,DIRECT",
     "DOMAIN-SUFFIX,bingosoft.net,DIRECT",
-    "DOMAIN-KEYWORD,javdb,JavDB" // 匹配所有含 javdb 的域名
+    "DOMAIN-SUFFIX,javdb.com,JavDB",     // 1. 主站 javdb.com 及其子域名走 JavDB 策略组
+    "DOMAIN-KEYWORD,javdb,DIRECT"        // 2. 其他所有包含 javdb 的域名（如 javdb573.com）一律直连
   ];
 
   const oldRules = config["rules"] || [];
