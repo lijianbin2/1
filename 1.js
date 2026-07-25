@@ -1,4 +1,4 @@
-// 脚本 2：还原 DNS & Hosts 并应用 JavDB 规则
+// 脚本 2：还原 DNS & Hosts 并应用分流规则
 function main(config) {
   const backup = globalThis.__CONFIG_BACKUP__ || {};
 
@@ -21,60 +21,20 @@ function main(config) {
   }
 
   // ----------------------------------------------------
-  // 3. 策略组处理 (JavDB)
+  // 3. 自动获取订阅中的主代理组（通常是第 1 个策略组，如"节点选择"）
   // ----------------------------------------------------
-  if (!config["proxy-groups"]) {
-    config["proxy-groups"] = [];
-  }
-
-  const existingGroups = (config["proxy-groups"] || []).map(g => g.name);
-  const existingProxies = (config["proxies"] || []).map(p => p.name);
-
-  // 地区智能匹配规则（港、台、新、美）
-  const regionRules = [
-    { name: "香港", regex: /香港|Hong\s*Kong|🇭🇰|\bHK\b/i },
-    { name: "台湾", regex: /台湾|臺灣|Taiwan|🇹🇼|\bTW\b/i },
-    { name: "新加坡", regex: /新加坡|Singapore|狮城|🇸🇬|\bSG\b/i },
-    { name: "美国", regex: /美国|美國|United\s*States|America|🇺🇸|\bUS\b/i }
-  ];
-
-  const matchedItems = [];
-
-  regionRules.forEach(rule => {
-    const matchedGroups = existingGroups.filter(name => rule.regex.test(name));
-
-    if (matchedGroups.length > 0) {
-      matchedItems.push(...matchedGroups);
-    } else {
-      const matchedNodes = existingProxies.filter(name => rule.regex.test(name));
-      matchedItems.push(...matchedNodes);
-    }
-  });
-
-  let validProxies = Array.from(new Set(matchedItems));
-
-  if (validProxies.length === 0) {
-    const fallbackGroup = config["proxy-groups"][0]?.name || "DIRECT";
-    validProxies = [fallbackGroup];
-  }
-
-  const javdbGroup = {
-    name: "JavDB",
-    type: "select",
-    proxies: validProxies
-  };
-
-  // 插入到策略组第 2 行（索引 1）
-  config["proxy-groups"].splice(1, 0, javdbGroup);
+  const mainProxyGroup = (config["proxy-groups"] && config["proxy-groups"][0]) 
+    ? config["proxy-groups"][0].name 
+    : "节点选择";
 
   // ----------------------------------------------------
-  // 4. 将自定义分流规则插入到最前端（注意顺序！）
+  // 4. 自定义分流规则（置顶插入，注意优先顺序！）
   // ----------------------------------------------------
   const customRules = [
     "DOMAIN,cpa.wisdomsatan.de,DIRECT",
     "DOMAIN-SUFFIX,bingosoft.net,DIRECT",
-    "DOMAIN-SUFFIX,javdb.com,JavDB",     // 1. 主站 javdb.com 及其子域名走 JavDB 策略组
-    "DOMAIN-KEYWORD,javdb,DIRECT"        // 2. 其他所有包含 javdb 的域名（如 javdb573.com）一律直连
+    `DOMAIN-SUFFIX,javdb.com,${mainProxyGroup}`, // 1. javdb.com 主站走默认主代理组
+    "DOMAIN-KEYWORD,javdb,DIRECT"                // 2. 其他 javdb 变体/镜像（如 javdb573.com）一律直连
   ];
 
   const oldRules = config["rules"] || [];
