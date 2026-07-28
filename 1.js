@@ -1,4 +1,4 @@
-// 脚本 2：还原 DNS & Hosts 并创建 JavDB 自动测速策略组（置底）
+// 脚本 2：还原 DNS & Hosts 并创建 JavDB 自动测速策略组（强行置底）
 function main(config) {
   const backup = globalThis.__CONFIG_BACKUP__ || {};
 
@@ -27,6 +27,9 @@ function main(config) {
     config["proxy-groups"] = [];
   }
 
+  // 💥 先强行剔除可能残留/旧的的 JavDB 分组，防止位置被占用
+  config["proxy-groups"] = config["proxy-groups"].filter(g => g.name !== "JavDB");
+
   // 获取订阅中所有的【单个节点名称】
   const allProxies = (config["proxies"] || []).map(p => p.name);
 
@@ -48,7 +51,7 @@ function main(config) {
     proxies: finalProxies
   };
 
-  // 👈 追加到所有策略组的最末尾
+  // 👈 强行追加到数组的最末尾
   config["proxy-groups"].push(javdbGroup);
 
   // ----------------------------------------------------
