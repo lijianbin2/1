@@ -1,4 +1,4 @@
-// 脚本 2：还原 DNS & Hosts 并创建 JavDB 自动测速策略组
+// 脚本 2：还原 DNS & Hosts 并创建 JavDB 自动测速策略组（置底）
 function main(config) {
   const backup = globalThis.__CONFIG_BACKUP__ || {};
 
@@ -48,8 +48,8 @@ function main(config) {
     proxies: finalProxies
   };
 
-  // 插入到策略组第 2 行（索引位置 1）
-  config["proxy-groups"].splice(1, 0, javdbGroup);
+  // 👈 追加到所有策略组的最末尾
+  config["proxy-groups"].push(javdbGroup);
 
   // ----------------------------------------------------
   // 4. 自定义分流规则
@@ -57,7 +57,7 @@ function main(config) {
   const customRules = [
     "DOMAIN,cpa.wisdomsatan.de,DIRECT",
     "DOMAIN-SUFFIX,bingosoft.net,DIRECT",
-    "DOMAIN-SUFFIX,javdb.com,JavDB",     // 1. javdb.com 主站走自动测速组 JavDB
+    "DOMAIN-SUFFIX,javdb.com,JavDB",     // 1. javdb.com 主站走 JavDB 自动测速组
     "DOMAIN-KEYWORD,javdb,DIRECT"        // 2. 其他 javdb 镜像（如 javdb573.com）一律直连
   ];
 
