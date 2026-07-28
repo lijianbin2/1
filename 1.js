@@ -1,4 +1,4 @@
-// 脚本 2：还原 DNS & Hosts 并应用分流规则
+// 脚本 2：还原 DNS & Hosts 并创建 JavDB 自动测速策略组
 function main(config) {
   const backup = globalThis.__CONFIG_BACKUP__ || {};
 
@@ -21,20 +21,44 @@ function main(config) {
   }
 
   // ----------------------------------------------------
-  // 3. 自动获取订阅中的主代理组（通常是第 1 个策略组，如"节点选择"）
+  // 3. 构建 JavDB 自动测速策略组 (排除所有日本节点)
   // ----------------------------------------------------
-  const mainProxyGroup = (config["proxy-groups"] && config["proxy-groups"][0]) 
-    ? config["proxy-groups"][0].name 
-    : "节点选择";
+  if (!config["proxy-groups"]) {
+    config["proxy-groups"] = [];
+  }
+
+  // 获取订阅中所有的【单个节点名称】
+  const allProxies = (config["proxies"] || []).map(p => p.name);
+
+  // 过滤掉所有名称中带有日本/Japan/JP 标识的节点
+  const nonJpProxies = allProxies.filter(
+    name => !/日本|Japan|🇯🇵|\bJP\b/i.test(name)
+  );
+
+  // 防错兜底：若过滤后没有剩余节点，默认回退到 DIRECT
+  const finalProxies = nonJpProxies.length > 0 ? nonJpProxies : ["DIRECT"];
+
+  // 构建 url-test（自动测速）策略组
+  const javdbGroup = {
+    name: "JavDB",
+    type: "url-test",
+    url: "https://cp.cloudflare.com/generate_204", // 测速 URL
+    interval: 300,                                 // 300秒测速一次
+    tolerance: 50,                                 // 容忍延迟差 50ms 避免频繁切节点
+    proxies: finalProxies
+  };
+
+  // 插入到策略组第 2 行（索引位置 1）
+  config["proxy-groups"].splice(1, 0, javdbGroup);
 
   // ----------------------------------------------------
-  // 4. 自定义分流规则（置顶插入，注意优先顺序！）
+  // 4. 自定义分流规则
   // ----------------------------------------------------
   const customRules = [
     "DOMAIN,cpa.wisdomsatan.de,DIRECT",
     "DOMAIN-SUFFIX,bingosoft.net,DIRECT",
-    `DOMAIN-SUFFIX,javdb.com,${mainProxyGroup}`, // 1. javdb.com 主站走默认主代理组
-    "DOMAIN-KEYWORD,javdb,DIRECT"                // 2. 其他 javdb 变体/镜像（如 javdb573.com）一律直连
+    "DOMAIN-SUFFIX,javdb.com,JavDB",     // 1. javdb.com 主站走自动测速组 JavDB
+    "DOMAIN-KEYWORD,javdb,DIRECT"        // 2. 其他 javdb 镜像（如 javdb573.com）一律直连
   ];
 
   const oldRules = config["rules"] || [];
