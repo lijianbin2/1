@@ -1,6 +1,7 @@
 // 脚本 2：还原 DNS & Hosts 并创建 JavDB 自动测速策略组（强行置底）
+// 修改要点：使用 __SUBSTORE_CONFIG_BACKUP__、避免重复规则、健壮提取 proxies、备用测速 URL 注释
 function main(config) {
-  const backup = globalThis.__CONFIG_BACKUP__ || {};
+  const backup = globalThis.__SUBSTORE_CONFIG_BACKUP__ || {};
 
   // ----------------------------------------------------
   // 1. 还原初始备份的 DNS 设置
@@ -27,11 +28,13 @@ function main(config) {
     config["proxy-groups"] = [];
   }
 
-  // 💥 先强行剔除可能残留/旧的的 JavDB 分组，防止位置被占用
+  // 先移除可能残留/旧的 JavDB 分组，防止位置被占用
   config["proxy-groups"] = config["proxy-groups"].filter(g => g.name !== "JavDB");
 
-  // 获取订阅中所有的【单个节点名称】
-  const allProxies = (config["proxies"] || []).map(p => p.name);
+  // 更健壮地提取订阅中所有的【单个节点名称】，兼容字符串或对象
+  const allProxies = (config["proxies"] || [])
+    .map(p => (typeof p === 'string' ? p : (p && p.name) || ''))
+    .filter(Boolean);
 
   // 过滤掉所有名称中带有日本/Japan/JP 标识的节点
   const nonJpProxies = allProxies.filter(
@@ -45,27 +48,29 @@ function main(config) {
   const javdbGroup = {
     name: "JavDB",
     type: "url-test",
-    url: "https://cp.cloudflare.com/generate_204", // 测速 URL
+    url: "https://cp.cloudflare.com/generate_204", // 如需可替换为 https://www.gstatic.com/generate_204
     interval: 300,                                 // 300秒测速一次
     tolerance: 50,                                 // 容忍延迟差 50ms 避免频繁切节点
     proxies: finalProxies
   };
 
-  // 👈 强行追加到数组的最末尾
+  // 强行追加到数组的最末尾
   config["proxy-groups"].push(javdbGroup);
 
   // ----------------------------------------------------
-  // 4. 自定义分流规则
+  // 4. 自定义分流规则（确保幂等，不重复追加）
   // ----------------------------------------------------
   const customRules = [
     "DOMAIN,cpa.wisdomsatan.de,DIRECT",
     "DOMAIN-SUFFIX,bingosoft.net,DIRECT",
-    "DOMAIN-SUFFIX,javdb.com,JavDB",     // 1. javdb.com 主站走 JavDB 自动测速组
-    "DOMAIN-KEYWORD,javdb,DIRECT"        // 2. 其他 javdb 镜像（如 javdb573.com）一律直连
+    "DOMAIN-SUFFIX,javdb.com,JavDB",     // javdb.com 主站走 JavDB 自动测速组
+    "DOMAIN-KEYWORD,javdb,DIRECT"        // 其他 javdb 镜像一律直连
   ];
 
   const oldRules = config["rules"] || [];
-  config["rules"] = customRules.concat(oldRules);
+  // 移除老规则里与 customRules 完全相同的行，保证 idempotent
+  const filteredOldRules = oldRules.filter(r => !customRules.includes(r));
+  config["rules"] = customRules.concat(filteredOldRules);
 
   return config;
 }
