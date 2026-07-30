@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         全网 Cloudflare Error1015 自动重试（改进版）
 // @namespace    http://tampermonkey.net/
-// @version      2.2
+// @version      2.3
 // @description  全网生效：检测到 Cloudflare Error 1015 限速时自动倒计时并刷新页面（带重试限制与取消按钮）
 // @author       You
 // @match        *://*/*
@@ -173,50 +173,57 @@
     }
 
     function isRateLimitedContent() {
-        // 更稳健的启发式检测：
-        // - 跳过已知的源码托管/开发域名（默认列表可扩展）
-        // - 如果页面看起来像代码/文档（包含 <pre>，或 GitHub 的 .blob/.repository-content），则跳过
-        // - 先检测明确的短语（Error 1015 / You are being rate limited / 您已被限速）
-        // - 作为备选，如果出现 Cloudflare + Ray ID 且页面正文较短，则判定为错误页
+        // 更严格的检测逻辑：
+        // - 跳过已知的源码托管/开发域名（DOMAIN_SKIP）
+        // - 跳过明显的代码/文档查看页或过长页面
+        // - 仅在页面包含明确的“Error 1015”或明确表述限速（"you are being rate limited" / 中文短语）时认定为限速
+        // 注意：不再把通用的 Cloudflare + Ray ID 作为自动判定的后备条件，避免把其他 Cloudflare 错误误判为 1015。
         try {
-            const hostname = location.hostname;
+            const hostname = location.hostname || '';
             const lowerHost = hostname.toLowerCase();
             if (DOMAIN_SKIP.includes(lowerHost)) return false;
 
             const title = (document.title || '').toLowerCase();
             const docText = (document.body && document.body.innerText) ? document.body.innerText.toLowerCase() : (document.documentElement && document.documentElement.innerText ? document.documentElement.innerText.toLowerCase() : '');
 
-            // 如果页面非常长，通常是代码/文档，不应触发
-            if (docText && docText.length > LONG_PAGE_LENGTH) {
-                // 但仍然允许当文档中包含明确的 Error 1015 等短语
-                if (title.includes('error 1015') || docText.includes('error 1015') || docText.includes('you are being rate limited') || docText.includes('您已被限速')) {
+            if (!title && !docText) return false;
+
+            // 如果页面非常长，通常是代码/文档，不应触发（除非明确包含 Error 1015）
+            if (docText.length > LONG_PAGE_LENGTH) {
+                if (title.includes('error 1015') || docText.includes('error 1015') || docText.includes('you are being rate limited') || docText.includes('您已被限速') || docText.includes('已被限速')) {
                     return true;
                 }
                 return false;
             }
 
-            // 判断是否为典型的代码/文件查看器页面（GitHub 等）
+            // 如果页面包含代码查看器的标识，默认跳过（除非明确包含 Error 1015）
             if (document.querySelector('pre') || document.querySelector('.blob') || document.querySelector('.repository-content') || document.querySelector('.file')) {
-                // 若包含明确的 Error 1015 或限速短语，则仍然视为错误页
-                if (title.includes('error 1015') || docText.includes('error 1015') || docText.includes('you are being rate limited') || docText.includes('您已被限速')) {
+                if (title.includes('error 1015') || docText.includes('error 1015') || docText.includes('you are being rate limited') || docText.includes('您已被限速') || docText.includes('已被限速')) {
                     return true;
                 }
                 return false;
             }
 
-            // 明确短语优先：Error 1015 或 You are being rate limited
-            if (title.includes('error 1015') || docText.includes('error 1015') || docText.includes('you are being rate limited') || docText.includes('您已被限速')) {
+            // 解析页面中明确的错误代码（例如 "Error 1033"）并仅在遇到 1015 时触发
+            const errCodeMatch = docText.match(/error\s*([0-9]{3,4})/i) || title.match(/error\s*([0-9]{3,4})/i);
+            if (errCodeMatch && errCodeMatch[1]) {
+                const code = errCodeMatch[1].trim();
+                if (code === '1015') return true;
+                // 不是 1015 则不是限速触发
+                return false;
+            }
+
+            // 明确的限速短语（无错误码也可触发）
+            if (docText.includes('you are being rate limited') || docText.includes('rate limited') || docText.includes('您已被限速') || docText.includes('已被限速')) {
                 return true;
             }
 
-            // 备选：Cloudflare + Ray ID 且页面较短
-            if (docText.includes('cloudflare') && docText.includes('ray id') && docText.length < LONG_PAGE_LENGTH) {
-                return true;
-            }
-
-            // 经典的 "Attention Required" 页面样式
+            // 经典的 "Attention Required" 页面样式，但排除并非限速的其他 Cloudflare 错误
             if (title.includes('attention required') || docText.includes('please enable javascript and cookies') || docText.includes('are you human')) {
-                return true;
+                // 这些通常用于挑战/验证码页，不一定表示 1015；只有当文本显式表明限速才触发
+                if (docText.includes('rate limited') || docText.includes('you are being rate limited') || docText.includes('1015')) {
+                    return true;
+                }
             }
         } catch (e) {
             console.warn('[Auto-Retry] 检测内容时出错', e);
