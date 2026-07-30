@@ -1,5 +1,5 @@
 // 脚本 2：还原 DNS & Hosts 并创建 JavDB 自动测速策略组（强行置底）
-// 修改要点：使用 __SUBSTORE_CONFIG_BACKUP__、避免重复规则、健壮提取 proxies、备用测速 URL 注释
+// 修改要点：使用 __SUBSTORE_CONFIG_BACKUP__、避免重复规则、健壮提取 proxies、测速 URL 已更新
 function main(config) {
   const backup = globalThis.__SUBSTORE_CONFIG_BACKUP__ || {};
 
@@ -48,7 +48,7 @@ function main(config) {
   const javdbGroup = {
     name: "JavDB",
     type: "url-test",
-    url: "https://cp.cloudflare.com/generate_204", // 如需可替换为 https://www.gstatic.com/generate_204
+    url: "https://www.gstatic.com/generate_204", // 已更新测速 URL（Google），可根据需要替换
     interval: 300,                                 // 300秒测速一次
     tolerance: 50,                                 // 容忍延迟差 50ms 避免频繁切节点
     proxies: finalProxies
