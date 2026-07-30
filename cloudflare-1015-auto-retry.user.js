@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         全网 Cloudflare Error1015 自动重试（改进版）
 // @namespace    http://tampermonkey.net/
-// @version      2.1
+// @version      2.2
 // @description  全网生效：检测到 Cloudflare Error 1015 限速时自动倒计时并刷新页面（带重试限制与取消按钮）
 // @author       You
 // @match        *://*/*
@@ -17,6 +17,17 @@
     const MAX_RETRIES = 5;                 // 在 RETRY_WINDOW 时间内允许的最大重试次数
     const RETRY_WINDOW = 60 * 60 * 1000;   // 重试窗口（毫秒），例如 1 小时
     const OBSERVE_DURATION = 5000;         // 对动态插入错误页观察的时长（毫秒）
+    // 域名白名单/跳过（例如源码托管和开发站点，避免误报）
+    const DOMAIN_SKIP = [
+        'github.com',
+        'raw.githubusercontent.com',
+        'gist.github.com',
+        'gitee.com',
+        'gitlab.com',
+        'stackoverflow.com',
+    ];
+    // 页面正文超过该阈值则视为“长页面”，常为代码/文档页面，跳过检测
+    const LONG_PAGE_LENGTH = 5000;
     // -----------------------------------
 
     const HOST_KEY = `cf1015_retry_${location.hostname}`;
@@ -162,37 +173,48 @@
     }
 
     function isRateLimitedContent() {
-        // Use several heuristics:
-        // - Title contains known Cloudflare phrases
-        // - Document text contains Error 1015 or "You are being rate limited"
-        // - Look for common Cloudflare header/h1 fragments
+        // 更稳健的启发式检测：
+        // - 跳过已知的源码托管/开发域名（默认列表可扩展）
+        // - 如果页面看起来像代码/文档（包含 <pre>，或 GitHub 的 .blob/.repository-content），则跳过
+        // - 先检测明确的短语（Error 1015 / You are being rate limited / 您已被限速）
+        // - 作为备选，如果出现 Cloudflare + Ray ID 且页面正文较短，则判定为错误页
         try {
+            const hostname = location.hostname;
+            const lowerHost = hostname.toLowerCase();
+            if (DOMAIN_SKIP.includes(lowerHost)) return false;
+
             const title = (document.title || '').toLowerCase();
             const docText = (document.body && document.body.innerText) ? document.body.innerText.toLowerCase() : (document.documentElement && document.documentElement.innerText ? document.documentElement.innerText.toLowerCase() : '');
 
-            if (!title && !docText) return false;
-
-            const checks = [
-                // English patterns
-                'error 1015',
-                'you are being rate limited',
-                'rate limited',
-                'error 1015 ray id', // often in Cloudflare error pages
-                'cloudflare',
-                'access denied', // sometimes appears
-                'too many requests', // 429-like wording
-                // Chinese patterns
-                '您已被限速',
-                '已被限速',
-            ];
-
-            for (const pattern of checks) {
-                if (title.includes(pattern) || docText.includes(pattern)) {
+            // 如果页面非常长，通常是代码/文档，不应触发
+            if (docText && docText.length > LONG_PAGE_LENGTH) {
+                // 但仍然允许当文档中包含明确的 Error 1015 等短语
+                if (title.includes('error 1015') || docText.includes('error 1015') || docText.includes('you are being rate limited') || docText.includes('您已被限速')) {
                     return true;
                 }
+                return false;
             }
 
-            // Also try to detect classic Cloudflare "Attention Required!" pages
+            // 判断是否为典型的代码/文件查看器页面（GitHub 等）
+            if (document.querySelector('pre') || document.querySelector('.blob') || document.querySelector('.repository-content') || document.querySelector('.file')) {
+                // 若包含明确的 Error 1015 或限速短语，则仍然视为错误页
+                if (title.includes('error 1015') || docText.includes('error 1015') || docText.includes('you are being rate limited') || docText.includes('您已被限速')) {
+                    return true;
+                }
+                return false;
+            }
+
+            // 明确短语优先：Error 1015 或 You are being rate limited
+            if (title.includes('error 1015') || docText.includes('error 1015') || docText.includes('you are being rate limited') || docText.includes('您已被限速')) {
+                return true;
+            }
+
+            // 备选：Cloudflare + Ray ID 且页面较短
+            if (docText.includes('cloudflare') && docText.includes('ray id') && docText.length < LONG_PAGE_LENGTH) {
+                return true;
+            }
+
+            // 经典的 "Attention Required" 页面样式
             if (title.includes('attention required') || docText.includes('please enable javascript and cookies') || docText.includes('are you human')) {
                 return true;
             }
