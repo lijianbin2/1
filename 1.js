@@ -1,5 +1,5 @@
-// 脚本 2：还原 DNS & Hosts 并创建 JavDB 自动测速策略组（强行置底）
-// 修改要点：使用 __SUBSTORE_CONFIG_BACKUP__、避免重复规则、健壮提取 proxies、测速 URL 已更新
+// 脚本 2（改进版）：还原 DNS & Hosts 并创建 JavDB 自动测速策略组（强行置底）
+// 改进点：没有非日本节点时不再创建 url-test 组，javdb.com 直接走 DIRECT
 function main(config) {
   const backup = globalThis.__SUBSTORE_CONFIG_BACKUP__ || {};
 
@@ -41,30 +41,34 @@ function main(config) {
     name => !/日本|Japan|🇯🇵|\bJP\b/i.test(name)
   );
 
-  // 防错兜底：若过滤后没有剩余节点，默认回退到 DIRECT
-  const finalProxies = nonJpProxies.length > 0 ? nonJpProxies : ["DIRECT"];
+  // 默认 javdb.com 直接连接（当没有可用非日本节点时）
+  let javdbTarget = "DIRECT";
 
-  // 构建 url-test（自动测速）策略组
-  const javdbGroup = {
-    name: "JavDB",
-    type: "url-test",
-    url: "https://www.gstatic.com/generate_204", // 已更新测速 URL（Google），可根据需要替换
-    interval: 300,                                 // 300秒测速一次
-    tolerance: 50,                                 // 容忍延迟差 50ms 避免频繁切节点
-    proxies: finalProxies
-  };
+  // 仅当存在非日本节点时创建自动测速组，避免 url-test 对 DIRECT 做无意义测速
+  if (nonJpProxies.length > 0) {
+    const javdbGroup = {
+      name: "JavDB",
+      type: "url-test",
+      url: "https://www.gstatic.com/generate_204", // 已更新测速 URL（Google），可根据需要替换
+      interval: 300,                                 // 300秒测速一次
+      tolerance: 50,                                 // 容忍延迟差 50ms 避免频繁切节点
+      proxies: nonJpProxies
+    };
 
-  // 强行追加到数组的最末尾
-  config["proxy-groups"].push(javdbGroup);
+    // 强行追加到数组的最末尾
+    config["proxy-groups"].push(javdbGroup);
+    javdbTarget = "JavDB";
+  }
 
   // ----------------------------------------------------
   // 4. 自定义分流规则（确保幂等，不重复追加）
+  // 注意：DOMAIN-SUFFIX,javdb.com 必须排在 DOMAIN-KEYWORD,javdb 之前
   // ----------------------------------------------------
   const customRules = [
-    "DOMAIN,cpa.wisdomsatan.de,DIRECT",
+    "DOMAIN,cpa.wisdamsatan.de,DIRECT",
     "DOMAIN-SUFFIX,bingosoft.net,DIRECT",
-    "DOMAIN-SUFFIX,javdb.com,JavDB",     // javdb.com 主站走 JavDB 自动测速组
-    "DOMAIN-KEYWORD,javdb,DIRECT"        // 其他 javdb 镜像一律直连
+    "DOMAIN-SUFFIX,javdb.com," + javdbTarget, // javdb.com 主站走 JavDB 自动测速组（无可用节点时直连）
+    "DOMAIN-KEYWORD,javdb,DIRECT"             // 其他 javdb 镜像一律直连
   ];
 
   const oldRules = config["rules"] || [];
