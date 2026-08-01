@@ -2,7 +2,7 @@
 // @name         JavDB 万能磁链提取器
 // @namespace    http://tampermonkey.net/
 // @version      5.7.2
-// @description  【极速冲刺版】移除休眠机制，请求间隔压缩至 0.3s；遇封禁 3s 自动切数字域名复活；精准精选字幕版与迅雷 txt 导出。修复：429 自动重试、封禁中断不再空跑、导出文件名与脚本兼容性。
+// @description  JavDB 磁链批量提取：支持按当前列表、番号段、女优/组合三种模式抓取磁力链接；自动优先字幕版并选择最小体积，去重后导出迅雷专用 TXT；内置 429/封禁重试、备用域名自动切换与多标签排队保护。
 // @author       Assistant
 // @license      MIT
 // @match        *://*.javdb574.com/*
