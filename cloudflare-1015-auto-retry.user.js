@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         全网 Cloudflare Error1015 自动重试（改进版）
 // @namespace    http://tampermonkey.net/
-// @version      2.4
+// @version      2.5
 // @description  全网生效：检测到 Cloudflare Error 1015 限速时自动按递增间隔重试并刷新页面（带暂停/立即重试/重置计数）
 // @author       You
 // @match        *://*/*
@@ -15,7 +15,7 @@
 
     // ---------- Configuration ----------
     // 第 N 次重试前的等待秒数（按 1/2/3/4/5 次递增）
-    const WAIT_TIMES = [10, 20, 40, 80, 160];
+    const WAIT_TIMES = [5, 10, 20, 40, 80];
     const MAX_RETRIES = WAIT_TIMES.length;
     const RETRY_WINDOW = 60 * 60 * 1000;   // 重试窗口（毫秒），例如 1 小时
     const OBSERVE_DURATION = 5000;         // 对动态插入错误页观察的时长（毫秒）
