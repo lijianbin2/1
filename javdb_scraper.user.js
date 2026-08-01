@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         JavDB 万能磁链提取器
 // @namespace    http://tampermonkey.net/
-// @version      5.7.1
+// @version      5.7.2
 // @description  JavDB 磁链提取器：在 JavDB 页面提取磁力链接并导出为 TXT，可筛选字幕版、按番号或女优抓取。
 // @author       Assistant
 // @license      MIT
@@ -307,4 +307,25 @@
   const panel = document.createElement('div');
   panel.id = 'javdb-scraper-panel';
   panel.innerHTML = `
-    <div id="scraper-header" style="font-weight: bold; margin-bottom: 8px; font-size: 14px; border-bottom: 1px solid #444; padding-bottom: 4px; cursor: move; user-select: none; display: flex; jus[... truncated ...]
+    <div id="scraper-header" style="font-weight: bold; margin-bottom: 8px; font-size: 14px; border-bottom: 1px solid #444; padding-bottom: 4px; cursor: move; user-select: none; display: flex; justify-content: space-between; align-items: center;">
+      <span>⚡ JavDB 磁链提取器 v5.7.2 (极速版)</span>
+      <span style="font-size: 10px; color: #888;">(按住拖动)</span>
+    </div>
+
+    <div style="display: flex; gap: 6px; margin-bottom: 10px; font-size: 11px; justify-content: center; background: #2a2a2a; padding: 4px; border-radius: 4px;">
+      <label style="cursor: pointer;"><input type="radio" name="scraper-mode" value="current" checked> 当前列表</label>
+      <label style="cursor: pointer;"><input type="radio" name="scraper-mode" value="code"> 按番号段</label>
+      <label style="cursor: pointer;"><input type="radio" name="scraper-mode" value="actor"> 女优/组合</label>
+    </div>
+
+    <div id="section-current" style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; font-size: 12px;">
+      <div style="display: flex; align-items: center; justify-content: space-between;">
+        <label>抓取页数:</label>
+        <div style="display: flex; gap: 4px; align-items: center;">
+          <input id="scraper-curr-start" type="number" value="1" min="1" style="width: 48px; background: #333; color: #fff; border: 1px solid #555; padding: 2px 4px; border-radius: 3px;">
+          <span>~</span>
+          <input id="scraper-curr-end" type="number" value="1" min="1" style="width: 48px; background: #333; color: #fff; border: 1px solid #555; padding: 2px 4px; border-radius: 3px;">
+        </div>
+      </div>
+
+{
