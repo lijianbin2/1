@@ -346,7 +346,7 @@
         <div style="display: flex; gap: 4px; align-items: center;">
           <input id="scraper-curr-start" type="number" value="1" min="1" style="width: 48px; background: #333; color: #fff; border: 1px solid #555; padding: 2px 4px; border-radius: 3px;">
           <span>~</span>
-          <input id="scraper-curr-end" type="number" value="1" min="1" style="width: 48px; background: #333; color: #fff; border: 1px solid #555; padding: 2px 4px; border-radius: 3px;">
+          <input id="scraper-curr-end" type="number" value="2" min="1" style="width: 48px; background: #333; color: #fff; border: 1px solid #555; padding: 2px 4px; border-radius: 3px;">
         </div>
       </div>
       <div style="font-size: 11px; color: #00ff66; line-height: 1.3;">
