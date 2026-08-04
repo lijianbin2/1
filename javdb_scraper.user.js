@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         JavDB 万能磁链提取器
 // @namespace    http://tampermonkey.net/
-// @version      5.8.0
+// @version      5.8.1
 // @description  JavDB 磁链批量提取：支持按当前列表、番号段、女优/组合三种模式抓取磁力链接；自动优先字幕版并选择最小体积，去重后导出迅雷专用 TXT；内置 429/封禁重试、备用域名自动切换与多标签排队保护。
 // @author       Assistant
 // @license      MIT
@@ -329,7 +329,7 @@
   panel.id = 'javdb-scraper-panel';
   panel.innerHTML = `
     <div id="scraper-header" style="font-weight: bold; margin-bottom: 8px; font-size: 14px; border-bottom: 1px solid #444; padding-bottom: 4px; cursor: move; user-select: none; display: flex; justify-content: space-between; align-items: center;">
-      <span>🐢 JavDB 磁链提取器 v5.8.0 (稳速版)</span>
+      <span>🐢 JavDB 磁链提取器 v5.8.1 (稳速版)</span>
       <span style="font-size: 10px; color: #888;">(按住拖动)</span>
     </div>
 
@@ -819,18 +819,33 @@
           } else if (genreName) {
             const normTag = s => (s || '').replace(/\s+/g, '').replace(/[（(][^)）]*[)）]/g, '').toLowerCase();
             const wanted = normTag(genreName);
-            const indexUrls = ['/tags?c10=1', '/tags/uncensored?c10=1'];
-            for (const idxUrl of indexUrls) {
+            const inheritCParams = (u, ...srcUrls) => {
+              for (const src of srcUrls) {
+                try {
+                  new URL(src, window.location.origin).searchParams.forEach((v, k) => {
+                    if (/^c\d+$/.test(k) && !u.searchParams.has(k)) u.searchParams.set(k, v);
+                  });
+                } catch (e) {}
+              }
+              return u;
+            };
+            const matchTagLinks = (doc) => {
+              const links = Array.from(doc.querySelectorAll('a[href*="/tags?"]'))
+                .filter(a => /[?&]c\d+=\d+/.test(a.getAttribute('href') || ''));
+              let h = links.find(a => normTag(a.textContent) === wanted);
+              if (!h) h = links.find(a => { const t = normTag(a.textContent); return t && (t.includes(wanted) || wanted.includes(t)); });
+              return { hit: h, count: links.length };
+            };
+            for (const idxUrl of ['/tags?c10=1', '/tags/uncensored?c10=1']) {
               if (baseCategoryUrl || shouldStop) break;
-              const tagRes = await fetchWithRetry(idxUrl, '标签 ');
-              if (!tagRes) continue;
+              const tagRes = await fetchWithRetry(idxUrl, '标签索引 ');
+              if (!tagRes) { log(`[-] 标签索引 ${idxUrl} 请求失败`); continue; }
               const tagHtml = await tagRes.text();
               if (isBannedPage(tagRes.status, tagHtml)) continue;
               const tagDoc = parser.parseFromString(tagHtml, 'text/html');
-              const tagLinks = Array.from(tagDoc.querySelectorAll('a[href*="/tags?"]'))
-                .filter(a => /[?&]c\d+=\d+/.test(a.getAttribute('href') || ''));
-              let hit = tagLinks.find(a => normTag(a.textContent) === wanted);
-              if (!hit) hit = tagLinks.find(a => { const t = normTag(a.textContent); return t && (t.includes(wanted) || wanted.includes(t)); });
+              const { hit: linkHit, count } = matchTagLinks(tagDoc);
+              log(`标签索引 ${idxUrl}: 状态 ${tagRes.status}，标签链接 ${count} 个${(tagRes.url || '').includes('/login') ? '（跳转到登录页，请先登录）' : ''}`);
+              let hit = linkHit;
               if (!hit) {
                 const boxes = Array.from(tagDoc.querySelectorAll('input[type="checkbox"][name^="c"][value]'));
                 const boxHit = boxes.find(b => {
@@ -840,16 +855,44 @@
                 });
                 if (boxHit) hit = { getAttribute: () => `/tags?${boxHit.name.replace(/\[\]$/, '')}=${boxHit.value}` };
               }
-              if (hit) {
-                const u = new URL(hit.getAttribute('href'), window.location.origin);
-                const curC10 = new URLSearchParams(window.location.search).get('c10');
-                if (curC10 && !u.searchParams.get('c10')) u.searchParams.set('c10', curC10);
-                baseCategoryUrl = u.toString();
+              if (hit) baseCategoryUrl = inheritCParams(new URL(hit.getAttribute('href'), window.location.origin), idxUrl, window.location.href).toString();
+            }
+            if (!baseCategoryUrl && !shouldStop) {
+              log('索引页未命中，尝试通过搜索结果详情页反查标签链接...');
+              const sRes = await fetchWithRetry(`/search?q=${encodeURIComponent(genreName)}&f=all`, '搜索 ');
+              if (sRes) {
+                const sHtml = await sRes.text();
+                if (!isBannedPage(sRes.status, sHtml)) {
+                  const sDoc = parser.parseFromString(sHtml, 'text/html');
+                  const candidates = Array.from(sDoc.querySelectorAll('.movie-list .item a[href^="/v/"]')).slice(0, 5);
+                  for (const a of candidates) {
+                    if (baseCategoryUrl || shouldStop) break;
+                    await sleep(getRandomDelay(800, 1500));
+                    const dRes = await fetchWithRetry(a.getAttribute('href'), '详情反查 ');
+                    if (!dRes) continue;
+                    const dHtml = await dRes.text();
+                    if (isBannedPage(dRes.status, dHtml)) continue;
+                    const dDoc = parser.parseFromString(dHtml, 'text/html');
+                    const { hit } = matchTagLinks(dDoc);
+                    if (hit) {
+                      baseCategoryUrl = inheritCParams(new URL(hit.getAttribute('href'), window.location.origin), window.location.href).toString();
+                      break;
+                    }
+                  }
+                }
               }
             }
-            if (!baseCategoryUrl) log(`未在标签索引页找到「${genreName}」，请确认已登录且标签名正确`);
+            if (baseCategoryUrl) log(`标签「${genreName}」解析为: ${baseCategoryUrl}`);
           }
-          if (!baseCategoryUrl) baseCategoryUrl = window.location.href;
+          if (!baseCategoryUrl) {
+            if (genreName) {
+              log(`❌ 未能解析标签「${genreName}」，已中止抓取（避免抓错列表）。请确认已登录，或直接打开该标签页后再点开始`);
+              statusEl.innerText = '状态: 标签解析失败';
+              btnStart.disabled = false; btnStop.disabled = true; isRunning = false; removeFromQueue(); document.title = origTitle;
+              return;
+            }
+            baseCategoryUrl = window.location.href;
+          }
           log(`抓取分类列表：${baseCategoryUrl}`);
         }
         if (isNaN(inputStartPage) || isNaN(inputEndPage)) { alert('请检查正确的页码范围！'); btnStart.disabled = false; btnStop.disabled = true; isRunning = false; removeFromQueue(); document.title = origTitle; return; }
