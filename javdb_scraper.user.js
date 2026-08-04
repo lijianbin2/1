@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         JavDB 万能磁链提取器
 // @namespace    http://tampermonkey.net/
-// @version      5.7.8
+// @version      5.7.9
 // @description  JavDB 磁链批量提取：支持按当前列表、番号段、女优/组合三种模式抓取磁力链接；自动优先字幕版并选择最小体积，去重后导出迅雷专用 TXT；内置 429/封禁重试、备用域名自动切换与多标签排队保护。
 // @author       Assistant
 // @license      MIT
@@ -329,7 +329,7 @@
   panel.id = 'javdb-scraper-panel';
   panel.innerHTML = `
     <div id="scraper-header" style="font-weight: bold; margin-bottom: 8px; font-size: 14px; border-bottom: 1px solid #444; padding-bottom: 4px; cursor: move; user-select: none; display: flex; justify-content: space-between; align-items: center;">
-      <span>🐢 JavDB 磁链提取器 v5.7.8 (稳速版)</span>
+      <span>🐢 JavDB 磁链提取器 v5.7.9 (稳速版)</span>
       <span style="font-size: 10px; color: #888;">(按住拖动)</span>
     </div>
 
@@ -808,21 +808,40 @@
         const useCurrentList = !actorName;
         let baseCategoryUrl = null;
         if (useCurrentList) {
-          if (/\/tags($|\?)/.test(location.pathname + location.search)) {
+          if (/\/tags(\/|$|\?)/.test(location.pathname + location.search)) {
             baseCategoryUrl = window.location.href;
           } else if (genreName) {
-            const tagRes = await fetchWithRetry('/tags', '标签 ');
-            if (tagRes) {
+            const normTag = s => (s || '').replace(/\s+/g, '').replace(/[（(][^)）]*[)）]/g, '').toLowerCase();
+            const wanted = normTag(genreName);
+            const indexUrls = ['/tags?c10=1', '/tags/uncensored?c10=1'];
+            for (const idxUrl of indexUrls) {
+              if (baseCategoryUrl || shouldStop) break;
+              const tagRes = await fetchWithRetry(idxUrl, '标签 ');
+              if (!tagRes) continue;
               const tagHtml = await tagRes.text();
-              if (!isBannedPage(tagRes.status, tagHtml)) {
-                const tagDoc = parser.parseFromString(tagHtml, 'text/html');
-                const tagLinks = Array.from(tagDoc.querySelectorAll('a[href*="/tags?"]'));
-                const wanted = genreName.trim().toLowerCase();
-                let hit = tagLinks.find(a => (a.textContent || '').trim().toLowerCase() === wanted);
-                if (!hit) hit = tagLinks.find(a => (a.textContent || '').trim().toLowerCase().includes(wanted));
-                if (hit) baseCategoryUrl = new URL(hit.getAttribute('href'), window.location.origin).toString();
+              if (isBannedPage(tagRes.status, tagHtml)) continue;
+              const tagDoc = parser.parseFromString(tagHtml, 'text/html');
+              const tagLinks = Array.from(tagDoc.querySelectorAll('a[href*="/tags?"]'))
+                .filter(a => /[?&]c\d+=\d+/.test(a.getAttribute('href') || ''));
+              let hit = tagLinks.find(a => normTag(a.textContent) === wanted);
+              if (!hit) hit = tagLinks.find(a => { const t = normTag(a.textContent); return t && (t.includes(wanted) || wanted.includes(t)); });
+              if (!hit) {
+                const boxes = Array.from(tagDoc.querySelectorAll('input[type="checkbox"][name^="c"][value]'));
+                const boxHit = boxes.find(b => {
+                  const label = b.closest('label') || (b.id && tagDoc.querySelector(`label[for="${b.id}"]`)) || b.parentElement;
+                  const t = normTag(label ? label.textContent : '');
+                  return t && (t === wanted || t.includes(wanted) || wanted.includes(t));
+                });
+                if (boxHit) hit = { getAttribute: () => `/tags?${boxHit.name.replace(/\[\]$/, '')}=${boxHit.value}` };
+              }
+              if (hit) {
+                const u = new URL(hit.getAttribute('href'), window.location.origin);
+                const curC10 = new URLSearchParams(window.location.search).get('c10');
+                if (curC10 && !u.searchParams.get('c10')) u.searchParams.set('c10', curC10);
+                baseCategoryUrl = u.toString();
               }
             }
+            if (!baseCategoryUrl) log(`未在标签索引页找到「${genreName}」，请确认已登录且标签名正确`);
           }
           if (!baseCategoryUrl) baseCategoryUrl = window.location.href;
           log(`抓取分类列表：${baseCategoryUrl}`);
