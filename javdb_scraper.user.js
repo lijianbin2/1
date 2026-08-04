@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         JavDB 万能磁链提取器
 // @namespace    http://tampermonkey.net/
-// @version      5.7.7
+// @version      5.7.8
 // @description  JavDB 磁链批量提取：支持按当前列表、番号段、女优/组合三种模式抓取磁力链接；自动优先字幕版并选择最小体积，去重后导出迅雷专用 TXT；内置 429/封禁重试、备用域名自动切换与多标签排队保护。
 // @author       Assistant
 // @license      MIT
@@ -25,6 +25,7 @@
   let isRunning = false;
   let shouldStop = false;
   let currentMode = 'current';
+  let fetchedCount = 0;
 
   function autoCheckRememberMe() {
     const checkboxes = document.querySelectorAll('input[type="checkbox"]');
@@ -328,7 +329,7 @@
   panel.id = 'javdb-scraper-panel';
   panel.innerHTML = `
     <div id="scraper-header" style="font-weight: bold; margin-bottom: 8px; font-size: 14px; border-bottom: 1px solid #444; padding-bottom: 4px; cursor: move; user-select: none; display: flex; justify-content: space-between; align-items: center;">
-      <span>⚡ JavDB 磁链提取器 v5.7.7 (极速版)</span>
+      <span>🐢 JavDB 磁链提取器 v5.7.8 (稳速版)</span>
       <span style="font-size: 10px; color: #888;">(按住拖动)</span>
     </div>
 
@@ -348,7 +349,7 @@
         </div>
       </div>
       <div style="font-size: 11px; color: #00ff66; line-height: 1.3;">
-        🚀 极速冲刺模式：无休眠等待，遭遇封禁自动切号复活。
+        🐢 防风控稳速模式：降低抓取频率，自动定期休息，遭遇封禁自动切号复活。
       </div>
     </div>
 
@@ -402,7 +403,7 @@
     </div>
 
     <div id="scraper-log" style="margin-top: 8px; height: 90px; overflow-y: auto; background: #1e1e1e; color: #00ff66; padding: 6px; font-family: monospace; font-size: 11px; border-radius: 4px;">
-      🔥 极速版已就绪：延迟压缩至毫秒级...
+      🐢 稳速版已就绪：已加入防风控延时与定期休息...
     </div>
   `;
 
@@ -473,7 +474,7 @@
         lastStatus = -1;
       }
       if (attempt < 3) {
-        const delay = Math.min(1500 * Math.pow(2, attempt), 15000) + getRandomDelay(0, 500);
+        const delay = Math.min(3000 * Math.pow(2, attempt), 30000) + getRandomDelay(0, 1000);
         log(`⚠️ ${label}${lastStatus === 429 ? '触发限流' : '网络错误'}，约 ${Math.round(delay / 1000)} 秒后重试 (${attempt + 1}/3)...`);
         await sleep(delay);
       }
@@ -609,8 +610,8 @@
       return;
     }
 
-    document.title = `⚡[极速抓取中...] ${origTitle}`;
-    statusEl.innerText = '状态: 正在极速抓取中...';
+    document.title = `⚡[防风控抓取中...] ${origTitle}`;
+    statusEl.innerText = '状态: 正在防风控抓取中...';
     const results = [];
     const parser = new DOMParser();
 
@@ -670,7 +671,7 @@
               document.title = `⚡[抓取 ${p}页 ${idx + 1}/${movieItems.length}] ${origTitle}`;
               log(`提取中: ${movieCode}...`);
 
-              await sleep(getRandomDelay(200, 400));
+              await sleep(getRandomDelay(800, 1500));
               const magnet = await processDetailPage(movieHref, movieCode);
 
               if (magnet === 'IP_BANNED') {
@@ -680,7 +681,13 @@
               }
 
               if (magnet) results.push(magnet);
-              await sleep(getRandomDelay(300, 600)); // 极速抓取间隔
+              await sleep(getRandomDelay(1500, 3000)); // 防风控间隔
+              fetchedCount++;
+              if (fetchedCount % 10 === 0) {
+                const rest = getRandomDelay(15000, 25000);
+                log(`☕ 已连续抓取 ${fetchedCount} 个，休息 ${Math.round(rest / 1000)} 秒防风控...`);
+                await sleep(rest);
+              }
             }
           } catch (e) {
             log(`[!] 第 ${p} 页提取失败`);
@@ -760,7 +767,7 @@
               }
 
               if (targetMovieLink) break;
-              await sleep(getRandomDelay(200, 400));
+              await sleep(getRandomDelay(800, 1500));
             } catch (e) {}
           }
 
@@ -769,7 +776,7 @@
           if (!targetMovieLink) {
             log(`[-] ${rawPrefix}-${pad3Str} 不存在/未录入`);
           } else {
-            await sleep(getRandomDelay(200, 400));
+            await sleep(getRandomDelay(800, 1500));
             const absLink = toAbsoluteUrl(targetMovieLink);
             const magnet = await processDetailPage(absLink, `${rawPrefix}-${pad3Str}`);
 
@@ -780,7 +787,13 @@
             }
 
             if (magnet) results.push(magnet);
-            await sleep(getRandomDelay(300, 600)); // 极速抓取间隔
+            await sleep(getRandomDelay(1500, 3000)); // 防风控间隔
+            fetchedCount++;
+            if (fetchedCount % 10 === 0) {
+              const rest = getRandomDelay(15000, 25000);
+              log(`☕ 已连续抓取 ${fetchedCount} 个，休息 ${Math.round(rest / 1000)} 秒防风控...`);
+              await sleep(rest);
+            }
           }
         }
         if (results.length > 0) downloadTXT(results, sanitizeFileName(`${rawPrefix}_${startNum}-${endNum}`));
@@ -793,6 +806,27 @@
         const orderMode = document.getElementById('scraper-order').value;
 
         const useCurrentList = !actorName;
+        let baseCategoryUrl = null;
+        if (useCurrentList) {
+          if (/\/tags($|\?)/.test(location.pathname + location.search)) {
+            baseCategoryUrl = window.location.href;
+          } else if (genreName) {
+            const tagRes = await fetchWithRetry('/tags', '标签 ');
+            if (tagRes) {
+              const tagHtml = await tagRes.text();
+              if (!isBannedPage(tagRes.status, tagHtml)) {
+                const tagDoc = parser.parseFromString(tagHtml, 'text/html');
+                const tagLinks = Array.from(tagDoc.querySelectorAll('a[href*="/tags?"]'));
+                const wanted = genreName.trim().toLowerCase();
+                let hit = tagLinks.find(a => (a.textContent || '').trim().toLowerCase() === wanted);
+                if (!hit) hit = tagLinks.find(a => (a.textContent || '').trim().toLowerCase().includes(wanted));
+                if (hit) baseCategoryUrl = new URL(hit.getAttribute('href'), window.location.origin).toString();
+              }
+            }
+          }
+          if (!baseCategoryUrl) baseCategoryUrl = window.location.href;
+          log(`抓取分类列表：${baseCategoryUrl}`);
+        }
         if (isNaN(inputStartPage) || isNaN(inputEndPage)) { alert('请检查正确的页码范围！'); btnStart.disabled = false; btnStop.disabled = true; isRunning = false; removeFromQueue(); document.title = origTitle; return; }
 
         const minPage = Math.min(inputStartPage, inputEndPage);
@@ -815,7 +849,7 @@
             updateLockHeartbeat();
             let searchUrl;
             if (useCurrentList) {
-              const listObj = new URL(window.location.href);
+              const listObj = new URL(baseCategoryUrl || window.location.href);
               listObj.searchParams.set('page', page);
               searchUrl = listObj.toString();
             } else {
@@ -857,7 +891,7 @@
               document.title = `⚡[抓取 ${page}页 ${idx + 1}/${movieItems.length}] ${origTitle}`;
               log(`检查标签中: ${movieCode}...`);
 
-              await sleep(getRandomDelay(200, 400));
+              await sleep(getRandomDelay(800, 1500));
               const magnet = await processDetailPage(movieHref, movieCode, useCurrentList ? '' : genreName);
 
               if (magnet === 'IP_BANNED') {
@@ -867,7 +901,13 @@
               }
 
               if (magnet) results.push(magnet);
-              await sleep(getRandomDelay(300, 600)); // 极速抓取间隔
+              await sleep(getRandomDelay(1500, 3000)); // 防风控间隔
+              fetchedCount++;
+              if (fetchedCount % 10 === 0) {
+                const rest = getRandomDelay(15000, 25000);
+                log(`☕ 已连续抓取 ${fetchedCount} 个，休息 ${Math.round(rest / 1000)} 秒防风控...`);
+                await sleep(rest);
+              }
             }
           } catch (e) { log(`[!] 第 ${page} 页抓取失败`); }
         }
