@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         JavDB 万能磁链提取器
 // @namespace    http://tampermonkey.net/
-// @version      5.7.5
+// @version      5.7.6
 // @description  JavDB 磁链批量提取：支持按当前列表、番号段、女优/组合三种模式抓取磁力链接；自动优先字幕版并选择最小体积，去重后导出迅雷专用 TXT；内置 429/封禁重试、备用域名自动切换与多标签排队保护。
 // @author       Assistant
 // @license      MIT
@@ -15,8 +15,6 @@
 // @connect      t.me
 // @run-at       document-idle
 // @noframes
-// @downloadURL https://update.greasyfork.org/scripts/588177/JavDB%20%E4%B8%87%E8%83%BD%E7%A3%81%E9%93%BE%E6%8F%90%E5%8F%96%E5%99%A8.user.js
-// @updateURL https://update.greasyfork.org/scripts/588177/JavDB%20%E4%B8%87%E8%83%BD%E7%A3%81%E9%93%BE%E6%8F%90%E5%8F%96%E5%99%A8.meta.js
 // ==/UserScript==
 
 (function () {
@@ -330,7 +328,7 @@
   panel.id = 'javdb-scraper-panel';
   panel.innerHTML = `
     <div id="scraper-header" style="font-weight: bold; margin-bottom: 8px; font-size: 14px; border-bottom: 1px solid #444; padding-bottom: 4px; cursor: move; user-select: none; display: flex; justify-content: space-between; align-items: center;">
-      <span>⚡ JavDB 磁链提取器 v5.7.5 (极速版)</span>
+      <span>⚡ JavDB 磁链提取器 v5.7.6 (极速版)</span>
       <span style="font-size: 10px; color: #888;">(按住拖动)</span>
     </div>
 
