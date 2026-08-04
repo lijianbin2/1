@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         JavDB 万能磁链提取器
 // @namespace    http://tampermonkey.net/
-// @version      5.7.6
+// @version      5.7.7
 // @description  JavDB 磁链批量提取：支持按当前列表、番号段、女优/组合三种模式抓取磁力链接；自动优先字幕版并选择最小体积，去重后导出迅雷专用 TXT；内置 429/封禁重试、备用域名自动切换与多标签排队保护。
 // @author       Assistant
 // @license      MIT
@@ -328,7 +328,7 @@
   panel.id = 'javdb-scraper-panel';
   panel.innerHTML = `
     <div id="scraper-header" style="font-weight: bold; margin-bottom: 8px; font-size: 14px; border-bottom: 1px solid #444; padding-bottom: 4px; cursor: move; user-select: none; display: flex; justify-content: space-between; align-items: center;">
-      <span>⚡ JavDB 磁链提取器 v5.7.6 (极速版)</span>
+      <span>⚡ JavDB 磁链提取器 v5.7.7 (极速版)</span>
       <span style="font-size: 10px; color: #888;">(按住拖动)</span>
     </div>
 
@@ -369,7 +369,7 @@
 
     <div id="section-actor" style="display: none; flex-direction: column; gap: 6px; margin-bottom: 10px; font-size: 12px;">
       <div style="display: flex; align-items: center; justify-content: space-between;">
-        <label for="scraper-actor">女优姓名:</label>
+        <label for="scraper-actor">女优姓名(选填):</label>
         <input id="scraper-actor" type="text" value="" style="width: 110px; background: #333; color: #fff; border: 1px solid #555; padding: 2px 5px; border-radius: 3px;">
       </div>
       <div style="display: flex; align-items: center; justify-content: space-between;">
@@ -792,7 +792,7 @@
         let inputEndPage = parseInt(document.getElementById('scraper-end-page').value, 10);
         const orderMode = document.getElementById('scraper-order').value;
 
-        if (!actorName) { alert('请输入女优姓名！'); btnStart.disabled = false; btnStop.disabled = true; isRunning = false; removeFromQueue(); document.title = origTitle; return; }
+        const useCurrentList = !actorName;
         if (isNaN(inputStartPage) || isNaN(inputEndPage)) { alert('请检查正确的页码范围！'); btnStart.disabled = false; btnStop.disabled = true; isRunning = false; removeFromQueue(); document.title = origTitle; return; }
 
         const minPage = Math.min(inputStartPage, inputEndPage);
@@ -809,11 +809,19 @@
         for (let pIdx = 0; pIdx < pagesToVisit.length; pIdx++) {
           if (shouldStop || domainJumped) break;
           const page = pagesToVisit[pIdx];
-          log(`检索女优 [${actorName}] 第 ${page} 页...`);
+          log(useCurrentList ? `抓取当前分类 第 ${page} 页...` : `检索女优 [${actorName}] 第 ${page} 页...`);
 
           try {
             updateLockHeartbeat();
-            const searchRes = await fetchWithRetry(`/search?q=${encodeURIComponent(actorName)}&page=${page}&f=all`, '检索 ');
+            let searchUrl;
+            if (useCurrentList) {
+              const listObj = new URL(window.location.href);
+              listObj.searchParams.set('page', page);
+              searchUrl = listObj.toString();
+            } else {
+              searchUrl = `/search?q=${encodeURIComponent(actorName)}&page=${page}&f=all`;
+            }
+            const searchRes = await fetchWithRetry(searchUrl, '检索 ');
             if (!searchRes) {
               if (shouldStop) break;
               continue;
@@ -850,7 +858,7 @@
               log(`检查标签中: ${movieCode}...`);
 
               await sleep(getRandomDelay(200, 400));
-              const magnet = await processDetailPage(movieHref, movieCode, genreName);
+              const magnet = await processDetailPage(movieHref, movieCode, useCurrentList ? '' : genreName);
 
               if (magnet === 'IP_BANNED') {
                 await triggerDomainJump('抓取详情遭遇域名拦截');
@@ -865,7 +873,7 @@
         }
 
         const orderLabel = orderMode === 'new' ? '新到旧' : '旧到新';
-        const fileLabel = genreName ? `${actorName}_${genreName}` : actorName;
+        const fileLabel = useCurrentList ? (genreName || sanitizeFileName(origTitle || 'JavDB_列表')) : (genreName ? `${actorName}_${genreName}` : actorName);
         if (results.length > 0) downloadTXT(results, sanitizeFileName(`${fileLabel}_第${minPage}-${maxPage}页_${orderLabel}`));
       }
     } finally {
