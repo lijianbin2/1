@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         JavDB 万能磁链提取器
 // @namespace    http://tampermonkey.net/
-// @version      5.8.2
+// @version      5.8.3
 // @description  JavDB 磁链批量提取：支持按当前列表、番号段、女优/组合三种模式抓取磁力链接；自动优先字幕版并选择最小体积，去重后导出迅雷专用 TXT；内置 429/封禁重试、备用域名自动切换与多标签排队保护。
 // @author       Assistant
 // @license      MIT
@@ -329,7 +329,7 @@
   panel.id = 'javdb-scraper-panel';
   panel.innerHTML = `
     <div id="scraper-header" style="font-weight: bold; margin-bottom: 8px; font-size: 14px; border-bottom: 1px solid #444; padding-bottom: 4px; cursor: move; user-select: none; display: flex; justify-content: space-between; align-items: center;">
-      <span>🐢 JavDB 磁链提取器 v5.8.2 (稳速版)</span>
+      <span>🐢 JavDB 磁链提取器 v5.8.3 (稳速版)</span>
       <span style="font-size: 10px; color: #888;">(按住拖动)</span>
     </div>
 
@@ -665,6 +665,11 @@
 
             for (let idx = 0; idx < movieItems.length; idx++) {
               if (shouldStop) break;
+              if (fetchedCount > 0 && fetchedCount % 10 === 0) {
+                const rest = getRandomDelay(15000, 25000);
+                log(`☕ 已连续抓取 ${fetchedCount} 个，休息 ${Math.round(rest / 1000)} 秒防风控...`);
+                await sleep(rest);
+              }
               const item = movieItems[idx];
               const aTag = item.querySelector('a');
               if (!aTag) continue;
@@ -689,11 +694,6 @@
               if (magnet) results.push(magnet);
               await sleep(getRandomDelay(1500, 3000)); // 防风控间隔
               fetchedCount++;
-              if (fetchedCount % 10 === 0) {
-                const rest = getRandomDelay(15000, 25000);
-                log(`☕ 已连续抓取 ${fetchedCount} 个，休息 ${Math.round(rest / 1000)} 秒防风控...`);
-                await sleep(rest);
-              }
             }
           } catch (e) {
             log(`[!] 第 ${p} 页提取失败`);
@@ -717,6 +717,11 @@
         let domainJumped = false;
         for (let i = startNum; i <= endNum; i++) {
           if (shouldStop || domainJumped) break;
+          if (fetchedCount > 0 && fetchedCount % 10 === 0) {
+            const rest = getRandomDelay(15000, 25000);
+            log(`☕ 已连续抓取 ${fetchedCount} 个，休息 ${Math.round(rest / 1000)} 秒防风控...`);
+            await sleep(rest);
+          }
 
           const rawNumStr = String(i);
           const pad3Str = rawNumStr.padStart(3, '0');
@@ -795,11 +800,6 @@
             if (magnet) results.push(magnet);
             await sleep(getRandomDelay(1500, 3000)); // 防风控间隔
             fetchedCount++;
-            if (fetchedCount % 10 === 0) {
-              const rest = getRandomDelay(15000, 25000);
-              log(`☕ 已连续抓取 ${fetchedCount} 个，休息 ${Math.round(rest / 1000)} 秒防风控...`);
-              await sleep(rest);
-            }
           }
         }
         if (results.length > 0) downloadTXT(results, sanitizeFileName(`${rawPrefix}_${startNum}-${endNum}`));
@@ -947,6 +947,11 @@
 
             for (let idx = 0; idx < movieItems.length; idx++) {
               if (shouldStop) break;
+              if (fetchedCount > 0 && fetchedCount % 10 === 0) {
+                const rest = getRandomDelay(15000, 25000);
+                log(`☕ 已连续抓取 ${fetchedCount} 个，休息 ${Math.round(rest / 1000)} 秒防风控...`);
+                await sleep(rest);
+              }
               const item = movieItems[idx];
               const aTag = item.querySelector('a');
               if (!aTag) continue;
@@ -971,11 +976,6 @@
               if (magnet) results.push(magnet);
               await sleep(getRandomDelay(1500, 3000)); // 防风控间隔
               fetchedCount++;
-              if (fetchedCount % 10 === 0) {
-                const rest = getRandomDelay(15000, 25000);
-                log(`☕ 已连续抓取 ${fetchedCount} 个，休息 ${Math.round(rest / 1000)} 秒防风控...`);
-                await sleep(rest);
-              }
             }
           } catch (e) { log(`[!] 第 ${page} 页抓取失败`); }
         }
