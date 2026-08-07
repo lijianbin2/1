@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         咸鱼助手-页面隔离绝对安全版(v18)
+// @name         咸鱼助手-页面隔离绝对安全版(v19)
 // @namespace    http://tampermonkey.net/
-// @version      18.0
+// @version      19.0
 // @description  打开仪表板后自动跳转商品页并点击同步闲鱼商品；在“自动发货”页面按容器精确定位开关，支持文本/卡密两种发货模式，持续轮询自动开启
 // @match        *://44.81938193.xyz/*
 // @grant        none
@@ -19,8 +19,12 @@
     const SYNC_BUTTON_SELECTOR = 'button.btn--primary.desktop-only';
     const SYNC_LABEL = '同步闲鱼商品';
     const AUTO_SYNC_QUERY = 'auto_sync';
+    const SYNC_SUCCESS_TEXT = '商品数据刷新成功';
+    const AUTO_DELIVERY_PATH = '/auto-delivery';
     let lastDashboardRedirectAt = 0;
     let syncClicked = false;
+    let syncSuccessObserver = null;
+    let navigatedToAutoDelivery = false;
 
     function isElementVisible(el) {
         if (!el || !el.isConnected) return false;
@@ -74,7 +78,7 @@
         const button = getSyncButton();
         if (!button) return;
         if (button.classList.contains('btn--loading')) {
-            syncClicked = true;
+            watchSyncSuccess();
             return;
         }
         if (button.disabled) return;
@@ -83,6 +87,46 @@
         clearAutoSyncFlag();
         console.log('[咸鱼助手] 自动点击“同步闲鱼商品”');
         button.click();
+        watchSyncSuccess();
+    }
+
+    function isSyncSuccessMessage(el) {
+        return el && el.children.length === 0 && el.textContent.trim() === SYNC_SUCCESS_TEXT;
+    }
+
+    function gotoAutoDelivery() {
+        if (navigatedToAutoDelivery) return;
+        navigatedToAutoDelivery = true;
+        console.log('[咸鱼助手] 商品数据刷新成功，跳转到自动发货页面');
+        location.href = AUTO_DELIVERY_PATH;
+    }
+
+    function watchSyncSuccess() {
+        if (navigatedToAutoDelivery) return;
+
+        const alreadyShown = Array.from(document.querySelectorAll('body *'))
+            .some(isSyncSuccessMessage);
+        if (alreadyShown) {
+            gotoAutoDelivery();
+            return;
+        }
+        if (syncSuccessObserver) return;
+
+        syncSuccessObserver = new MutationObserver((mutations) => {
+            const hit = mutations.some(mutation =>
+                Array.from(mutation.addedNodes)
+                    .filter(node => node.nodeType === Node.ELEMENT_NODE)
+                    .flatMap(node => [node].concat(Array.from(node.querySelectorAll ? node.querySelectorAll('*') : [])))
+                    .concat(mutation.target)
+                    .some(isSyncSuccessMessage)
+            );
+            if (hit) {
+                syncSuccessObserver.disconnect();
+                syncSuccessObserver = null;
+                gotoAutoDelivery();
+            }
+        });
+        syncSuccessObserver.observe(document.body, { childList: true, subtree: true, characterData: true });
     }
 
     function getMatchingToggleContainers(labelText) {
