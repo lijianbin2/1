@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         全网 Cloudflare Error1015 自动重试（改进版）
 // @namespace    http://tampermonkey.net/
-// @version      2.6
+// @version      2.7
 // @description  全网生效：检测到 Cloudflare Error 1015 限速时自动按递增间隔重试并刷新页面（带暂停/立即重试/重置计数）
 // @author       You
 // @match        *://*/*
@@ -287,6 +287,12 @@
             return;
         }
 
+        // 同一页面已有提示时不再重复计数，避免多个脚本实例叠加
+        if (document.getElementById(NOTICE_ID)) {
+            console.info('[Auto-Retry] 已存在重试提示，避免重复计数');
+            return;
+        }
+
         const state = getRetryState();
         if (state.count >= MAX_RETRIES && state.first && now() - state.first < RETRY_WINDOW) {
             console.warn('[Auto-Retry] 已达到最大重试次数，停止自动刷新');
@@ -413,6 +419,12 @@
         if (window.top !== window.self) {
             return;
         }
+
+        // 同一页面只允许一个脚本实例处理限速重试
+        if (window.__cf1015AutoRetryHandled) {
+            return;
+        }
+        window.__cf1015AutoRetryHandled = true;
 
         handleRateLimitWithObserver();
 

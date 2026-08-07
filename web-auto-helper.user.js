@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         网页自动助手
 // @namespace    http://tampermonkey.net/
-// @version      20.1
+// @version      20.2
 // @description  打开仪表板后自动跳转商品页并点击同步闲鱼商品；在“自动发货”页面按容器精确定位开关，持续轮询自动开启；全网检测 Cloudflare Error 1015 限速并自动按递增间隔重试刷新
 // @match        *://*/*
 // @grant        none
@@ -517,6 +517,12 @@
                 return;
             }
 
+            // 同一页面已有提示时不再重复计数，避免多个脚本实例叠加
+            if (document.getElementById(NOTICE_ID)) {
+                console.info('[Auto-Retry] 已存在重试提示，避免重复计数');
+                return;
+            }
+
             const state = getRetryState();
             if (state.count >= MAX_RETRIES && state.first && now() - state.first < RETRY_WINDOW) {
                 console.warn('[Auto-Retry] 已达到最大重试次数，停止自动刷新');
@@ -643,6 +649,12 @@
             if (window.top !== window.self) {
                 return;
             }
+
+            // 同一页面只允许一个脚本实例处理限速重试
+            if (window.__cf1015AutoRetryHandled) {
+                return;
+            }
+            window.__cf1015AutoRetryHandled = true;
 
             handleRateLimitWithObserver();
 
