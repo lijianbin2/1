@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         网页自动助手
 // @namespace    http://tampermonkey.net/
-// @version      20.2
-// @description  打开仪表板后自动跳转商品页并点击同步闲鱼商品；在“自动发货”页面按容器精确定位开关，持续轮询自动开启；全网检测 Cloudflare Error 1015 限速并自动按递增间隔重试刷新
+// @version      20.3
+// @description  打开仪表板后自动跳转商品页并点击同步闲鱼商品；在“自动发货”页面按容器精确定位开关，持续轮询自动开启；全网检测 Cloudflare Error 1015 限速并自动每 10 秒重试 2 次刷新
 // @match        *://*/*
 // @grant        none
 // @run-at       document-idle
@@ -244,8 +244,8 @@
         'use strict';
 
         // ---------- Configuration ----------
-        // 第 N 次重试前的等待秒数（按 1/2 次递增）
-        const WAIT_TIMES = [5, 10];
+        // 每次重试前固定等待 10 秒，共重试 2 次
+        const WAIT_TIMES = [10, 10];
         const MAX_RETRIES = WAIT_TIMES.length;
         const RETRY_WINDOW = 60 * 60 * 1000;   // 重试窗口（毫秒），例如 1 小时
         const OBSERVE_DURATION = 5000;         // 对动态插入错误页观察的时长（毫秒）
