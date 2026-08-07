@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         咸鱼助手-页面隔离绝对安全版(v17)
+// @name         咸鱼助手-页面隔离绝对安全版(v18)
 // @namespace    http://tampermonkey.net/
-// @version      17.0
-// @description  仅在“自动发货”页面生效，按容器精确定位开关，支持文本/卡密两种发货模式，持续轮询自动开启
+// @version      18.0
+// @description  打开仪表板后自动跳转商品页并点击同步闲鱼商品；在“自动发货”页面按容器精确定位开关，支持文本/卡密两种发货模式，持续轮询自动开启
 // @match        *://44.81938193.xyz/*
 // @grant        none
 // @run-at       document-idle
@@ -16,6 +16,11 @@
     const PAGE_MARKER_SELECTOR = '.ad__master-toggles, .ad__config-panel';
     const CLICK_COOLDOWN_MS = 3000;
     const POLL_INTERVAL_MS = 800;
+    const SYNC_BUTTON_SELECTOR = 'button.btn--primary.desktop-only';
+    const SYNC_LABEL = '同步闲鱼商品';
+    const AUTO_SYNC_QUERY = 'auto_sync';
+    let lastDashboardRedirectAt = 0;
+    let syncClicked = false;
 
     function isElementVisible(el) {
         if (!el || !el.isConnected) return false;
@@ -33,6 +38,51 @@
     function isAutoDeliveryPage() {
         if (location.pathname === PAGE_PATH) return true;
         return Boolean(document.querySelector(PAGE_MARKER_SELECTOR));
+    }
+
+    function isGoodsPage() {
+        return location.pathname === '/goods';
+    }
+
+    function hasAutoSyncFlag() {
+        return new URLSearchParams(location.search).get(AUTO_SYNC_QUERY) === '1';
+    }
+
+    function clearAutoSyncFlag() {
+        const url = new URL(location.href);
+        url.searchParams.delete(AUTO_SYNC_QUERY);
+        history.replaceState(null, '', url.pathname + url.search + url.hash);
+    }
+
+    function getSyncButton() {
+        const buttons = Array.from(document.querySelectorAll(SYNC_BUTTON_SELECTOR));
+        return buttons.find(btn => isElementVisible(btn) && btn.textContent.includes(SYNC_LABEL)) || null;
+    }
+
+    function autoSyncFromDashboard() {
+        if (location.pathname !== '/dashboard') return;
+        if (Date.now() - lastDashboardRedirectAt < 5000) return;
+
+        lastDashboardRedirectAt = Date.now();
+        console.log('[咸鱼助手] 检测到仪表板，跳转到商品页同步闲鱼商品');
+        location.href = '/goods?' + AUTO_SYNC_QUERY + '=1';
+    }
+
+    function autoClickSync() {
+        if (!isGoodsPage() || !hasAutoSyncFlag() || syncClicked) return;
+
+        const button = getSyncButton();
+        if (!button) return;
+        if (button.classList.contains('btn--loading')) {
+            syncClicked = true;
+            return;
+        }
+        if (button.disabled) return;
+
+        syncClicked = true;
+        clearAutoSyncFlag();
+        console.log('[咸鱼助手] 自动点击“同步闲鱼商品”');
+        button.click();
     }
 
     function getMatchingToggleContainers(labelText) {
@@ -126,7 +176,13 @@
         console.log('[咸鱼助手] “自动发货”和“自动确认发货”均已开启');
     }
 
-    const timer = setInterval(autoEnable, POLL_INTERVAL_MS);
+    const timer = setInterval(() => {
+        autoSyncFromDashboard();
+        autoClickSync();
+        autoEnable();
+    }, POLL_INTERVAL_MS);
+    autoSyncFromDashboard();
+    autoClickSync();
     autoEnable();
 
     window.addEventListener('beforeunload', () => {
