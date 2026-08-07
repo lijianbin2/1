@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         咸鱼助手-页面隔离绝对安全版(v20)
+// @name         网页自动助手
 // @namespace    http://tampermonkey.net/
-// @version      20.0
+// @version      20.1
 // @description  打开仪表板后自动跳转商品页并点击同步闲鱼商品；在“自动发货”页面按容器精确定位开关，持续轮询自动开启；全网检测 Cloudflare Error 1015 限速并自动按递增间隔重试刷新
 // @match        *://*/*
 // @grant        none
