@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         JavDB 万能磁链提取器
 // @namespace    http://tampermonkey.net/
-// @version      5.8.5
-// @description  JavDB 磁链批量提取：支持按当前列表、番号段、女优/组合三种模式抓取磁力链接；自动优先字幕版并选择最小体积，去重后导出迅雷专用 TXT；内置 429/封禁重试、备用域名自动切换与多标签排队保护。
+// @version      5.8.6
+// @description  JavDB 磁链批量提取：支持按当前列表、番号段、女优/组合三种模式抓取磁力链接；自动优先字幕版并选择最小体积，去重后导出迅雷专用 TXT；内置 429/封禁重试、备用域名自动切换与多标签排队保护；可按发布时间段(最近 N 天)过滤。
 // @author       Assistant
 // @license      MIT
 // @match        *://*.javdb574.com/*
@@ -26,6 +26,7 @@
   let shouldStop = false;
   let currentMode = 'current';
   let fetchedCount = 0;
+  let timeCutoff = null;
 
   function autoCheckRememberMe() {
     const checkboxes = document.querySelectorAll('input[type="checkbox"]');
@@ -331,7 +332,7 @@
   panel.id = 'javdb-scraper-panel';
   panel.innerHTML = `
     <div id="scraper-header" style="font-weight: bold; margin-bottom: 8px; font-size: 14px; border-bottom: 1px solid #444; padding-bottom: 4px; cursor: move; user-select: none; display: flex; justify-content: space-between; align-items: center;">
-      <span>🐢 JavDB 磁链提取器 v5.8.5 (稳速版)</span>
+      <span>🐢 JavDB 磁链提取器 v5.8.6 (稳速版)</span>
       <span style="font-size: 10px; color: #888;">(按住拖动)</span>
     </div>
 
@@ -393,6 +394,15 @@
           <option value="new">新 ➔ 旧 (最新优先)</option>
           <option value="old">旧 ➔ 新 (早期优先)</option>
         </select>
+      </div>
+    </div>
+
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; font-size: 12px; border-top: 1px dashed #444; padding-top: 8px;">
+      <label for="scraper-days" title="留空抓取所有时间；填 N 则只抓最近 N 天到今天发布的作品">时间段:</label>
+      <div style="display: flex; gap: 4px; align-items: center;">
+        <span>最近</span>
+        <input id="scraper-days" type="number" value="" min="0" placeholder="全部" style="width: 52px; background: #333; color: #fff; border: 1px solid #555; padding: 2px 4px; border-radius: 3px;">
+        <span>天内</span>
       </div>
     </div>
 
@@ -507,6 +517,34 @@
     return null;
   }
 
+  function fmtDateYMD(d) {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+
+  function isDateInTimeRange(d) {
+    if (!timeCutoff) return true;
+    if (!d || isNaN(d.getTime())) return true; // 无法识别日期时放行
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
+    return d >= timeCutoff && d <= todayEnd;
+  }
+
+  function parseListItemDate(itemEl) {
+    if (!itemEl) return null;
+    const metaEl = itemEl.querySelector ? itemEl.querySelector('.meta') : null;
+    const text = metaEl ? metaEl.textContent : (itemEl.textContent || '');
+    const m = text.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (!m) return null;
+    return new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10));
+  }
+
+  function parseReleaseDate(doc) {
+    const panel = doc.querySelector('.movie-panel-info') || doc.body;
+    const m = (panel.textContent || '').match(/日期[\s\S]{0,20}?(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (!m) return null;
+    return new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10));
+  }
+
   // resolve relative hrefs to absolute
   function toAbsoluteUrl(href) {
     try {
@@ -554,6 +592,14 @@
       if (durationMin !== null && durationMin > 180) {
         log(`[-] ${movieCode} 时长 ${durationMin} 分钟，超过 180 分钟，跳过`);
         return null;
+      }
+
+      if (timeCutoff) {
+        const relDate = parseReleaseDate(detailDoc);
+        if (relDate && !isDateInTimeRange(relDate)) {
+          log(`[-] ${movieCode} 发布日期 ${fmtDateYMD(relDate)} 超出设定时间段，跳过`);
+          return null;
+        }
       }
 
       const magnetItems = detailDoc.querySelectorAll('#magnets-content .item, #magnets-content tr');
@@ -639,6 +685,16 @@
     const results = [];
     const parser = new DOMParser();
 
+    const daysInputVal = parseInt(document.getElementById('scraper-days').value, 10);
+    if (!isNaN(daysInputVal) && daysInputVal >= 0) {
+      timeCutoff = new Date();
+      timeCutoff.setHours(0, 0, 0, 0);
+      timeCutoff.setDate(timeCutoff.getDate() - daysInputVal);
+      log(`时间段过滤: 仅抓取 ${fmtDateYMD(timeCutoff)} 至今发布的作品`);
+    } else {
+      timeCutoff = null;
+    }
+
     try {
       if (currentMode === 'current') {
         const startPage = parseInt(document.getElementById('scraper-curr-start').value, 10) || 1;
@@ -695,6 +751,14 @@
               const movieHref = aTag.getAttribute('href');
               const codeEl = item.querySelector('.uid') || item.querySelector('strong');
               const movieCode = codeEl ? codeEl.textContent.trim() : `作品${idx + 1}`;
+
+              if (timeCutoff) {
+                const itemDate = parseListItemDate(item);
+                if (itemDate && !isDateInTimeRange(itemDate)) {
+                  log(`[-] ${movieCode} 发布日期 ${fmtDateYMD(itemDate)} 超出设定时间段，跳过`);
+                  continue;
+                }
+              }
 
               progressEl.innerText = `进度: 页 ${p} (${idx + 1}/${movieItems.length})`;
               document.title = `⚡[抓取 ${p}页 ${idx + 1}/${movieItems.length}] ${origTitle}`;
@@ -760,6 +824,7 @@
           log(`检索中: ${rawPrefix}-${pad3Str}...`);
 
           let targetMovieLink = null;
+          let dateSkipped = false;
 
           for (const term of searchTerms) {
             if (shouldStop) break;
@@ -786,21 +851,35 @@
                 for (const item of movieItems) {
                   const text = ((item.textContent || '') + ' ' + (item.getAttribute('title') || '')).toUpperCase();
                   if (text.includes(term.toUpperCase()) || text.includes(`${rawPrefix}-${pad3Str}`)) {
+                    if (timeCutoff) {
+                      const itemDate = parseListItemDate(item.closest('.item'));
+                      if (itemDate && !isDateInTimeRange(itemDate)) { dateSkipped = true; break; }
+                    }
                     targetMovieLink = item.getAttribute('href');
                     break;
                   }
                 }
-                if (!targetMovieLink && movieItems.length === 1) {
-                  targetMovieLink = movieItems[0].getAttribute('href');
+                if (!targetMovieLink && !dateSkipped && movieItems.length === 1) {
+                  const itemDate = timeCutoff ? parseListItemDate(movieItems[0].closest('.item')) : null;
+                  if (itemDate && !isDateInTimeRange(itemDate)) {
+                    dateSkipped = true;
+                  } else {
+                    targetMovieLink = movieItems[0].getAttribute('href');
+                  }
                 }
               }
 
-              if (targetMovieLink) break;
+              if (targetMovieLink || dateSkipped) break;
               await sleep(getRandomDelay(800, 1500));
             } catch (e) {}
           }
 
           if (shouldStop || domainJumped) break;
+
+          if (dateSkipped) {
+            log(`[-] ${rawPrefix}-${pad3Str} 发布日期超出设定时间段，跳过`);
+            continue;
+          }
 
           if (!targetMovieLink) {
             log(`[-] ${rawPrefix}-${pad3Str} 不存在/未录入`);
@@ -977,6 +1056,14 @@
               const movieHref = aTag.getAttribute('href');
               const codeEl = item.querySelector('.uid') || item.querySelector('strong');
               const movieCode = codeEl ? codeEl.textContent.trim() : `作品${idx + 1}`;
+
+              if (timeCutoff) {
+                const itemDate = parseListItemDate(item);
+                if (itemDate && !isDateInTimeRange(itemDate)) {
+                  log(`[-] ${movieCode} 发布日期 ${fmtDateYMD(itemDate)} 超出设定时间段，跳过`);
+                  continue;
+                }
+              }
 
               progressEl.innerText = `进度: 页 ${page} (${idx + 1}/${movieItems.length})`;
               document.title = `⚡[抓取 ${page}页 ${idx + 1}/${movieItems.length}] ${origTitle}`;
