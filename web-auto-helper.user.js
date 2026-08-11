@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         网页自动助手
 // @namespace    http://tampermonkey.net/
-// @version      20.4
+// @version      20.5
 // @description  打开仪表板后自动跳转商品页并点击同步闲鱼商品；在“自动发货”页面按容器精确定位开关，持续轮询自动开启，并自动打开最新商品；全网检测 Cloudflare Error 1015 限速并自动每 10 秒重试 2 次刷新
 // @match        *://*/*
 // @grant        none
@@ -31,6 +31,8 @@
     const GOODS_ACTIVE_CLASS = 'ad__goods-item--active';
     const GOODS_TOTAL_PATTERN = /^共\s*(\d+)\s*件$/;
     const GOODS_STABLE_MS = 1600;
+    const GOODS_TOGGLE_SELECTOR = 'button.ad__goods-toggle';
+    const GOODS_TOGGLE_EXPAND_TITLE = "展开商品列表";
     let lastDashboardRedirectAt = 0;
     let syncClicked = false;
     let syncSuccessObserver = null;
@@ -161,6 +163,14 @@
         if (list) list.scrollTop = list.scrollHeight;
     }
 
+    function expandGoodsPanelIfCollapsed() {
+        const toggle = document.querySelector(GOODS_TOGGLE_SELECTOR);
+        if (!toggle || !isElementVisible(toggle)) return false;
+        if (toggle.title !== GOODS_TOGGLE_EXPAND_TITLE) return false;
+        toggle.click();
+        return true;
+    }
+
     function autoSelectLatestGoods() {
         if (location.pathname !== AUTO_DELIVERY_PATH) {
             latestGoodsSelected = false;
@@ -169,6 +179,8 @@
             return;
         }
         if (latestGoodsSelected) return;
+
+        if (expandGoodsPanelIfCollapsed()) return;
 
         const items = getGoodsItems();
         if (items.length === 0) return;
