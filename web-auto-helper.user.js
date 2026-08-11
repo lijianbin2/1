@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         网页自动助手
 // @namespace    http://tampermonkey.net/
-// @version      20.3
-// @description  打开仪表板后自动跳转商品页并点击同步闲鱼商品；在“自动发货”页面按容器精确定位开关，持续轮询自动开启；全网检测 Cloudflare Error 1015 限速并自动每 10 秒重试 2 次刷新
+// @version      20.4
+// @description  打开仪表板后自动跳转商品页并点击同步闲鱼商品；在“自动发货”页面按容器精确定位开关，持续轮询自动开启，并自动打开最新商品；全网检测 Cloudflare Error 1015 限速并自动每 10 秒重试 2 次刷新
 // @match        *://*/*
 // @grant        none
 // @run-at       document-idle
@@ -26,10 +26,18 @@
     const AUTO_SYNC_QUERY = 'auto_sync';
     const SYNC_SUCCESS_TEXT = '商品数据刷新成功';
     const AUTO_DELIVERY_PATH = '/auto-delivery';
+    const GOODS_ITEM_SELECTOR = '.ad__goods-item';
+    const GOODS_LIST_SELECTOR = '.ad__goods-list';
+    const GOODS_ACTIVE_CLASS = 'ad__goods-item--active';
+    const GOODS_TOTAL_PATTERN = /^共\s*(\d+)\s*件$/;
+    const GOODS_STABLE_MS = 1600;
     let lastDashboardRedirectAt = 0;
     let syncClicked = false;
     let syncSuccessObserver = null;
     let navigatedToAutoDelivery = false;
+    let latestGoodsSelected = false;
+    let lastGoodsCount = -1;
+    let goodsCountStableAt = 0;
 
     function isElementVisible(el) {
         if (!el || !el.isConnected) return false;
@@ -134,6 +142,63 @@
         syncSuccessObserver.observe(document.body, { childList: true, subtree: true, characterData: true });
     }
 
+    function getGoodsItems() {
+        return Array.from(document.querySelectorAll(GOODS_ITEM_SELECTOR)).filter(isElementVisible);
+    }
+
+    function getTotalGoodsCount() {
+        const spans = Array.from(document.querySelectorAll('span'));
+        for (const span of spans) {
+            if (span.children.length !== 0) continue;
+            const match = span.textContent.trim().match(GOODS_TOTAL_PATTERN);
+            if (match) return parseInt(match[1], 10);
+        }
+        return 0;
+    }
+
+    function scrollGoodsListToBottom() {
+        const list = document.querySelector(GOODS_LIST_SELECTOR);
+        if (list) list.scrollTop = list.scrollHeight;
+    }
+
+    function autoSelectLatestGoods() {
+        if (location.pathname !== AUTO_DELIVERY_PATH) {
+            latestGoodsSelected = false;
+            lastGoodsCount = -1;
+            goodsCountStableAt = 0;
+            return;
+        }
+        if (latestGoodsSelected) return;
+
+        const items = getGoodsItems();
+        if (items.length === 0) return;
+
+        const total = getTotalGoodsCount();
+        if (total > 0) {
+            if (items.length < total) {
+                scrollGoodsListToBottom();
+                return;
+            }
+        } else {
+            if (items.length !== lastGoodsCount) {
+                lastGoodsCount = items.length;
+                goodsCountStableAt = Date.now();
+                scrollGoodsListToBottom();
+                return;
+            }
+            if (Date.now() - goodsCountStableAt < GOODS_STABLE_MS) {
+                scrollGoodsListToBottom();
+                return;
+            }
+        }
+
+        const last = items[items.length - 1];
+        latestGoodsSelected = true;
+        if (last.classList.contains(GOODS_ACTIVE_CLASS)) return;
+        console.log("[咸鱼助手] 自动打开最新商品（列表最后一个）的配置");
+        last.click();
+    }
+
     function getMatchingToggleContainers(labelText) {
         const containers = Array.from(document.querySelectorAll(TOGGLE_CONTAINER_SELECTOR));
         const matches = [];
@@ -229,10 +294,12 @@
         autoSyncFromDashboard();
         autoClickSync();
         autoEnable();
+        autoSelectLatestGoods();
     }, POLL_INTERVAL_MS);
     autoSyncFromDashboard();
     autoClickSync();
     autoEnable();
+    autoSelectLatestGoods();
 
     window.addEventListener('beforeunload', () => {
         clearInterval(timer);
