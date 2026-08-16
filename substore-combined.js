@@ -1,12 +1,11 @@
 // ============================================================================
-// Sub-Store 三合一合并脚本（自动更新版）
-// 本文件直接维护；文件尾部的 convert.min.js 内联快照仅作兜底，
-// 上游更新时可按需刷新快照，不影响本文件的自定义逻辑
+// Sub-Store 三合一合并脚本（自动更新版）模板
+// 由 build-substore-combined.js 生成为 substore-combined.js，请勿直接编辑生成物
 //
 // 执行流程等价于 0.js -> convert.min.js#grouptype=1 -> 1.js：
 //   1) 备份原始 DNS / Hosts
 //   2) 拉取并执行【最新版】convert.min.js（失败时回退到文件尾部的内联快照）
-//   3) 还原 DNS / Hosts + 自动选择组改为全部节点 + 追加 JavDB 自动测速组与分流规则
+//   3) 还原 DNS / Hosts + 追加 JavDB 自动测速组与分流规则
 // ============================================================================
 
 // 中间脚本地址与本地缓存时间（避免每次生成配置都发起网络请求）
@@ -109,17 +108,6 @@ async function main(config) {
   const allProxies = (config["proxies"] || [])
     .map(p => (typeof p === 'string' ? p : (p && p.name) || ''))
     .filter(Boolean);
-
-  // ================= 自动选择组：改为包含全部节点 =================
-  // 上游按地区/倍率筛选节点，这里直接替换为全部节点；
-  // 同时移除 include-all / filter，避免上游的过滤条件继续生效
-  const autoGroup = config["proxy-groups"].find(g => g && g.name === "自动选择");
-  if (autoGroup) {
-    delete autoGroup["include-all"];
-    delete autoGroup["filter"];
-    delete autoGroup["exclude-filter"];
-    autoGroup["proxies"] = allProxies.slice();
-  }
 
   // 过滤掉所有名称中带有日本/Japan/JP 标识的节点
   const nonJpProxies = allProxies.filter(
