@@ -103,7 +103,7 @@ async function main(config) {
 
   // 先移除可能残留/旧的自定义分组，防止位置被占用
   config["proxy-groups"] = config["proxy-groups"].filter(
-    g => g.name !== "JavDB" && g.name !== "非香港节点"
+    g => g.name !== "JavDB"
   );
 
   // 提取所有单个节点名称，兼容字符串或对象
@@ -112,34 +112,9 @@ async function main(config) {
     .filter(Boolean);
 
   const isJapanProxy = name => /日本|Japan|🇯🇵|\bJP\b/i.test(name);
-  const isHongKongProxy = name => (
-    /香港|港|\b(?:HK|hk)(?:[-_ ]?\d+(?:[-_ ]?[A-Za-z]{2,})?)?\b|Hong Kong|HongKong|hongkong|HONG KONG|HONGKONG|深港|HKG|九龙|Kowloon|新界|沙田|荃湾|葵涌|🇭🇰/i
-  ).test(name);
-  const hasNonHongKongRegion = name => (
-    /澳门|Macau|🇲🇴|台湾|台北|新北|彰化|Taiwan|TWN|TPE|🇹🇼|新加坡|Singapore|SIN|🇸🇬|韩国|首尔|Korea|KOR|ICN|🇰🇷|美国|洛杉矶|纽约|United States|USA|America|LAX|SFO|SEA|加拿大|温哥华|多伦多|Canada|CAN|YVR|YYZ|英国|伦敦|United Kingdom|England|GBR|LHR|澳洲|澳大利亚|Australia|🇦🇺|德国|柏林|法兰克福|Germany|DEU|MUC|法国|巴黎|France|FRA|CDG|俄罗斯|Russia|🇷🇺|泰国|Thailand|🇹🇭|印度|India|🇮🇳|马来西亚|Malaysia|🇲🇾|阿根廷|Argentina|🇦🇷|芬兰|Finland|🇫🇮|埃及|Egypt|🇪🇬|菲律宾|Philippines|🇵🇭|土耳其|Turkey|Türkiye|🇹🇷|乌克兰|Ukraine|🇺🇦/i
-  ).test(name);
 
   // JavDB 组：明确排除日本节点，其他节点（包括香港和无地区标识节点）保留
   const nonJpProxies = allProxies.filter(name => !isJapanProxy(name));
-
-  // opencode.ai 不使用香港节点：只纳入明确识别为非香港地区的节点。
-  // 无地区标识的节点无法从配置可靠判断实际出口，宁可不纳入该组。
-  const nonHkProxies = allProxies.filter(
-    name => !isHongKongProxy(name) && hasNonHongKongRegion(name)
-  );
-  let opencodeTarget = "DIRECT";
-
-  if (nonHkProxies.length > 0) {
-    config["proxy-groups"].push({
-      name: "非香港节点",
-      type: "url-test",
-      url: "https://www.gstatic.com/generate_204",
-      interval: 300,
-      tolerance: 50,
-      proxies: nonHkProxies
-    });
-    opencodeTarget = "非香港节点";
-  }
 
   // 默认 javdb.com 直连（当没有可用非日本节点时）
   let javdbTarget = "DIRECT";
@@ -161,7 +136,7 @@ async function main(config) {
   const customRules = [
     "DOMAIN,cpa.wisdamsatan.de,DIRECT",
     "DOMAIN-SUFFIX,bingosoft.net,DIRECT",
-    "DOMAIN-SUFFIX,opencode.ai," + opencodeTarget, // 不使用香港节点（无可用非香港节点时直连）
+    "DOMAIN-SUFFIX,opencode.ai,谷歌服务",            // opencode.ai 走谷歌服务组
     "DOMAIN-SUFFIX,javdb.com," + javdbTarget, // javdb.com 主站走 JavDB 自动测速组（无可用节点时直连）
     "DOMAIN-KEYWORD,javdb,DIRECT"             // 其他 javdb 镜像一律直连
   ];
