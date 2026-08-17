@@ -101,8 +101,10 @@ async function main(config) {
     config["proxy-groups"] = [];
   }
 
-  // 先移除可能残留/旧的 JavDB 分组，防止位置被占用
-  config["proxy-groups"] = config["proxy-groups"].filter(g => g.name !== "JavDB");
+  // 先移除可能残留/旧的自定义分组，防止位置被占用
+  config["proxy-groups"] = config["proxy-groups"].filter(
+    g => g.name !== "JavDB" && g.name !== "非香港节点"
+  );
 
   // 提取所有单个节点名称，兼容字符串或对象
   const allProxies = (config["proxies"] || [])
@@ -113,6 +115,24 @@ async function main(config) {
   const nonJpProxies = allProxies.filter(
     name => !/日本|Japan|🇯🇵|\bJP\b/i.test(name)
   );
+
+  // opencode.ai 不使用香港节点：用全部非香港节点建独立测速组
+  const nonHkProxies = allProxies.filter(
+    name => !/香港|港|\b(?:HK|hk)(?:[-_ ]?\d+(?:[-_ ]?[A-Za-z]{2,})?)?\b|Hong Kong|HongKong|hongkong|HONG KONG|HONGKONG|深港|HKG|九龙|Kowloon|新界|沙田|荃湾|葵涌|🇭🇰/i.test(name)
+  );
+  let opencodeTarget = "DIRECT";
+
+  if (nonHkProxies.length > 0) {
+    config["proxy-groups"].push({
+      name: "非香港节点",
+      type: "url-test",
+      url: "https://www.gstatic.com/generate_204",
+      interval: 300,
+      tolerance: 50,
+      proxies: nonHkProxies
+    });
+    opencodeTarget = "非香港节点";
+  }
 
   // 默认 javdb.com 直连（当没有可用非日本节点时）
   let javdbTarget = "DIRECT";
@@ -134,6 +154,7 @@ async function main(config) {
   const customRules = [
     "DOMAIN,cpa.wisdamsatan.de,DIRECT",
     "DOMAIN-SUFFIX,bingosoft.net,DIRECT",
+    "DOMAIN-SUFFIX,opencode.ai," + opencodeTarget, // 不使用香港节点（无可用非香港节点时直连）
     "DOMAIN-SUFFIX,javdb.com," + javdbTarget, // javdb.com 主站走 JavDB 自动测速组（无可用节点时直连）
     "DOMAIN-KEYWORD,javdb,DIRECT"             // 其他 javdb 镜像一律直连
   ];
