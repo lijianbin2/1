@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         JavDB 万能磁链提取器
 // @namespace    http://tampermonkey.net/
-// @version      5.8.8
+// @version      5.8.9
 // @description  JavDB 磁链批量提取：支持按当前列表、番号段、女优/组合三种模式抓取磁力链接；自动优先字幕版并选择最小体积，去重后导出迅雷专用 TXT；内置 429/封禁重试、备用域名自动切换与多标签排队保护；可按发布时间段(最近 N 天)过滤；自动跳过时长超过 2.5 小时(150 分钟)的作品。
 // @author       Assistant
 // @license      MIT
@@ -332,7 +332,7 @@
   panel.id = 'javdb-scraper-panel';
   panel.innerHTML = `
     <div id="scraper-header" style="font-weight: bold; margin-bottom: 8px; font-size: 14px; border-bottom: 1px solid #444; padding-bottom: 4px; cursor: move; user-select: none; display: flex; justify-content: space-between; align-items: center;">
-      <span>🐢 JavDB 磁链提取器 v5.8.8 (正常速度版)</span>
+      <span>🐢 JavDB 磁链提取器 v5.8.9 (正常速度版)</span>
       <span style="font-size: 10px; color: #888;">(按住拖动)</span>
     </div>
 
@@ -509,11 +509,16 @@
 
   function parseDurationMin(doc) {
     const panel = doc.querySelector('.movie-panel-info') || doc.body;
-    const text = (panel.textContent || '');
-    const hm = text.match(/時長[\s\S]{0,30}?(\d+)\s*(?:小時|小时)[\s\S]{0,10}?(\d+)\s*分/);
-    if (hm) return parseInt(hm[1], 10) * 60 + parseInt(hm[2], 10);
-    const m = text.match(/時長[\s\S]{0,30}?(\d+)\s*分/);
+    const text = (panel.textContent || '').replace(/\u00A0/g, ' ');
+    const labels = '(?:時長|时长|長度|长度|片長|片长|時間|时间|Length|Duration|Time)';
+    const hm = text.match(new RegExp(labels + '[\\s\\S]{0,40}?(\\d+)\\s*(?:小時|小时|時|时)\\s*(?:(\\d+)\\s*(?:分鍾|分鐘|分钟|分))?', 'i'));
+    if (hm) return parseInt(hm[1], 10) * 60 + (hm[2] ? parseInt(hm[2], 10) : 0);
+    const m = text.match(new RegExp(labels + '[\\s\\S]{0,40}?(\\d+)\\s*(?:分鍾|分鐘|分钟|分)', 'i'));
     if (m) return parseInt(m[1], 10);
+    const bareHm = text.match(/(\d+)\s*(?:小時|小时|時|时)\s*(?:(\d+)\s*(?:分鍾|分鐘|分钟|分))?/);
+    if (bareHm) return parseInt(bareHm[1], 10) * 60 + (bareHm[2] ? parseInt(bareHm[2], 10) : 0);
+    const bareM = text.match(/(\d+)\s*(?:分鍾|分鐘|分钟|分)/);
+    if (bareM) return parseInt(bareM[1], 10);
     return null;
   }
 
