@@ -111,14 +111,21 @@ async function main(config) {
     .map(p => (typeof p === 'string' ? p : (p && p.name) || ''))
     .filter(Boolean);
 
-  // 过滤掉所有名称中带有日本/Japan/JP 标识的节点
-  const nonJpProxies = allProxies.filter(
-    name => !/日本|Japan|🇯🇵|\bJP\b/i.test(name)
-  );
+  const isJapanProxy = name => /日本|Japan|🇯🇵|\bJP\b/i.test(name);
+  const isHongKongProxy = name => (
+    /香港|港|\b(?:HK|hk)(?:[-_ ]?\d+(?:[-_ ]?[A-Za-z]{2,})?)?\b|Hong Kong|HongKong|hongkong|HONG KONG|HONGKONG|深港|HKG|九龙|Kowloon|新界|沙田|荃湾|葵涌|🇭🇰/i
+  ).test(name);
+  const hasNonHongKongRegion = name => (
+    /澳门|Macau|🇲🇴|台湾|台北|新北|彰化|Taiwan|TWN|TPE|🇹🇼|新加坡|Singapore|SIN|🇸🇬|韩国|首尔|Korea|KOR|ICN|🇰🇷|美国|洛杉矶|纽约|United States|USA|America|LAX|SFO|SEA|加拿大|温哥华|多伦多|Canada|CAN|YVR|YYZ|英国|伦敦|United Kingdom|England|GBR|LHR|澳洲|澳大利亚|Australia|🇦🇺|德国|柏林|法兰克福|Germany|DEU|MUC|法国|巴黎|France|FRA|CDG|俄罗斯|Russia|🇷🇺|泰国|Thailand|🇹🇭|印度|India|🇮🇳|马来西亚|Malaysia|🇲🇾|阿根廷|Argentina|🇦🇷|芬兰|Finland|🇫🇮|埃及|Egypt|🇪🇬|菲律宾|Philippines|🇵🇭|土耳其|Turkey|Türkiye|🇹🇷|乌克兰|Ukraine|🇺🇦/i
+  ).test(name);
 
-  // opencode.ai 不使用香港节点：用全部非香港节点建独立测速组
+  // JavDB 组：明确排除日本节点，其他节点（包括香港和无地区标识节点）保留
+  const nonJpProxies = allProxies.filter(name => !isJapanProxy(name));
+
+  // opencode.ai 不使用香港节点：只纳入明确识别为非香港地区的节点。
+  // 无地区标识的节点无法从配置可靠判断实际出口，宁可不纳入该组。
   const nonHkProxies = allProxies.filter(
-    name => !/香港|港|\b(?:HK|hk)(?:[-_ ]?\d+(?:[-_ ]?[A-Za-z]{2,})?)?\b|Hong Kong|HongKong|hongkong|HONG KONG|HONGKONG|深港|HKG|九龙|Kowloon|新界|沙田|荃湾|葵涌|🇭🇰/i.test(name)
+    name => !isHongKongProxy(name) && hasNonHongKongRegion(name)
   );
   let opencodeTarget = "DIRECT";
 
