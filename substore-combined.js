@@ -96,6 +96,14 @@ async function main(config) {
     delete config["hosts"];
   }
 
+  // ================= 后处理：从 AI服务 / 谷歌服务 中排除「选择代理」「香港节点」 =================
+  const __excludeFromGroups = ["选择代理", "香港节点"];
+  for (const g of config["proxy-groups"]) {
+    if (g.name === "AI服务" || g.name === "谷歌服务") {
+      g.proxies = (g.proxies || []).filter(p => !__excludeFromGroups.includes(p));
+    }
+  }
+
   // ================= 原 1.js：JavDB 自动测速策略组（排除日本节点，强行置底） =================
   if (!config["proxy-groups"]) {
     config["proxy-groups"] = [];
@@ -136,7 +144,7 @@ async function main(config) {
   const customRules = [
     "DOMAIN,cpa.wisdamsatan.de,DIRECT",
     "DOMAIN-SUFFIX,bingosoft.net,DIRECT",
-    "DOMAIN-SUFFIX,opencode.ai,谷歌服务",            // opencode.ai 走谷歌服务组
+    "DOMAIN-SUFFIX,opencode.ai,AI服务",              // opencode.ai 走 AI服务组
     "DOMAIN-SUFFIX,javdb.com," + javdbTarget, // javdb.com 主站走 JavDB 自动测速组（无可用节点时直连）
     "DOMAIN-KEYWORD,javdb,DIRECT"             // 其他 javdb 镜像一律直连
   ];
