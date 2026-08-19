@@ -344,15 +344,11 @@
 
     <div id="section-current" style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; font-size: 12px;">
       <div style="display: flex; align-items: center; justify-content: space-between;">
-        <label>抓取页数:</label>
-        <div style="display: flex; gap: 4px; align-items: center;">
-          <input id="scraper-curr-start" type="number" value="1" min="1" style="width: 48px; background: #333; color: #fff; border: 1px solid #555; padding: 2px 4px; border-radius: 3px;">
-          <span>~</span>
-          <input id="scraper-curr-end" type="number" value="1" min="1" style="width: 48px; background: #333; color: #fff; border: 1px solid #555; padding: 2px 4px; border-radius: 3px;">
-        </div>
+        <label>作品数量:</label>
+        <input id="scraper-curr-count" type="number" value="20" min="1" step="1" placeholder="20" style="width: 72px; background: #333; color: #fff; border: 1px solid #555; padding: 2px 4px; border-radius: 3px;">
       </div>
-      <div style="font-size: 11px; color: #00ff66; line-height: 1.3;">
-        🐢 正常速度抓取：不设固定延时与定期休息，按正常节奏连续抓取。
+      <div style="font-size: 11px; color: #888; line-height: 1.3;">
+        仅抓取当前页面显示的作品，不翻页。超过当前页实际数量时抓取所有可用作品。
       </div>
     </div>
 
@@ -702,86 +698,79 @@
 
     try {
       if (currentMode === 'current') {
-        const startPage = parseInt(document.getElementById('scraper-curr-start').value, 10) || 1;
-        const endPage = parseInt(document.getElementById('scraper-curr-end').value, 10) || 1;
-        const minPage = Math.min(startPage, endPage);
-        const maxPage = Math.max(startPage, endPage);
+        const rawCount = parseInt(document.getElementById('scraper-curr-count').value, 10);
+        const wantCount = Number.isInteger(rawCount) && rawCount >= 1 ? rawCount : 0;
 
-        const baseObj = new URL(window.location.href);
+        if (wantCount === 0) {
+          alert('请输入有效的作品数量（正整数）！');
+          btnStart.disabled = false; btnStop.disabled = true; isRunning = false;
+          removeFromQueue(); document.title = origTitle; return;
+        }
 
-        let domainJumped = false;
-        for (let p = minPage; p <= maxPage; p++) {
-          if (shouldStop || domainJumped) break;
-          log(`提取当前列表 第 ${p} 页...`);
+        log('当前页面模式: 请求抓取前 ' + wantCount + ' 个作品');
 
-          baseObj.searchParams.set('page', p);
-          const pageUrl = baseObj.toString();
-
-          try {
-            updateLockHeartbeat();
-            const searchRes = await fetchWithRetry(pageUrl, `列表页 ${p} `);
-            if (!searchRes) {
-              if (shouldStop) break;
-              continue;
-            }
-
+        try {
+          updateLockHeartbeat();
+          const searchRes = await fetchWithRetry(window.location.href, '当前页面列表');
+          if (shouldStop) { /* nothing to do */ }
+          else if (!searchRes) {
+            log('[-] 获取当前页面失败');
+          } else {
             const searchHtml = await searchRes.text();
             if (isBannedPage(searchRes.status, searchHtml)) {
               await triggerDomainJump('当前域名已遭封禁');
-              domainJumped = true;
-              break;
-            }
+            } else {
+              const searchDoc = parser.parseFromString(searchHtml, 'text/html');
+              const movieNodeList = searchDoc.querySelectorAll('.movie-list .item');
+              const allItems = movieNodeList ? Array.from(movieNodeList) : [];
 
-            const searchDoc = parser.parseFromString(searchHtml, 'text/html');
-            const movieNodeList = searchDoc.querySelectorAll('.movie-list .item');
+              if (allItems.length === 0) {
+                log('[-] 当前页面没有可抓取的作品');
+              } else {
+                const items = allItems.slice(0, wantCount);
+                log('当前页面共 ' + allItems.length + ' 个作品，本次抓取前 ' + items.length + ' 个');
 
-            if (!movieNodeList || movieNodeList.length === 0) {
-              log(`[-] 第 ${p} 页无作品或已到末尾`);
-              continue;
-            }
+                for (let idx = 0; idx < items.length; idx++) {
+                  if (shouldStop) break;
+                  const item = items[idx];
+                  const aTag = item.querySelector('a');
+                  if (!aTag) continue;
 
-            const movieItems = Array.from(movieNodeList);
+                  const movieHref = aTag.getAttribute('href');
+                  const codeEl = item.querySelector('.uid') || item.querySelector('strong');
+                  const movieCode = codeEl ? codeEl.textContent.trim() : ('作品' + (idx + 1));
 
-            for (let idx = 0; idx < movieItems.length; idx++) {
-              if (shouldStop) break;
-              const item = movieItems[idx];
-              const aTag = item.querySelector('a');
-              if (!aTag) continue;
+                  if (timeCutoff) {
+                    const itemDate = parseListItemDate(item);
+                    if (itemDate && !isDateInTimeRange(itemDate)) {
+                      log('[-] ' + movieCode + ' 发布日期 ' + fmtDateYMD(itemDate) + ' 超出设定时间段，跳过');
+                      continue;
+                    }
+                  }
 
-              const movieHref = aTag.getAttribute('href');
-              const codeEl = item.querySelector('.uid') || item.querySelector('strong');
-              const movieCode = codeEl ? codeEl.textContent.trim() : `作品${idx + 1}`;
+                  progressEl.innerText = '进度: (' + (idx + 1) + '/' + items.length + ')';
+                  document.title = '⚡[抓取 ' + (idx + 1) + '/' + items.length + '] ' + origTitle;
+                  log('提取中: ' + movieCode + '...');
 
-              if (timeCutoff) {
-                const itemDate = parseListItemDate(item);
-                if (itemDate && !isDateInTimeRange(itemDate)) {
-                  log(`[-] ${movieCode} 发布日期 ${fmtDateYMD(itemDate)} 超出设定时间段，跳过`);
-                  continue;
+                  const magnet = await processDetailPage(movieHref, movieCode);
+
+                  if (magnet === 'IP_BANNED') {
+                    await triggerDomainJump('抓取中遭遇域名拦截');
+                    break;
+                  }
+
+                  if (magnet) results.push(magnet);
+                  fetchedCount++;
                 }
               }
-
-              progressEl.innerText = `进度: 页 ${p} (${idx + 1}/${movieItems.length})`;
-              document.title = `⚡[抓取 ${p}页 ${idx + 1}/${movieItems.length}] ${origTitle}`;
-              log(`提取中: ${movieCode}...`);
-
-              const magnet = await processDetailPage(movieHref, movieCode);
-
-              if (magnet === 'IP_BANNED') {
-                await triggerDomainJump('抓取中遭遇域名拦截');
-                domainJumped = true;
-                break;
-              }
-
-              if (magnet) results.push(magnet);
-              fetchedCount++;
             }
-          } catch (e) {
-            log(`[!] 第 ${p} 页提取失败`);
           }
+        } catch (e) {
+          log('[!] 当前页面提取失败');
         }
 
         const pageTitle = sanitizeFileName(origTitle || 'JavDB_列表');
-        if (results.length > 0) downloadTXT(results, sanitizeFileName(`${pageTitle}_当前列表_第${minPage}-${maxPage}页`));
+        if (results.length > 0) downloadTXT(results, sanitizeFileName(pageTitle + '_当前页面_前' + wantCount + '个'));
 
       } else if (currentMode === 'code') {
         const rawPrefix = document.getElementById('scraper-prefix').value.trim().toUpperCase();
