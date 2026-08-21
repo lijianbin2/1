@@ -104,6 +104,13 @@ async function main(config) {
     }
   }
 
+  // ================= 后处理：从选择代理中排除「自动选择」 =================
+  for (const g of config["proxy-groups"]) {
+    if (g.name === "选择代理") {
+      g.proxies = (g.proxies || []).filter(p => p !== "自动选择");
+    }
+  }
+
   // ================= 原 1.js：JavDB 自动测速策略组（排除日本节点，强行置底） =================
   if (!config["proxy-groups"]) {
     config["proxy-groups"] = [];
