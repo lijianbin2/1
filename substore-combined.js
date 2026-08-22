@@ -5,7 +5,7 @@
 // 执行流程等价于 0.js -> convert.min.js#grouptype=1 -> 1.js：
 //   1) 备份原始 DNS / Hosts
 //   2) 拉取并执行【最新版】convert.min.js（失败时回退到文件尾部的内联快照）
-//   3) 还原 DNS / Hosts + 追加 JavDB 自动测速组与分流规则
+//   3) 还原 DNS / Hosts + 追加自定义分流规则
 // ============================================================================
 
 // 中间脚本地址与本地缓存时间（避免每次生成配置都发起网络请求）
@@ -111,49 +111,11 @@ async function main(config) {
     }
   }
 
-  // ================= 原 1.js：JavDB 自动测速策略组（排除日本节点，强行置底） =================
-  if (!config["proxy-groups"]) {
-    config["proxy-groups"] = [];
-  }
-
-  // 先移除可能残留/旧的自定义分组，防止位置被占用
-  config["proxy-groups"] = config["proxy-groups"].filter(
-    g => g.name !== "JavDB"
-  );
-
-  // 提取所有单个节点名称，兼容字符串或对象
-  const allProxies = (config["proxies"] || [])
-    .map(p => (typeof p === 'string' ? p : (p && p.name) || ''))
-    .filter(Boolean);
-
-  const isJapanProxy = name => /日本|Japan|🇯🇵|\bJP\b/i.test(name);
-
-  // JavDB 组：明确排除日本节点，其他节点（包括香港和无地区标识节点）保留
-  const nonJpProxies = allProxies.filter(name => !isJapanProxy(name));
-
-  // 默认 javdb.com 直连（当没有可用非日本节点时）
-  let javdbTarget = "DIRECT";
-
-  // 仅当存在非日本节点时创建自动测速组，避免 url-test 对 DIRECT 做无意义测速
-  if (nonJpProxies.length > 0) {
-    config["proxy-groups"].push({
-      name: "JavDB",
-      type: "url-test",
-      url: "https://www.gstatic.com/generate_204",
-      interval: 300,
-      tolerance: 50,
-      proxies: nonJpProxies
-    });
-    javdbTarget = "JavDB";
-  }
-
   // ================= 原 1.js：自定义分流规则（幂等，SUFFIX 必须排在 KEYWORD 之前） =================
   const customRules = [
     "DOMAIN,cpa.wisdamsatan.de,DIRECT",
     "DOMAIN-SUFFIX,bingosoft.net,DIRECT",
-    "DOMAIN-SUFFIX,opencode.ai,AI服务",              // opencode.ai 走 AI服务组
-    "DOMAIN-SUFFIX,javdb.com," + javdbTarget, // javdb.com 主站走 JavDB 自动测速组（无可用节点时直连）
-    "DOMAIN-KEYWORD,javdb,DIRECT"             // 其他 javdb 镜像一律直连
+    "DOMAIN-SUFFIX,opencode.ai,AI服务"               // opencode.ai 走 AI服务组
   ];
 
   const oldRules = config["rules"] || [];
