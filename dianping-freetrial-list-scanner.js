@@ -1,6 +1,6 @@
 // ============================================================
 // 大众点评「免费试」列表扫描筛选（Hamibot 版）
-// 版本：v1.45.0-click-fix
+// 版本：v1.45.5-bottom-card-click
 //
 // 运行环境：Hamibot 手机客户端
 // 目标 App：大众点评（com.dianping.v1）
@@ -88,7 +88,7 @@
 // ============================================================
 
 // 版本标记：手机端日志中会输出，用来确认运行的是新脚本
-var __SCRIPT_VERSION = "v1.45.0-click-fix";
+var __SCRIPT_VERSION = "v1.45.5-bottom-card-click";
 
 // 运行结果回传：把摘要 POST 到调试端点便于远程验收。
 // 网络失败静默忽略，绝不影响主流程；无 http 模块的环境（如测试）自动跳过。
@@ -2357,6 +2357,23 @@ function enterFreeTrial() {
     return false;
 }
 
+// 列表顶部的“美食”标签是已选类目的可靠兜底信号。
+// 个别机型点击分类后 selector 返回失败，但页面实际已经切到美食，
+// 此时若仍把 __foodCategorySelected 置为 false，会把没有“美食”字样的
+// 粤菜/茶点卡片（包括价值100元卡片）全部误判为“无法确认类目”。
+function isFoodFilterSelectedOnList() {
+    try {
+        var infos = getVisibleTextInfos();
+        for (var i = 0; i < infos.length; i++) {
+            if (infos[i].text === "美食" && infos[i].cy < 420) {
+                return true;
+            }
+        }
+    } catch (e) {
+    }
+    return false;
+}
+
 function selectFoodCategory() {
     log("选择「全部分类」");
 
@@ -2660,7 +2677,20 @@ function collectCardTexts(item, lowerY) {
     if (root) {
         var infos = getCardTextInfos(root);
 
-        if (infos.length > 0) {
+        // 某些版本的点评无障碍树会把卡片根节点错误收窄到
+        // 「免费抽」按钮自身（或只剩按钮 + 一个空壳 View）。
+        // 这种结果虽然 length > 0，但不含活动名/价值，直接返回会让
+        // 整张卡片被解析成“未知活动”，并可能与其他未知卡片合并，
+        // 从而漏掉真实的 100 元活动。只有至少 2 条非按钮文本时才
+        // 信任容器结果，否则退回按按钮位置收集整张卡片。
+        var usefulCount = 0;
+        for (var ui = 0; ui < infos.length; ui++) {
+            if (infos[ui].text !== "免费抽") {
+                usefulCount++;
+            }
+        }
+
+        if (usefulCount >= 2) {
             return infos;
         }
     }
@@ -2949,6 +2979,35 @@ function extractSplitValue(texts) {
         }
     }
 
+    // v1.45.1：部分机型的无障碍树会把“价值100元”拆成
+    // 「价值」+「100」+「60个中奖名额」，甚至不暴露独立的“元”节点。
+    // 原实现要求后续必须出现“元”，因此这类卡片会被判定为价值未知。
+    // “价值”后的第一个纯数字节点就是活动价值；只在价值前缀上下文中
+    // 使用该兜底，避免把中奖名额/距离数字误当价值。
+    for (i = 0; i < normalized.length; i++) {
+        var prefix = normalized[i];
+        if (prefix === "价值" || prefix === "价值¥" || prefix === "价值￥") {
+            for (var vi = i + 1; vi < normalized.length && vi <= i + 3; vi++) {
+                var valueToken = normalized[vi];
+                var valueMatch = valueToken.match(/^(?:¥|￥)?(\d+(?:\.\d+)?)(?:元)?$/);
+                if (valueMatch) {
+                    return parseFloat(valueMatch[1]);
+                }
+                // 遇到标题、商户、距离等非价格文本就停止，避免跨卡片串值。
+                if (valueToken && !/^元$/.test(valueToken)) {
+                    break;
+                }
+            }
+        }
+    }
+
+    // 最后处理“价值”与数字在同一个合并文本节点中的变体。
+    var allCompact = normalized.join("");
+    var allValueMatch = allCompact.match(/价值(?:¥|￥)?(\d+(?:\.\d+)?)/);
+    if (allValueMatch) {
+        return parseFloat(allValueMatch[1]);
+    }
+
     return null;
 }
 
@@ -3099,7 +3158,10 @@ function parseCardFields(texts) {
     // 名称与商户：按「信息行」区分。
     // 信息行 = 价值/距离/区域标签/平台标签/功能文案所在的行；
     // 活动名只取非信息行的文本，避免混入「多门店多商圈 12.8km」；
-    // 商户只从信息行候选里取，且排除位置性结尾文本
+    // 商户只从信息行候选里取，且排除位置性结尾文本。
+    // 注意：点评的实际节点可能把“分店 | 商圈/商户 | 距离”拆成
+    // 三个同一行节点；不能因为候选与距离同一行就全部排除，否则
+    // “来又来/大润发”会被误丢掉。
     var LOCATION_SUFFIX = /(店|路|街|中心|城|广场|大厦|站|号|区|商圈)$/;
     var infoRowYs = [];
 
@@ -3171,9 +3233,8 @@ function parseCardFields(texts) {
             return false;
         }
 
-        if (str.indexOf("/") >= 0) {
-            return false;
-        }
+        // 商户名可能包含“品牌/商圈”或“品牌/商场”形式，
+        // 例如“来又来/大润发”，不能再按斜杠一律排除。
 
         if (LOCATION_SUFFIX.test(str)) {
             return false;
@@ -3185,7 +3246,7 @@ function parseCardFields(texts) {
     for (i = 0; i < texts.length; i++) {
         t = String(texts[i].text || "").replace(/[\uFFFC\u200B\u200C\u200D\uFEFF\s]+/g, " ").trim();
 
-        if (isInfoText(t) || !isOnInfoRow(texts[i]) || isOnDistanceRow(texts[i])) {
+        if (isInfoText(t) || !isOnInfoRow(texts[i])) {
             continue;
         }
 
@@ -3196,6 +3257,22 @@ function parseCardFields(texts) {
         if (isPlausibleMerchant(t)) {
             card.merchant = t;
             break;
+        }
+    }
+
+    // 某些机型把信息行的 y 坐标拆得略开，导致上面的“同一行”判断
+    // 没命中。若卡片里存在带斜杠的明确商户候选（如“来又来/大润发”），
+    // 再做一次内容兜底；活动名本身已在 card.name 中，排除后不会串名。
+    if (card.merchant === null) {
+        for (i = 0; i < texts.length; i++) {
+            var slashMerchant = String(texts[i].text || "")
+                .replace(/[\uFFFC\u200B\u200C\u200D\uFEFF\s]+/g, " ").trim();
+            if (slashMerchant.indexOf("/") >= 0 &&
+                (!card.name || card.name.indexOf(slashMerchant) < 0) &&
+                isPlausibleMerchant(slashMerchant)) {
+                card.merchant = slashMerchant;
+                break;
+            }
         }
     }
 
@@ -3314,7 +3391,7 @@ function scanCurrentScreen(seenKeys) {
         var screenCategory = screenParsed.category;
         var screenDistance = screenParsed.distance;
         var screenMerchant = screenParsed.merchant;
-        var screenKey = buildActivityKey(screenName, screenValue, screenMerchant, screenArea);
+        var screenKey = buildActivityKey(screenName, screenValue, screenMerchant, screenArea, screenItem.key);
         // 免费抽节点的卡片容器偶尔会串入相邻卡片的「已报名」水印。
         // 已报名状态只接受独立收集到的当前标记节点，避免把免费活动误跳过。
         var screenRegistered = !!screenItem.isRegisteredMarker;
@@ -3438,13 +3515,14 @@ function scanCurrentScreen(seenKeys) {
             });
         }
 
-        // 价值或区域没解析出来时， dump 本卡片原始文本，
-        // 方便对照日志确认大众点评实际返回的节点结构
-        if (value === null || area === null) {
+        // 价值是筛选必需字段；区域只展示、不参与筛选，未知区域不应
+        // 被标成“解析失败”，否则会掩盖“价值100元且符合”的真实结果。
+        if (value === null) {
             log("[解析失败] 当前活动卡片原始文本：");
             log(parsed.raw || "（卡片内无文本）");
-            log("[解析失败] 价值：" + (value === null ? "未知" : value + "元"));
-            log("[解析失败] 区域：" + (area || "未知"));
+            log("[解析失败] 价值：未知");
+        } else if (area === null) {
+            log("[解析提示] 区域未知（不参与筛选），价值：" + value + "元");
         }
 
         if (activity.qualified && !registered) {
@@ -3757,6 +3835,11 @@ function scanFreeTrialList() {
     // v1.42.0：边扫边报——立即处理，不再等全部扫描完
     var processedKeys = {};
     var queuedKeys = {};
+    // 卡片点击偶发失败时不能永久标记为已处理，否则活动会被漏掉。
+    // 允许同一活动最多重试 2 次；成功进入详情后即永久标记，
+    // 连续两次点击失败才安全放弃，避免无限重试。
+    var failedProcessAttempts = {};
+    var MAX_FAILED_PROCESS_ATTEMPTS = 2;
     var results = [];
     var processedCount = 0;
     // v1.42.2：处理完一个活动后重新扫描当前屏，而不是用过期 node 继续
@@ -3894,7 +3977,10 @@ function scanFreeTrialList() {
             // v1.42.7：重新扫描时价值/区域可能暂时解析不同，使用活动名+商户稳定去重，
             // 避免同一活动再次进入详情页。
             var processKey = buildActivityProcessKey(it);
-            if (it.qualified && !it.registered && !processedKeys[it.key] && !processedKeys[processKey]) {
+            var failedAttempts = failedProcessAttempts[processKey] || 0;
+            if (it.qualified && !it.registered &&
+                !processedKeys[it.key] && !processedKeys[processKey] &&
+                failedAttempts < MAX_FAILED_PROCESS_ATTEMPTS) {
                 if (!queuedKeys[processKey]) {
                     qualifiedList.push({
                         name: it.name, merchant: it.merchant, value: it.value,
@@ -3903,8 +3989,6 @@ function scanFreeTrialList() {
                     });
                     queuedKeys[processKey] = true;
                 }
-                processedKeys[it.key] = true;
-                processedKeys[processKey] = true;
                 processedCount++;
                 log("[边扫边报] ===== 第 " + processedCount + " 次处理 =====");
                 log("[边扫边报] 活动：" + (it.name || "未知"));
@@ -3913,23 +3997,44 @@ function scanFreeTrialList() {
                 log("[边扫边报] 区域：" + (it.area || "未知"));
                 log("[边扫边报] 距离：" + (it.distance || "未知"));
                 var inlineStatus = "";
+                var clickOkResult = null;
                 try {
-                    var clickOk = diagnoseFreeDrawClick({
+                    clickOkResult = diagnoseFreeDrawClick({
                         name: it.name, merchant: it.merchant, value: it.value,
                         area: it.area, distance: it.distance, key: it.key,
                         node: it.node
                     });
-                    if (clickOk && clickOk.ok) {
+                    if (clickOkResult && clickOkResult.ok) {
                         log("[边扫边报] 卡片点击成功，进入详情页");
                         inlineStatus = handleSignupInDetail(it);
                     } else {
-                        inlineStatus = "卡片点击失败：" + (clickOk && clickOk.reason || "未知原因");
+                        inlineStatus = "卡片点击失败：" + (clickOkResult && clickOkResult.reason || "未知原因");
                         log("[边扫边报] " + inlineStatus);
                     }
                 } catch (eClick) {
                     inlineStatus = "处理异常：" + String(eClick);
                     logError("[边扫边报] 处理异常", eClick);
                 }
+
+                // 只有真正进入详情页才标记为已处理。此前在点击前标记，
+                // 一旦定位/点击偶发失败，后续重扫会直接跳过这张卡片。
+                if (clickOkResult && clickOkResult.ok) {
+                    processedKeys[it.key] = true;
+                    processedKeys[processKey] = true;
+                } else {
+                    failedProcessAttempts[processKey] = failedAttempts + 1;
+                    if (failedProcessAttempts[processKey] < MAX_FAILED_PROCESS_ATTEMPTS) {
+                        log("[边扫边报] 点击失败，第" + failedProcessAttempts[processKey] +
+                            "次失败，当前屏重扫后重试");
+                    } else {
+                        // 达到上限后才标记，防止卡片永久阻塞后续活动。
+                        processedKeys[it.key] = true;
+                        processedKeys[processKey] = true;
+                        log("[边扫边报] 点击连续失败" + MAX_FAILED_PROCESS_ATTEMPTS +
+                            "次，跳过该活动避免循环");
+                    }
+                }
+
                 results.push({ activity: it, status: inlineStatus });
                 logAutoSignupResult(it, inlineStatus, results.length - 1, qualifiedList.length);
                 if (typeof postTelemetry === "function") {
@@ -4161,10 +4266,18 @@ function scanFreeTrialList() {
 // ---------- v1.7：逐个处理符合条件活动 ----------
 
 // 与扫描阶段一致的活动唯一键：名称 + 价值 + 商户/区域
-function buildActivityKey(name, value, merchant, area) {
-    return (name || "未知活动") + "|" +
+function buildActivityKey(name, value, merchant, area, positionKey) {
+    var base = (name || "未知活动") + "|" +
         (value === null ? "?" : value) + "|" +
         (merchant || area || "未知");
+
+    // 解析失败时不能让同屏多张卡片都使用同一个
+    // “未知活动|?|未知”键，否则后一张（可能正是100元卡）会被去重掉。
+    if (!name && value === null && !merchant && !area && positionKey) {
+        return base + "|pos:" + String(positionKey);
+    }
+
+    return base;
 }
 
 function buildActivityProcessKey(activity) {
@@ -4573,6 +4686,44 @@ function anyTextContains(keyword) {
 }
 
 // 点击后页面状态 dump + 目标活动匹配检查
+// v1.45.4：部分活动详情页由 WebView/分段文本渲染，标题和商户名
+// 不一定出现在无障碍文本中，导致名称匹配失败。此时只有在页面已发生明显切换，
+// 且出现详情页专属结构（报名按钮或多个详情字段）时才允许确认，避免把普通列表变化
+// 当成详情页。
+function detectDetailPageStructure(after, diff) {
+    var signupSignals = ["我要报名", "立即报名", "免费报名", "立即参与", "参加活动"];
+    var detailSignals = ["活动详情", "活动流程", "活动内容", "活动规则", "报名须知", "抽奖规则"];
+    var signupHit = false;
+    var detailHitCount = 0;
+    var i;
+
+    for (i = 0; i < signupSignals.length; i++) {
+        if (signatureContainsNormalized(after, signupSignals[i]) || anyTextContains(signupSignals[i])) {
+            signupHit = true;
+            break;
+        }
+    }
+
+    for (i = 0; i < detailSignals.length; i++) {
+        if (signatureContainsNormalized(after, detailSignals[i]) || anyTextContains(detailSignals[i])) {
+            detailHitCount++;
+        }
+    }
+
+    // 出现报名按钮是最强确认；页面变化后列表入口消失时即可接受。
+    var freeDrawGone = !signatureContainsNormalized(after, "免费抽") && !anyTextContains("免费抽");
+    var listFilterGone = !signatureContainsNormalized(after, "全部分类") && !anyTextContains("全部分类");
+    if (signupHit && (freeDrawGone || listFilterGone)) {
+        return "DETAIL_PAGE_STRUCTURE_SIGNUP";
+    }
+
+    // 没有暴露报名按钮时，至少要求两个详情字段 + 列表内容消失 + 明显页面变化。
+    if (detailHitCount >= 2 && freeDrawGone && diff.missingCount >= 4) {
+        return "DETAIL_PAGE_STRUCTURE";
+    }
+
+    return null;
+}
 function dumpPostClickState(before, after, diff, activity) {
     log("[点击诊断] 点击后前台包名：" + after.pkg);
     log("[点击诊断] 点击后文本数量：" + after.count);
@@ -4661,6 +4812,14 @@ function dumpPostClickState(before, after, diff, activity) {
         log("[v1.32.0] 消失文本" + diff.missingCount + "条，免费抽消失，仍在大众点评");
     }
 
+    // v1.45.4：标题可能在 WebView 中不可见，使用详情页结构作为安全兜底。
+    // 该兜底要求出现报名/详情专属信号，且列表入口已消失，不接受普通页面变化。
+    var structureMatched = detectDetailPageStructure(after, diff);
+    if (structureMatched) {
+        log("[v1.45.4] " + structureMatched + "：标题无障碍文本不可见，但详情页结构已确认");
+        return structureMatched;
+    }
+
     log("[v1.32.0] TARGET_DETAIL_UNCONFIRMED：页面变化后的内容与目标活动不匹配");
     return null;
 }
@@ -4721,16 +4880,23 @@ function diagnoseFreeDrawClick(activity) {
     var clickX = (cardBounds.left + cardBounds.right) / 2;
     var clickY = (cardBounds.top + cardBounds.bottom) / 2;
 
-    // 4. 底部区域保护：排除屏幕底部 10% 区域（导航栏/底部标签栏）
+    // 4. 底部区域保护：排除屏幕底部 10% 区域（导航栏/底部标签栏）。
+    // v1.45.5：卡片可能只有下半部分被底部导航遮挡，但卡片上半部分仍然可见可点击；
+    // 不能因为“卡片中心”落入底部区域就整张放弃，否则会漏掉最后一张商户卡片。
     var bottomThreshold = device.height * 0.90;
+    var bottomSafeY = bottomThreshold - 35;
     if (clickY > bottomThreshold) {
-        // 如果卡片中心在底部区域，将点击位置上移到卡片顶部 1/3 处
-        clickY = cardBounds.top + (cardBounds.bottom - cardBounds.top) * 0.33;
-        log("[免费试定位] 卡片中心在底部区域，调整点击位置到卡片上部：(" + Math.round(clickX) + "," + Math.round(clickY) + ")");
-        if (clickY > bottomThreshold) {
-            log("[免费试定位] 调整后仍在底部区域，拒绝点击（防止误点底部导航）");
+        var cardHeight = cardBounds.bottom - cardBounds.top;
+        var upperClickY = cardBounds.top + Math.min(cardHeight * 0.25, 120);
+        upperClickY = Math.min(upperClickY, bottomSafeY);
+        log("[免费试定位] 卡片中心在底部区域，尝试点击卡片上部：(" + Math.round(clickX) + "," + Math.round(upperClickY) + ")");
+
+        // 仅当卡片上部仍位于底部导航上方时才允许点击；整张卡片都在底部时继续拒绝。
+        if (cardBounds.top >= bottomSafeY || upperClickY <= cardBounds.top || upperClickY >= cardBounds.bottom) {
+            log("[免费试定位] 卡片上部也进入底部导航区域，拒绝点击（防止误点底部导航）");
             return { ok: false, reason: "卡片在底部导航区域" };
         }
+        clickY = upperClickY;
     }
 
     log("[免费试定位] 卡片 bounds：[" + cardBounds.left + "," + cardBounds.top + "," + cardBounds.right + "," + cardBounds.bottom + "]");
@@ -5692,7 +5858,9 @@ function main() {
 
     if (CONFIG.SELECT_FOOD_CATEGORY) {
         try {
-            __foodCategorySelected = selectFoodCategory();
+            var foodClickConfirmed = selectFoodCategory();
+            // 点击结果不可靠时，以列表顶部实际显示的“美食”筛选标签兜底。
+            __foodCategorySelected = foodClickConfirmed || isFoodFilterSelectedOnList();
             log("[列表] 美食分类筛选：" +
                 (__foodCategorySelected ? "已选择" : "未确认，按页面实际文案继续扫描"));
         } catch (e) {
