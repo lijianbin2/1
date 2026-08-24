@@ -115,7 +115,9 @@ async function main(config) {
   const customRules = [
     "DOMAIN,cpa.wisdamsatan.de,DIRECT",
     "DOMAIN-SUFFIX,bingosoft.net,DIRECT",
-    "DOMAIN-SUFFIX,opencode.ai,AI服务"               // opencode.ai 走 AI服务组
+    "DOMAIN-SUFFIX,opencode.ai,AI服务",               // opencode.ai 走 AI服务组
+    "DOMAIN-SUFFIX,javdb.com,选择代理",             // javdb.com 主站走选择代理组（须排在 KEYWORD 之前）
+    "DOMAIN-KEYWORD,javdb,DIRECT"                  // 其余含 javdb 的域名一律直连
   ];
 
   const oldRules = config["rules"] || [];
