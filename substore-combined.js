@@ -96,6 +96,14 @@ async function main(config) {
     delete config["hosts"];
   }
 
+
+  // ================= 后处理：从选择代理中排除「自动选择」 =================
+  for (const g of config["proxy-groups"]) {
+    if (g.name === "选择代理") {
+      g.proxies = (g.proxies || []).filter(p => p !== "自动选择");
+    }
+  }
+
   // ================= 后处理：新增「非香港节点」故障转移组（置于分组列表最后） =================
   const __nonHkRegionGroups = (config["proxy-groups"] || [])
     .map(g => g.name)
