@@ -120,10 +120,12 @@ async function main(config) {
     });
   }
 
-  // ================= 后处理：把「非香港节点」插入 AI服务 / 谷歌服务 最前面 =================
+  // ================= 后处理：把「非香港节点」插入 AI服务 最前面，AI服务 插入谷歌服务 =================
   for (const g of config["proxy-groups"]) {
-    if (g.name === "AI服务" || g.name === "谷歌服务") {
+    if (g.name === "AI服务") {
       g.proxies = ["非香港节点", ...(g.proxies || [])];
+    } else if (g.name === "谷歌服务") {
+      g.proxies = ["AI服务", ...(g.proxies || [])];
     }
   }
 
