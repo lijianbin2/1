@@ -96,8 +96,8 @@ async function main(config) {
     delete config["hosts"];
   }
 
-  // ================= 后处理：从 AI服务 / 谷歌服务 中排除「选择代理」「香港节点」 =================
-  const __excludeFromGroups = ["选择代理", "香港节点"];
+  // ================= 后处理：从 AI服务 / 谷歌服务 中排除「选择代理」 =================
+  const __excludeFromGroups = ["选择代理"];
   for (const g of config["proxy-groups"]) {
     if (g.name === "AI服务" || g.name === "谷歌服务") {
       g.proxies = (g.proxies || []).filter(p => !__excludeFromGroups.includes(p));
@@ -108,6 +108,29 @@ async function main(config) {
   for (const g of config["proxy-groups"]) {
     if (g.name === "选择代理") {
       g.proxies = (g.proxies || []).filter(p => p !== "自动选择");
+    }
+  }
+
+  // ================= 后处理：新增「非香港节点」故障转移组（置于分组列表最后） =================
+  const __nonHkRegionGroups = (config["proxy-groups"] || [])
+    .map(g => g.name)
+    .filter(name => /节点$/.test(name) && name !== "香港节点");
+
+  if (__nonHkRegionGroups.length > 0) {
+    config["proxy-groups"].push({
+      name: "非香港节点",
+      type: "fallback",
+      url: "https://www.gstatic.com/generate_204",
+      interval: 300,
+      tolerance: 50,
+      proxies: __nonHkRegionGroups
+    });
+  }
+
+  // ================= 后处理：把「非香港节点」插入 AI服务 / 谷歌服务 最前面 =================
+  for (const g of config["proxy-groups"]) {
+    if (g.name === "AI服务" || g.name === "谷歌服务") {
+      g.proxies = ["非香港节点", ...(g.proxies || [])];
     }
   }
 
