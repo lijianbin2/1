@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         JavDB 万能磁链提取器
 // @namespace    http://tampermonkey.net/
-// @version      5.10.3
-// @description  JavDB 磁链批量提取：支持按当前列表、番号段、女优/组合三种模式抓取磁力链接；自动优先字幕版并选择最小体积，去重后导出迅雷专用 TXT；内置 429/封禁重试、备用域名自动切换与多标签排队保护；自动跳过时长超过 2.5 小时(150 分钟)的作品。
+// @version      5.10.4
+// @description  JavDB 磁链批量提取：支持按当前列表、番号段、女优/组合三种模式抓取磁力链接；自动优先字幕版并选择最小体积，去重后导出迅雷专用 TXT；内置 429/封禁重试、备用域名自动切换与多标签排队保护；自动跳过 VR 及时长超过 2.5 小时(150 分钟)的作品。
 // @author       Assistant
 // @license      MIT
 // @match        *://*.javdb574.com/*
@@ -515,6 +515,23 @@
     return null;
   }
 
+  function hasVrCategory(doc) {
+    const panel = doc.querySelector('.movie-panel-info');
+    const blocks = panel ? panel.querySelectorAll('.panel-block') : doc.querySelectorAll('.panel-block');
+
+    for (const block of blocks) {
+      const labelEl = block.querySelector('strong');
+      const label = (labelEl ? labelEl.textContent : '').replace(/[:：]\s*$/, '').trim().toLowerCase();
+      if (!/^(?:類別|类别|分類|分类|categories?|genres?)$/.test(label)) continue;
+
+      const categories = Array.from(block.querySelectorAll('.value a, a'));
+      const hasVr = categories.some(el => /(?:^|[^a-z0-9])vr(?:$|[^a-z0-9])/i.test((el.textContent || '').trim()));
+      if (hasVr) return true;
+    }
+
+    return false;
+  }
+
   // resolve relative hrefs to absolute
   function toAbsoluteUrl(href) {
     try {
@@ -539,6 +556,11 @@
 
       const parser = new DOMParser();
       const detailDoc = parser.parseFromString(detailHtml, 'text/html');
+
+      if (hasVrCategory(detailDoc)) {
+        log(`[-] ${movieCode} 類別含 VR，跳过`);
+        return null;
+      }
 
       if (genreTarget) {
         const genreLower = genreTarget.toLowerCase();
