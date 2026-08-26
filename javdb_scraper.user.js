@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         JavDB 万能磁链提取器
 // @namespace    http://tampermonkey.net/
-// @version      5.10.2
+// @version      5.10.3
 // @description  JavDB 磁链批量提取：支持按当前列表、番号段、女优/组合三种模式抓取磁力链接；自动优先字幕版并选择最小体积，去重后导出迅雷专用 TXT；内置 429/封禁重试、备用域名自动切换与多标签排队保护；自动跳过时长超过 2.5 小时(150 分钟)的作品。
 // @author       Assistant
 // @license      MIT
@@ -26,6 +26,7 @@
   let shouldStop = false;
   let currentMode = 'current';
   let fetchedCount = 0;
+  const ITEM_INTERVAL_MS = 2000;
 
   function autoCheckRememberMe() {
     const checkboxes = document.querySelectorAll('input[type="checkbox"]');
@@ -331,7 +332,7 @@
   panel.id = 'javdb-scraper-panel';
   panel.innerHTML = `
     <div id="scraper-header" style="font-weight: bold; margin-bottom: 8px; font-size: 14px; border-bottom: 1px solid #444; padding-bottom: 4px; cursor: move; user-select: none; display: flex; justify-content: space-between; align-items: center;">
-      <span>🐢 JavDB 磁链提取器 v5.10.2 (正常速度版)</span>
+      <span>🐢 JavDB 磁链提取器 v5.10.3 (2秒间隔版)</span>
       <span style="font-size: 10px; color: #888;">(按住拖动)</span>
     </div>
 
@@ -407,7 +408,7 @@
     </div>
 
     <div id="scraper-log" style="margin-top: 8px; height: 90px; overflow-y: auto; background: #1e1e1e; color: #00ff66; padding: 6px; font-family: monospace; font-size: 11px; border-radius: 4px;">
-      🐢 正常速度版已就绪：已移除固定延时与定期休息，按正常速度抓取...
+      🐢 已就绪：每个作品之间保持 2 秒间隔，降低请求频率...
     </div>
   `;
 
@@ -646,6 +647,22 @@
     statusEl.innerText = '状态: 正在抓取中...';
     const results = [];
     const parser = new DOMParser();
+    let lastItemStartedAt = 0;
+
+    async function waitForNextItemSlot() {
+      if (!lastItemStartedAt) {
+        lastItemStartedAt = Date.now();
+        return;
+      }
+
+      const elapsed = Date.now() - lastItemStartedAt;
+      const waitMs = ITEM_INTERVAL_MS - elapsed;
+      if (waitMs > 0) {
+        log(`⏳ 等待 ${(waitMs / 1000).toFixed(1)} 秒后处理下一个...`);
+        await sleep(waitMs);
+      }
+      lastItemStartedAt = Date.now();
+    }
 
 
     try {
@@ -686,6 +703,7 @@
 
                 for (let idx = 0; idx < items.length; idx++) {
                   if (shouldStop) break;
+                  await waitForNextItemSlot();
                   const item = items[idx];
                   const aTag = item.querySelector('a');
                   if (!aTag) continue;
@@ -732,6 +750,7 @@
         let domainJumped = false;
         for (let i = startNum; i <= endNum; i++) {
           if (shouldStop || domainJumped) break;
+          await waitForNextItemSlot();
 
           const rawNumStr = String(i);
           const pad3Str = rawNumStr.padStart(3, '0');
@@ -951,6 +970,7 @@
 
             for (let idx = 0; idx < movieItems.length; idx++) {
               if (shouldStop) break;
+              await waitForNextItemSlot();
               const item = movieItems[idx];
               const aTag = item.querySelector('a');
               if (!aTag) continue;
