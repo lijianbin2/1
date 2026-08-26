@@ -107,7 +107,7 @@ async function main(config) {
   // ================= 后处理：新增「非香港节点」故障转移组（置于分组列表最后） =================
   const __nonHkRegionGroups = (config["proxy-groups"] || [])
     .map(g => g.name)
-    .filter(name => /^(?:香港|澳门|台湾|新加坡|日本|韩国|美国|加拿大|英国|澳大利亚|德国|法国|俄罗斯|泰国|印度|马来西亚|阿根廷|芬兰|埃及|菲律宾|土耳其|乌克兰)节点$/.test(name));
+    .filter(name => /^(?:澳门|台湾|新加坡|日本|韩国|美国|加拿大|英国|澳大利亚|德国|法国|俄罗斯|泰国|印度|马来西亚|阿根廷|芬兰|埃及|菲律宾|土耳其|乌克兰)节点$/.test(name));
 
   if (__nonHkRegionGroups.length > 0) {
     config["proxy-groups"].push({
