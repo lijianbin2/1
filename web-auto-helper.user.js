@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         网页自动助手
 // @namespace    http://tampermonkey.net/
-// @version      20.6
-// @description  打开仪表板后自动跳转商品页并点击同步闲鱼商品；在“自动发货”页面按容器精确定位开关，持续轮询自动开启，并自动打开最新商品；全网检测 Cloudflare Error 1015 限速并自动每 10 秒重试 2 次刷新
+// @version      20.7
+// @description  打开仪表板后自动跳转商品页并点击同步闲鱼商品；在“自动发货”页面按容器精确定位开关，持续轮询自动开启，并自动打开最新商品；/goods页未找到Cookie时自动跳/connection并点首个账号后新标签打开闲鱼；全网检测 Cloudflare Error 1015 限速并自动每 10 秒重试 2 次刷新
 // @match        *://*/*
 // @grant        none
 // @run-at       document-idle
@@ -305,22 +305,35 @@
 
 
     // ===== 新增：未找到 Cookie 自动处理 =====
-    const COOKIE_MISSING_TEXTS = ['未找到账号Cookie', '未找到Cookie', '未找到账号 Cookie'];
+    const COOKIE_MISSING_TEXTS = ['未找到账号Cookie', '未找到Cookie', '未找到账号 Cookie', '未找到cookies', '未找到 cookies'];
     const CONNECTION_PATH = '/connection';
+    const GOODS_PATH = '/goods';
     const GOOFISH_URL = 'https://www.goofish.com/';
     let cookieMissingNavigated = false;
     let firstAccountClickedAt = 0;
     let goofishOpened = false;
 
+    // v20.7: /goods 为主触发页，兼容 toast 容器
     function hasCookieMissingTip() {
         if (!document.body) return false;
-        const bodyText = document.body.innerText || '';
-        const hitText = COOKIE_MISSING_TEXTS.some(t => bodyText.includes(t));
+        const bodyText = (document.body.innerText || '').toLowerCase();
+        const hitText = COOKIE_MISSING_TEXTS.some(t => bodyText.includes(t.toLowerCase())) || (bodyText.includes('未找到') && bodyText.includes('cookie'));
         if (!hitText) return false;
+        const toastSelectors = ['.ant-message', '.ant-message-notice', '[class*="toast"]', '[class*="message"]', '[role="alert"]', '.el-message', '.notice'];
+        for (const sel of toastSelectors) {
+            try {
+                const els = Array.from(document.querySelectorAll(sel)).filter(isElementVisible);
+                for (const el of els) {
+                    const txt = (el.innerText || el.textContent || '').toLowerCase();
+                    if (txt.includes('未找到') && txt.includes('cookie')) return true;
+                    if (COOKIE_MISSING_TEXTS.some(t => txt.includes(t.toLowerCase()))) return true;
+                }
+            } catch(e) {}
+        }
         const tips = Array.from(document.querySelectorAll('body *')).filter(el => {
             if (!el || el.children.length !== 0) return false;
-            const txt = (el.textContent || '').trim();
-            return COOKIE_MISSING_TEXTS.some(t => txt.includes(t) || (txt.includes('未找到') && txt.includes('Cookie')));
+            const txt = (el.textContent || '').trim().toLowerCase();
+            return COOKIE_MISSING_TEXTS.some(t => txt.includes(t.toLowerCase())) || (txt.includes('未找到') && txt.includes('cookie'));
         });
         if (tips.length === 0) return hitText;
         return tips.some(isElementVisible) || hitText;
@@ -382,19 +395,13 @@
                 firstAccountClickedAt = now;
                 console.log('[咸鱼助手] 点击账号列表第一个账号', (first.innerText || '').slice(0,30));
                 try { first.click(); } catch(e) { first.dispatchEvent(new MouseEvent('click', {bubbles:true})); }
-                setTimeout(() => {
-                    if (goofishOpened) return;
-                    goofishOpened = true;
-                    console.log('[咸鱼助手] 新标签打开闲鱼主页', GOOFISH_URL);
-                    window.open(GOOFISH_URL, '_blank', 'noopener');
-                }, 900);
+                setTimeout(openGoofishNewTab, 700);
+                setTimeout(openGoofishNewTab, 1500);
                 return;
             }
         }
-        if (firstAccountClickedAt && !goofishOpened && now - firstAccountClickedAt > 800) {
-            goofishOpened = true;
-            console.log('[咸鱼助手] 新标签打开闲鱼主页', GOOFISH_URL);
-            window.open(GOOFISH_URL, '_blank', 'noopener');
+        if (firstAccountClickedAt && !goofishOpened && now - firstAccountClickedAt > 700) {
+            openGoofishNewTab();
         }
     }
     const timer = setInterval(() => {
@@ -843,3 +850,4 @@
         }
     })();
 })();
+
