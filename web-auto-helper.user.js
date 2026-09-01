@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         网页自动助手
 // @namespace    http://tampermonkey.net/
-// @version      20.7
-// @description  打开仪表板后自动跳转商品页并点击同步闲鱼商品；在“自动发货”页面按容器精确定位开关，持续轮询自动开启，并自动打开最新商品；/goods页未找到Cookie时自动跳/connection并点首个账号后新标签打开闲鱼；全网检测 Cloudflare Error 1015 限速并自动每 10 秒重试 2 次刷新
+// @version      20.8
+// @description  打开仪表板后自动跳转商品页并点击同步闲鱼商品；在“自动发货”页面按容器精确定位开关，持续轮询自动开启，并自动打开最新商品；/goods页未找到Cookie秒级监听自动跳/connection并点首个账号后新标签打开闲鱼；全网检测 Cloudflare Error 1015 限速并自动每 10 秒重试 2 次刷新
 // @match        *://*/*
 // @grant        none
 // @run-at       document-idle
@@ -404,6 +404,18 @@
             openGoofishNewTab();
         }
     }
+    // v20.8: MutationObserver 秒级捕捉 /goods toast，一闪即跳转，不依赖轮询
+    let cookieMissingObserver = null;
+    function startCookieMissingObserver() {
+        if (cookieMissingObserver) return;
+        if (!document.body) { setTimeout(startCookieMissingObserver, 400); return; }
+        cookieMissingObserver = new MutationObserver(() => {
+            if (cookieMissingNavigated) return;
+            if (hasCookieMissingTip()) handleCookieMissing();
+        });
+        try { cookieMissingObserver.observe(document.body, { childList: true, subtree: true, characterData: true }); } catch(e) {}
+    }
+    startCookieMissingObserver();
     const timer = setInterval(() => {
         handleCookieMissing();
         autoClickFirstAccountAndOpenGoofish();
