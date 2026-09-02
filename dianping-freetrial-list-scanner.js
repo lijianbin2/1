@@ -1,6 +1,6 @@
 // ============================================================
 // 大众点评「免费试」列表扫描筛选（Hamibot 版）
-// 版本：v1.45.12-fix-结婚防循环加固-自动完成闭环
+// 版本：v1.45.13-fix-移除埋点-分类直连坐标-防循环
 //
 // 运行环境：Hamibot 手机客户端
 // 目标 App：大众点评（com.dianping.v1）
@@ -88,80 +88,7 @@
 // ============================================================
 
 // 版本标记：手机端日志中会输出，用来确认运行的是新脚本
-var __SCRIPT_VERSION = "v1.45.12-fix-结婚防循环加固-自动完成闭环";
-
-// 运行结果回传：把摘要 POST 到调试端点便于远程验收。
-// 网络失败静默忽略，绝不影响主流程；无 http 模块的环境（如测试）自动跳过。
-var __TELEMETRY_URL = "https://webhook.site/ed9b17b7-924d-4202-847b-20b986a340e5";
-var __RUN_ID = String(Date.now()) + "-" + Math.floor(Math.random() * 100000);
-
-var __telemetryStage = "starting";
-var __heartbeatStopped = false;
-
-function telemetryStage(stage) {
-    __telemetryStage = stage;
-}
-
-function postTelemetry(payload) {
-    if (typeof http === "undefined" || !http || !http.postJson) {
-        return;
-    }
-
-    try {
-        payload.run = __RUN_ID;
-    } catch (e2) {
-    }
-    try {
-        http.postJson(__TELEMETRY_URL, payload, { headers: { "Content-Type": "application/json" } });
-    } catch (e) {
-    }
-}
-
-function telemetryHeartbeatLoop() {
-    try {
-        if (typeof threads === "undefined" || !threads || !threads.start) {
-            return;
-        }
-
-        threads.start(function () {
-            try {
-                var beats = 0;
-                while (!__heartbeatStopped && beats < 45) {
-                    sleep(60000);
-                    beats++;
-                    postTelemetry({
-                        event: "heartbeat",
-                        version: __SCRIPT_VERSION,
-                        stage: __telemetryStage,
-                        elapsedSec: Math.floor((Date.now() - __scriptStartTime) / 1000),
-                        beat: beats
-                    });
-                }
-            } catch (e2) {
-            }
-        });
-    } catch (e) {
-    }
-}
-
-function postTelemetryItems(items) {
-    var chunk = [];
-    var seq = 0;
-
-    for (var i = 0; i < items.length; i++) {
-        chunk.push(items[i]);
-
-        if (chunk.length >= 12) {
-            postTelemetry({ event: "items", version: __SCRIPT_VERSION, seq: seq, items: chunk });
-            chunk = [];
-            seq++;
-        }
-    }
-
-    if (chunk.length > 0) {
-        postTelemetry({ event: "items", version: __SCRIPT_VERSION, seq: seq, items: chunk });
-    }
-}
+var __SCRIPT_VERSION = "v1.45.13-fix-移除埋点-分类直连坐标-防循环";
 
 var CONFIG = {
     PACKAGE: "com.dianping.v1",
@@ -1241,17 +1168,7 @@ function entryStallCheck() {
     log("入口卡住诊断：已运行 " + elapsed + " 秒，仍停留在首页寻找「免费试」");
     var info = getEntryStallInfo();
 
-    if (typeof postTelemetry === "function" && info) {
-        postTelemetry({
-            event: "entry_stalled",
-            version: __SCRIPT_VERSION,
-            pkg: info.pkg,
-            candidates: info.candidates,
-            visible: info.visible,
-            related: info.related
-        });
     }
-}
 
 // 免费试列表页一定会出现的顶部特征
 var LIST_MARKERS = ["全部商区", "全部分类", "智能排序", "更多筛选", "免费抽"];
@@ -2159,15 +2076,7 @@ function enterFreeTrialManual() {
     log("请手动进入大众点评「免费试」列表页后重新运行；当前前台：" +
         (getCurrentPackage() || "未知"));
 
-    if (typeof postTelemetry === "function") {
-        postTelemetry({
-            event: "manual_entry_timeout",
-            version: __SCRIPT_VERSION,
-            pkg: getCurrentPackage(),
-            visible: getVisibleSample(25)
-        });
-    }
-    toastMsg("未检测到免费试列表，脚本停止");
+        toastMsg("未检测到免费试列表，脚本停止");
     dumpRelatedDiagnostics();
     return false;
 }
@@ -2195,15 +2104,7 @@ function enterFreeTrial() {
         log("入口阶段硬超时：已等待 " + timeoutSec + " 秒仍未进入「免费试」列表，停止避免空转");
         log("最终前台应用：" + (getCurrentPackage() || "未知"));
 
-        if (typeof postTelemetry === "function") {
-            postTelemetry({
-                event: "entry_timeout",
-                version: __SCRIPT_VERSION,
-                pkg: getCurrentPackage(),
-                visible: getVisibleSample(25)
-            });
-        }
-        toastMsg("入口阶段超时，请查看 Hamibot 日志后重新运行");
+                toastMsg("入口阶段超时，请查看 Hamibot 日志后重新运行");
         dumpRelatedDiagnostics();
         return false;
     };
@@ -2302,15 +2203,7 @@ function enterFreeTrial() {
         Math.round(CONFIG.PATIENCE_MS / 1000) + " 秒）");
     toastMsg("持续扫描「免费试」入口中");
 
-    if (typeof postTelemetry === "function") {
-        postTelemetry({
-            event: "entry_patience",
-            version: __SCRIPT_VERSION,
-            pkg: getCurrentPackage(),
-            visible: getVisibleSample(20)
-        });
-    }
-
+    
     var patienceRemaining = Math.min(
         CONFIG.PATIENCE_MS,
         Math.max(0, entryDeadline - Date.now())
@@ -2328,16 +2221,7 @@ function enterFreeTrial() {
         dismissCommonDialogs();
         var again = findFreeTrialCandidates();
 
-        if (typeof postTelemetry === "function") {
-            postTelemetry({
-                event: "entry_tick",
-                version: __SCRIPT_VERSION,
-                pkg: getCurrentPackage(),
-                candidates: again.length,
-                visible: getVisibleSample(20)
-            });
-        }
-
+        
         if (again.length) {
             log("耐心扫描找到候选节点：" + again.length + " 个");
 
@@ -2358,15 +2242,7 @@ function enterFreeTrial() {
 
     log("仍未找到「免费试」入口，输出最终诊断");
 
-    if (typeof postTelemetry === "function") {
-        postTelemetry({
-            event: "entry_fail",
-            version: __SCRIPT_VERSION,
-            pkg: getCurrentPackage(),
-            visible: getVisibleSample(25)
-        });
-    }
-    toastMsg("找不到免费试入口，请看 Hamibot 日志");
+        toastMsg("找不到免费试入口，请看 Hamibot 日志");
     dumpRelatedDiagnostics();
     return false;
 }
@@ -2447,39 +2323,7 @@ function selectFoodCategory() {
             log("未找到\u5168\u90e8\u5206\u7c7b，但页面已有\u7f8e\u98df且已选中，继续");
             return true;
         }
-        var fallbackCats = ["丽人","结婚","亲子","玩乐","学习培训","生活服务","逛街"];
-        var uniq = {};
-        for (var fi = 0; fi < fallbackCats.length; fi++) {
-            var catName = fallbackCats[fi];
-            if (uniq[catName]) continue;
-            uniq[catName] = true;
-            try {
-                var candNodes = [];
-                try { eachNode(text(catName).find(), function(n){ candNodes.push(n); }); } catch(e){}
-                var topCand = null;
-                for (var ci=0; ci<candNodes.length; ci++) {
-                    try {
-                        var cb = candNodes[ci].bounds();
-                        var ccy = (cb.top+cb.bottom)/2;
-                        if (ccy>80 && ccy<500) { topCand = candNodes[ci]; break; }
-                    } catch(e){}
-                }
-                if (topCand) {
-                    var clickedTop = false;
-                    try { clickedTop = clickObj(topCand); } catch(e){}
-                    if (!clickedTop) try { clickedTop = clickNodeSmart(topCand); } catch(e){}
-                    if (clickedTop) {
-                        log("点击顶部" + catName + "打开面板");
-                        catOpened = true; break;
-                    }
-                }
-            } catch(e){}
-            if (clickText(catName, 800)) {
-                log("点击\u2018" + catName + "\u2019打开分类面板（通用兜底）");
-                catOpened = true;
-                break;
-            }
-        }
+        // v1.45.13: 移除 结婚/丽人兜底点击，改为坐标直连
         if (!catOpened) {
             try {
                 var infos = getVisibleTextInfos();
@@ -4156,8 +4000,7 @@ function scanFreeTrialList() {
             consecutiveNoFreeDraw = 0;
         }
         if (page % 10 === 9) {
-            postTelemetry({ event: "scan_page", version: __SCRIPT_VERSION, page: page + 1, found: totalNew });
-        }
+                    }
 
         // 记录扫描阶段见过的全部活动名（归一化），首屏单独留样，
         // 供处理阶段确认到顶 / 判断列表是否被整体刷新
@@ -4262,10 +4105,7 @@ function scanFreeTrialList() {
 
                 results.push({ activity: it, status: inlineStatus });
                 logAutoSignupResult(it, inlineStatus, results.length - 1, qualifiedList.length);
-                if (typeof postTelemetry === "function") {
-                    postTelemetry({ event: "progress", version: __SCRIPT_VERSION, n: results.length, total: qualifiedList.length, name: String(it.name || "").substring(0, 30), status: String(inlineStatus).substring(0, 60) });
-                }
-                // 等级资格弹窗表示当前账号无法报名后续同批次活动；停在详情页结束，
+                                // 等级资格弹窗表示当前账号无法报名后续同批次活动；停在详情页结束，
                 // 避免关闭弹窗后继续点下一家。
                 if (gStopAfterLevelRequirement) {
                     endReason = gStopAfterLevelRequirementReason || "等级资格不足，停止后续报名";
@@ -4468,16 +4308,7 @@ function scanFreeTrialList() {
     log("已报名：" + cntAlready);
     log("不可报名：" + cntUnavailable);
     log("失败/无法确认：" + cntFailed);
-    if (typeof postTelemetry === "function") {
-        var tItems = [];
-        for (var ti = 0; ti < results.length; ti++) {
-            var tt = results[ti].activity;
-            tItems.push({ n: ti + 1, name: String(tt.name || "").substring(0, 40), value: tt.value, area: tt.area || "", status: String(results[ti].status).substring(0, 60) });
-        }
-        postTelemetry({ event: "summary", version: __SCRIPT_VERSION, qualifiedTotal: qualifiedList.length, processed: results.length, success: cntSuccess, already: cntAlready, unavailable: cntUnavailable, failed: cntFailed });
-        postTelemetryItems(tItems);
-    }
-    toastMsg("扫描及自动报名完成");
+        toastMsg("扫描及自动报名完成");
     setScriptState("DONE");
 
     return {
@@ -6000,12 +5831,8 @@ function main() {
         return;
     }
 
-    telemetryStage("accessibility_ok");
 
-    if (typeof postTelemetry === "function") {
-        postTelemetry({ event: "stage", version: __SCRIPT_VERSION, stage: "accessibility_ok" });
-    }
-
+    
     try {
         log("屏幕尺寸：" + device.width + "x" + device.height);
     } catch (e) {
@@ -6015,20 +5842,12 @@ function main() {
     if (CONFIG.MANUAL_ENTRY) {
         // v1.8.8：不自动拉起/点击首页，只等用户手动停在「免费试」列表页。
         log("启动模式：手动入口（请确认已手动进入大众点评「免费试」列表页）");
-        telemetryStage("manual_entry_wait");
 
-        if (typeof postTelemetry === "function") {
-            postTelemetry({ event: "stage", version: __SCRIPT_VERSION, stage: "manual_entry_wait" });
-        }
-    } else {
+            } else {
         launchDianping();
         dismissCommonDialogs();
-        telemetryStage("launched");
 
-        if (typeof postTelemetry === "function") {
-            postTelemetry({ event: "stage", version: __SCRIPT_VERSION, stage: "launched" });
-        }
-
+        
         var foregroundOk = false;
 
         try {
@@ -6058,13 +5877,8 @@ function main() {
 
         // 只有真实进入列表才标记 trials_entered；v1.8.7 之前入口卡住时
         // 该阶段永远不出现，便于按日志区分「已进列表」和「仍在找入口」。
-        telemetryStage("trials_entered");
-        __heartbeatStopped = true;
 
-        if (typeof postTelemetry === "function") {
-            postTelemetry({ event: "stage", version: __SCRIPT_VERSION, stage: "trials_entered" });
-        }
-    } catch (e) {
+            } catch (e) {
         logError("进入「免费试」异常", e);
         return;
     }
@@ -6090,12 +5904,8 @@ function main() {
     } catch (e) {
         logError("确认全部地区异常", e);
     }
-    telemetryStage("regions_ok");
 
-    if (typeof postTelemetry === "function") {
-        postTelemetry({ event: "stage", version: __SCRIPT_VERSION, stage: "regions_ok" });
-    }
-
+    
     if (CONFIG.SELECT_FOOD_CATEGORY) {
         try {
             var foodClickConfirmed = selectFoodCategory();
@@ -6145,12 +5955,8 @@ function main() {
     log("[列表] 等待完成，开始扫描");
 
     try {
-    telemetryStage("scanning");
 
-    if (typeof postTelemetry === "function") {
-        postTelemetry({ event: "stage", version: __SCRIPT_VERSION, stage: "scanning" });
-    }
-
+    
         scanFreeTrialList();
     } catch (e) {
         logError("扫描免费试列表异常", e);
@@ -6164,39 +5970,12 @@ function main() {
 
 var __scriptStartTime = Date.now();
 
-if (typeof postTelemetry === "function") {
-    postTelemetry({ event: "start", version: __SCRIPT_VERSION });
-}
-
-if (typeof telemetryHeartbeatLoop === "function") {
-    telemetryHeartbeatLoop();
-}
-
 try {
     main();
 } catch (e) {
     logError("脚本异常", e);
-
-    if (typeof postTelemetry === "function") {
-        postTelemetry({ event: "fatal", version: __SCRIPT_VERSION, error: String(e) });
-    }
-}
-
-__heartbeatStopped = true;
-
-if (typeof postTelemetry === "function") {
-    postTelemetry({ event: "end", version: __SCRIPT_VERSION });
 }
 if (Date.now() - __scriptStartTime < 5000) {
     log("脚本在 5 秒内提前结束，请把上方所有日志发给开发者排查");
     toastMsg("脚本提前结束，请查看 Hamibot 日志");
 }
-
-
-
-
-
-
-
-
-
