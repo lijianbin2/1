@@ -1,4 +1,4 @@
-// ============================================================
+﻿// ============================================================
 // 大众点评「免费试」列表扫描筛选（Hamibot 版）
 // 版本：v1.45.14-fix-美食防误判-返回去重
 //
@@ -88,7 +88,7 @@
 // ============================================================
 
 // 版本标记：手机端日志中会输出，用来确认运行的是新脚本
-var __SCRIPT_VERSION = "v1.45.14-fix-美食防误判-返回去重";
+var __SCRIPT_VERSION = "v1.45.15-fix-美食强校验-未进不扫";
 
 var CONFIG = {
     PACKAGE: "com.dianping.v1",
@@ -2294,20 +2294,9 @@ function isFoodFilterSelectedOnList() {
             if (isPanelCategoryText(__tt14) && __cy14 > 300 && __cy14 < 1300 && __cx14 < 320) __panelCnt14++;
         }
         if (__panelCnt14 >= 3) return false;
+        if (__panelCnt14 >= 2) return false;
     } catch(ePC14) {}
-    try {
-        var probeNodes14 = [];
-        try { eachNode(text("美食").find(), function(n){ probeNodes14.push(n); }); } catch(e) {}
-        try { eachNode(descContains("美食").find(), function(n){ probeNodes14.push(n); }); } catch(e2) {}
-        try { eachNode(textContains("美食").find(), function(n){ probeNodes14.push(n); }); } catch(e3) {}
-        for (var pi14=0; pi14<probeNodes14.length; pi14++) {
-            try {
-                var nb14 = probeNodes14[pi14].bounds();
-                var ncy14 = (nb14.top + nb14.bottom)/2;
-                if (ncy14 >= -100 && ncy14 < 600) return true;
-            } catch(eB14) {}
-        }
-    } catch(e14) {}
+    // v1.45.15: 移除探针宽松返回，必须经顶部同行校验
     var __infosTop14 = null;
     var __hasMarker14 = false;
     var __otherCatAtTop14 = false;
@@ -2332,6 +2321,7 @@ function isFoodFilterSelectedOnList() {
             }
         }
     } catch(eTop14) {}
+    if (__otherCatAtTop14) return false;
     try {
         if (__infosTop14) {
             for (var i14 = 0; i14 < __infosTop14.length; i14++) {
@@ -2347,20 +2337,19 @@ function isFoodFilterSelectedOnList() {
                         }
                     } catch(eNear14) {}
                     if (__nearTop2_14) return true;
-                    if (!__hasMarker14) return true;
+                    if (!__hasMarker14) {
+                        try {
+                            var __mk15 = waitForListMarkers(800);
+                            if (__mk15 && __panelCnt14===0) return true;
+                        } catch(e){ }
+                        return false;
+                    }
                     if (__otherCatAtTop14) return false;
                     return true;
                 }
             }
         }
     } catch (e2_14) {}
-    try {
-        if (__panelCnt14 < 2 && !__otherCatAtTop14) {
-            var __mk14 = null;
-            try { __mk14 = waitForListMarkers(800); } catch(eMk14) {}
-            if (__mk14) return true;
-        }
-    } catch(eFallback14) {}
     return false;
 }
 
@@ -2487,15 +2476,7 @@ function selectFoodCategory() {
             log("校验通过：顶部已出现美食");
             return true;
         }
-        log("警告：坐标点击美食后顶部仍未出现\u7f8e\u98df，兜底校验");
-        try {
-            var hasListMarker = false;
-            try { hasListMarker = waitForListMarkers(1200) !== null; } catch(e){}
-            if (hasListMarker) {
-                log("列表标记仍在，视为选择完成（兜底）");
-                return true;
-            }
-        } catch(e){}
+        log("警告：坐标点击美食后顶部仍未出现\u7f8e\u98df，视为未选中");
         return false;
     }
     sleepMs(900);
@@ -2516,14 +2497,6 @@ function selectFoodCategory() {
             log("重试后校验通过");
             return true;
         }
-        try {
-            var marker2 = null;
-            try { marker2 = waitForListMarkers(1000);}catch(e){}
-            if (marker2) {
-                log("重试后列表标记存在，兜底视为完成");
-                return true;
-            }
-        } catch(e){}
         log("点击\u7f8e\u98df后校验仍失败");
         return false;
     }
@@ -5966,9 +5939,25 @@ function main() {
         try {
             var foodClickConfirmed = selectFoodCategory();
             // 点击结果不可靠时，以列表顶部实际显示的“美食”筛选标签兜底。
-            __foodCategorySelected = foodClickConfirmed || isFoodFilterSelectedOnList();
+            __foodCategorySelected = foodClickConfirmed && isFoodFilterSelectedOnList();
             log("[列表] 美食分类筛选：" +
-                (__foodCategorySelected ? "已选择" : "未确认，按页面实际文案继续扫描"));
+                (__foodCategorySelected ? "已选择" : "未选中"));
+            if (!__foodCategorySelected) {
+                log("[列表] 二次校验");
+                sleepMs(800);
+                __foodCategorySelected = isFoodFilterSelectedOnList();
+                if (!__foodCategorySelected) {
+                    log("[列表] 二次校验仍未选中，重试一次选择美食");
+                    try { foodClickConfirmed = selectFoodCategory(); } catch(eR) {}
+                    __foodCategorySelected = foodClickConfirmed && isFoodFilterSelectedOnList();
+                    log("[列表] 重试后：" + (__foodCategorySelected ? "已选择" : "未选中"));
+                }
+                if (!__foodCategorySelected) {
+                    log("[列表] 未能进入美食分类，停止扫描以免误扫其他分类");
+                    toastMsg("未进入美食分类，已停止");
+                    return;
+                }
+            }
         } catch (e) {
             logError("选择「美食」分类异常", e);
         }
