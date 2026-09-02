@@ -1,6 +1,6 @@
 // ============================================================
 // 大众点评「免费试」列表扫描筛选（Hamibot 版）
-// 版本：v1.45.23-fix-面板坐标直点+等待延长+诊断
+// 版本：v1.45.24-fix-美食desc兜底+左列cx限制+详细诊断
 //
 // 运行环境：Hamibot 手机客户端
 // 目标 App：大众点评（com.dianping.v1）
@@ -2332,7 +2332,7 @@ function isFoodFilterSelectedOnList() {
     } catch(eTop14) {}
     if (!__hasMarker14) {
         try {
-            if (text("\u5168\u90e8\u5546\u533a").exists() || text("\u667a\u80fd\u6392\u5e8f").exists() || text("\u66f4\u591a\u7b5b\u9009").exists()) __hasMarker14 = true;
+            if (text("\u5168\u90e8\u5546\u533a").exists() || text("\u667a\u80fd\u6392\u5e8f").exists() || text("\u66f4\u591a\u7b5b\u9009").exists() || desc("全部商区").exists() || desc("智能排序").exists()) __hasMarker14 = true;
             else { var __mkScan = null; try { __mkScan = scanHasAnyMarker(); } catch(e){} if (__mkScan) __hasMarker14 = true; }
         } catch(e){}
     }
@@ -2422,6 +2422,27 @@ function isFoodFilterSelectedOnList() {
         }
     } catch(eFoodApi){}
     try {
+        var _descNodes=[]; try{ eachNode(desc("美食").find(), function(n){_descNodes.push(n);}); }catch(e){}
+        try{ eachNode(descContains("美食").find(), function(n){_descNodes.push(n);}); }catch(e){}
+        for (var _di=0; _di<_descNodes.length; _di++) {
+            try {
+                var _db=_descNodes[_di].bounds(); var _dcy=(_db.top+_db.bottom)/2; var _dcx=(_db.left+_db.right)/2;
+                if (_dcy >= -200 && _dcy < 1300) {
+                    if (_dcx < 320 && _dcy > 300) continue;
+                    var _isNearD=false;
+                    if (__hasMarker14) {
+                        var _mkD=[]; try{ eachNode(text("全部商区").find(),function(n){_mkD.push(n);}); }catch(e){}
+                        try{ eachNode(text("智能排序").find(),function(n){_mkD.push(n);}); }catch(e){}
+                        try{ eachNode(text("更多筛选").find(),function(n){_mkD.push(n);}); }catch(e){}
+                        try{ eachNode(desc("全部商区").find(),function(n){_mkD.push(n);}); }catch(e){}
+                        for(var _mD=0;_mD<_mkD.length;_mD++){ try{ var _mbD=_mkD[_mD].bounds(); var _mcyD=(_mbD.top+_mbD.bottom)/2; if(Math.abs(_mcyD-_dcy)<110){_isNearD=true;break;}}catch(e){}}
+                    } else { _isNearD=true; }
+                    if(_isNearD) return true;
+                }
+            } catch(e){}
+        }
+    } catch(eDescApi){}
+    try {
         if (__hasMarker14 && __panelCnt14 < 2) {
             for (var __lf14=0; __lf14<__infosTop14.length; __lf14++) {
                 var __lft14 = String(__infosTop14[__lf14].text||"").trim();
@@ -2441,7 +2462,7 @@ function isFoodFilterSelectedOnList() {
             }
         }
     } catch(eLen20) {}
-    try { var _dbgFood=0; try{ _dbgFood=text("美食").find().length; }catch(e){} log("[诊断] 美食校验失败 panelCnt="+__panelCnt14+" hasMarker="+__hasMarker14+" otherCat="+__otherCatAtTop14+" foodTextNodes="+_dbgFood); } catch(e){}
+    try { var _dbgFood=0; var _dbgDesc=0; var _dbgAllTop=""; try{ _dbgFood=text("美食").find().length; }catch(e){} try{ _dbgDesc=desc("美食").find().length; }catch(e){} try{ var __sample=[]; for(var __si=0;__si<Math.min(8,__infosTop14.length);__si++){ __sample.push(__infosTop14[__si].text+"@"+Math.round(__infosTop14[__si].cy)); } _dbgAllTop=__sample.join("|"); }catch(e){} log("[诊断] 美食校验失败 panelCnt="+__panelCnt14+" hasMarker="+__hasMarker14+" otherCat="+__otherCatAtTop14+" foodTextNodes="+_dbgFood+" descNodes="+_dbgDesc+" topSample="+_dbgAllTop); } catch(e){}
     return false;
 }
 
@@ -2492,17 +2513,18 @@ function selectFoodCategory() {
     }
     sleepMs(900);
     var foodCoord = null;
+    var __dbgCandidates=[];
     var deadline = Date.now() + 4500;
     while (Date.now() < deadline) {
         try {
             var infos2 = getVisibleTextInfos();
             for (var k = 0; k < infos2.length; k++) {
-                if (infos2[k].text === "美食" && infos2[k].cy > 320 && infos2[k].cy < 1150) {
+                if (infos2[k].text === "美食") { __dbgCandidates.push(infos2[k]); if (infos2[k].cy > 320 && infos2[k].cy < 1300 && infos2[k].cx < 320) {
                     foodCoord = infos2[k];
                     break;
-                }
+                }}
             }
-            if (foodCoord) break;
+            if (foodCoord) { try{ log("[诊断] 面板美食候选数="+__dbgCandidates.length+" 选中("+Math.round(foodCoord.cx)+","+Math.round(foodCoord.cy)+")"); }catch(e){} break; }
         } catch(e){}
         sleepMs(300);
     }
@@ -2524,14 +2546,15 @@ function selectFoodCategory() {
             if(bestNode2){ try{ var cur2=bestNode2; for(var d2=0;d2<2;d2++){ try{ if(cur2.clickable&&cur2.clickable()){ if(cur2.click()){ log("备用祖先点击成功 depth="+d2); break;}} }catch(e){} try{ var par2=cur2.parent(); if(!par2||par2===cur2) break; cur2=par2;}catch(e){break;} } }catch(e){} }
         } catch(e){}
     }
+    if (!foodCoord && __dbgCandidates.length>0) { try{ var __candStr=""; for(var __ci=0;__ci<Math.min(5,__dbgCandidates.length);__ci++){ __candStr+=__dbgCandidates[__ci].text+"("+Math.round(__dbgCandidates[__ci].cx)+","+Math.round(__dbgCandidates[__ci].cy)+") "; } log("[诊断] 无左列美食候选，候选:"+__candStr); }catch(e){} }
     if (!food && !isCoordClicked) {
         log("分类中没有\u7f8e\u98df");
         dumpVisibleTexts(25);
         try { goBack(); sleepMs(600); } catch(e){ }
         return false;
     }
-    // v1.45.16 wait panel close
-    try { var __waitEnd = Date.now() + 4000; while (Date.now() < __waitEnd) { var __pc=0; try{var __infosW=getVisibleTextInfos(); for(var __wi=0;__wi<__infosW.length;__wi++){if(isPanelCategoryText(String(__infosW[__wi].text||'').trim())&&__infosW[__wi].cy>300&&__infosW[__wi].cy<1300&&__infosW[__wi].cx<320)__pc++;}}catch(e){} if(__pc<2)break; sleepMs(300);} }catch(e){}
+    // v1.45.24 wait panel close extended
+    try { var __waitEnd = Date.now() + 5000; while (Date.now() < __waitEnd) { var __pc=0; try{var __infosW=getVisibleTextInfos(); for(var __wi=0;__wi<__infosW.length;__wi++){if(isPanelCategoryText(String(__infosW[__wi].text||'').trim())&&__infosW[__wi].cy>300&&__infosW[__wi].cy<1300&&__infosW[__wi].cx<320)__pc++;}}catch(e){} if(__pc<2)break; sleepMs(300);} }catch(e){}
     sleepMs(1800);
     if (isCoordClicked) {
         log("已选择\u7f8e\u98df(面板坐标点击)");
