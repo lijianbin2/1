@@ -1,6 +1,6 @@
 // ============================================================
 // 大众点评「免费试」列表扫描筛选（Hamibot 版）
-// 版本：v1.45.21-fix-回顶方向修正+美食宽松校验
+// 版本：v1.45.22-fix-美食检测鲁棒化+文本API兜底
 //
 // 运行环境：Hamibot 手机客户端
 // 目标 App：大众点评（com.dianping.v1）
@@ -88,7 +88,7 @@
 // ============================================================
 
 // 版本标记：手机端日志中会输出，用来确认运行的是新脚本
-var __SCRIPT_VERSION = "v1.45.21-fix-回顶方向修正+美食宽松校验";
+var __SCRIPT_VERSION = "v1.45.22-fix-美食检测鲁棒化+文本API兜底";
 
 var CONFIG = {
     PACKAGE: "com.dianping.v1",
@@ -2296,7 +2296,16 @@ function isFoodFilterSelectedOnList() {
         if (__panelCnt14 >= 3) return false;
         if (__panelCnt14 >= 2) return false;
     } catch(ePC14) {}
-    // v1.45.15: 移除探针宽松返回，必须经顶部同行校验
+    try {
+        if (__panelCnt14 < 2) {
+            var _pcText = 0;
+            try { eachNode(text("\u7f8e\u98df").find(), function(n){ try{ var b=n.bounds(); var cy=(b.top+b.bottom)/2; var cx=(b.left+b.right)/2; if(cy>300&&cy<1300&&cx<320) _pcText++; }catch(e){}});} catch(e){}
+            try { eachNode(text("\u4e3d\u4eba").find(), function(n){ try{ var b=n.bounds(); var cy=(b.top+b.bottom)/2; var cx=(b.left+b.right)/2; if(cy>300&&cy<1300&&cx<320) _pcText++; }catch(e){}});} catch(e){}
+            try { eachNode(text("\u7ed3\u5a5a").find(), function(n){ try{ var b=n.bounds(); var cy=(b.top+b.bottom)/2; var cx=(b.left+b.right)/2; if(cy>300&&cy<1300&&cx<320) _pcText++; }catch(e){}});} catch(e){}
+            if (_pcText >= 2) return false;
+            if (_pcText > __panelCnt14) __panelCnt14 = _pcText;
+        }
+    } catch(e){}
     var __infosTop14 = null;
     var __hasMarker14 = false;
     var __otherCatAtTop14 = false;
@@ -2304,46 +2313,75 @@ function isFoodFilterSelectedOnList() {
         __infosTop14 = getVisibleTextInfos();
         for (var __m14=0; __m14<__infosTop14.length; __m14++) {
             var __mt14 = String(__infosTop14[__m14].text||"").trim();
-            if (__mt14=="全部商区" || __mt14=="智能排序" || __mt14=="更多筛选") { __hasMarker14 = true; break; }
+            if (__mt14=="\u5168\u90e8\u5546\u533a" || __mt14=="\u667a\u80fd\u6392\u5e8f" || __mt14=="\u66f4\u591a\u7b5b\u9009") { __hasMarker14 = true; break; }
         }
         for (var __oi14=0; __oi14<__infosTop14.length; __oi14++) {
             var __ot14 = String(__infosTop14[__oi14].text||"").trim();
             var __ocy14 = __infosTop14[__oi14].cy||0;
             if (__ocy14 >= -200 && __ocy14 < 1300) {
-                if (__ot14=="丽人"||__ot14=="结婚"||__ot14=="亲子"||__ot14=="玩乐"||__ot14=="逛街"||__ot14=="生活服务"||__ot14=="学习培训") {
+                if (__ot14=="\u4e3d\u4eba"||__ot14=="\u7ed3\u5a5a"||__ot14=="\u4eb2\u5b50"||__ot14=="\u73a9\u4e50"||__ot14=="\u901b\u8857"||__ot14=="\u751f\u6d3b\u670d\u52a1"||__ot14=="\u5b66\u4e60\u57f9\u8bad") {
                     var __nearTop14 = false;
                     for (var __kj14=0; __kj14<__infosTop14.length; __kj14++) {
                         var __otj14 = String(__infosTop14[__kj14].text||"").trim();
-                        if ((__otj14=="全部商区"||__otj14=="智能排序"||__otj14=="更多筛选") && Math.abs(__infosTop14[__kj14].cy - __ocy14) < 110) { __nearTop14 = true; break; }
+                        if ((__otj14=="\u5168\u90e8\u5546\u533a"||__otj14=="\u667a\u80fd\u6392\u5e8f"||__otj14=="\u66f4\u591a\u7b5b\u9009") && Math.abs(__infosTop14[__kj14].cy - __ocy14) < 110) { __nearTop14 = true; break; }
                     }
                     if (__nearTop14 || __hasMarker14) { __otherCatAtTop14 = true; break; }
                 }
             }
         }
     } catch(eTop14) {}
+    if (!__hasMarker14) {
+        try {
+            if (text("\u5168\u90e8\u5546\u533a").exists() || text("\u667a\u80fd\u6392\u5e8f").exists() || text("\u66f4\u591a\u7b5b\u9009").exists()) __hasMarker14 = true;
+            else { var __mkScan = null; try { __mkScan = scanHasAnyMarker(); } catch(e){} if (__mkScan) __hasMarker14 = true; }
+        } catch(e){}
+    }
+    if (!__otherCatAtTop14) {
+        try {
+            var _cats = ["\u4e3d\u4eba","\u7ed3\u5a5a","\u4eb2\u5b50","\u73a9\u4e50","\u901b\u8857","\u751f\u6d3b\u670d\u52a1","\u5b66\u4e60\u57f9\u8bad"];
+            for (var _ci=0; _ci<_cats.length; _ci++) {
+                var _nodesCat=[]; try{ eachNode(text(_cats[_ci]).find(), function(n){_nodesCat.push(n);}); }catch(e){}
+                for (var _ni=0; _ni<_nodesCat.length; _ni++) {
+                    try {
+                        var _b=_nodesCat[_ni].bounds(); var _cy=(_b.top+_b.bottom)/2;
+                        if (_cy >= -200 && _cy < 1300) {
+                            var _near=false;
+                            if (__hasMarker14) {
+                                var _mkNodes=[]; try{ eachNode(text("\u5168\u90e8\u5546\u533a").find(),function(n){_mkNodes.push(n);}); }catch(e){}
+                                try{ eachNode(text("\u667a\u80fd\u6392\u5e8f").find(),function(n){_mkNodes.push(n);}); }catch(e){}
+                                try{ eachNode(text("\u66f4\u591a\u7b5b\u9009").find(),function(n){_mkNodes.push(n);}); }catch(e){}
+                                for(var _mi=0;_mi<_mkNodes.length;_mi++){ try{ var _mb=_mkNodes[_mi].bounds(); var _mcy=(_mb.top+_mb.bottom)/2; if(Math.abs(_mcy-_cy)<110){_near=true;break;}}catch(e){}}
+                                if(!_near) continue;
+                            } else {
+                                if(_cy>500) continue;
+                            }
+                            __otherCatAtTop14=true; break;
+                        }
+                    } catch(e){}
+                }
+                if(__otherCatAtTop14) break;
+            }
+        } catch(e){}
+    }
     if (__otherCatAtTop14) return false;
     try {
         if (__infosTop14) {
             for (var i14 = 0; i14 < __infosTop14.length; i14++) {
                 var t14 = String(__infosTop14[i14].text||"").trim();
-                if ((t14 === "美食" || t14.indexOf("美食")>=0) && __infosTop14[i14].cy >= -200 && __infosTop14[i14].cy < 1300) {
+                if ((t14 === "\u7f8e\u98df" || t14.indexOf("\u7f8e\u98df")>=0) && __infosTop14[i14].cy >= -200 && __infosTop14[i14].cy < 1300) {
                     var __nearTop2_14 = false;
                     try {
                         for (var __k14=0; __k14<__infosTop14.length; __k14++) {
                             var __otk14 = String(__infosTop14[__k14].text||"").trim();
-                            if (__otk14=="全部商区" || __otk14=="智能排序" || __otk14=="更多筛选") {
+                            if (__otk14=="\u5168\u90e8\u5546\u533a" || __otk14=="\u667a\u80fd\u6392\u5e8f" || __otk14=="\u66f4\u591a\u7b5b\u9009") {
                                 if (Math.abs(__infosTop14[__k14].cy - __infosTop14[i14].cy) < 110) { __nearTop2_14 = true; break; }
                             }
                         }
                     } catch(eNear14) {}
                     if (__nearTop2_14) return true;
                     if (!__hasMarker14) {
-                        // v1.45.21: 无标记时放宽——面板已关且美食在顶部即视为选中，兼容标记暂时不可见
                         if (__panelCnt14 < 2) return true;
-                        try {
-                            var __mk15 = waitForListMarkers(800);
-                            if (__mk15 && __panelCnt14===0) return true;
-                        } catch(e){ }
+                        try { var __mk15 = waitForListMarkers(800); if (__mk15 && __panelCnt14===0) return true; } catch(e){ }
                         return false;
                     }
                     if (__otherCatAtTop14) return false;
@@ -2352,18 +2390,48 @@ function isFoodFilterSelectedOnList() {
             }
         }
     } catch (e2_14) {}
-    // v1.45.20: lenient 仍需顶部同行校验，防卡片内"美食"误判为已选中
+    try {
+        var _foodNodes=[]; try{ eachNode(text("\u7f8e\u98df").find(), function(n){_foodNodes.push(n);}); }catch(e){}
+        for (var _fi=0; _fi<_foodNodes.length; _fi++) {
+            try {
+                var _fb=_foodNodes[_fi].bounds(); var _fcy=(_fb.top+_fb.bottom)/2; var _fcx=(_fb.left+_fb.right)/2;
+                if (_fcy >= -200 && _fcy < 1300) {
+                    if (_fcx < 320 && _fcy > 300) {
+                        var _isPanelNear=false;
+                        if (__hasMarker14) {
+                            var _mk2=[]; try{ eachNode(text("\u5168\u90e8\u5546\u533a").find(),function(n){_mk2.push(n);}); }catch(e){}
+                            try{ eachNode(text("\u667a\u80fd\u6392\u5e8f").find(),function(n){_mk2.push(n);}); }catch(e){}
+                            try{ eachNode(text("\u66f4\u591a\u7b5b\u9009").find(),function(n){_mk2.push(n);}); }catch(e){}
+                            for(var _m2=0;_m2<_mk2.length;_m2++){ try{ var _mb2=_mk2[_m2].bounds(); var _mcy2=(_mb2.top+_mb2.bottom)/2; if(Math.abs(_mcy2-_fcy)<110){_isPanelNear=true;break;}}catch(e){}}
+                        }
+                        if (!_isPanelNear) continue;
+                    }
+                    var _isNear=false;
+                    if (__hasMarker14) {
+                        var _mk3=[]; try{ eachNode(text("\u5168\u90e8\u5546\u533a").find(),function(n){_mk3.push(n);}); }catch(e){}
+                        try{ eachNode(text("\u667a\u80fd\u6392\u5e8f").find(),function(n){_mk3.push(n);}); }catch(e){}
+                        try{ eachNode(text("\u66f4\u591a\u7b5b\u9009").find(),function(n){_mk3.push(n);}); }catch(e){}
+                        for(var _m3=0;_m3<_mk3.length;_m3++){ try{ var _mb3=_mk3[_m3].bounds(); var _mcy3=(_mb3.top+_mb3.bottom)/2; if(Math.abs(_mcy3-_fcy)<110){_isNear=true;break;}}catch(e){}}
+                        if(_isNear) return true;
+                        if(_fcy<500 && _fcy>80 && _fcx>80 && _fcx<900) return true;
+                    } else {
+                        if (__panelCnt14 < 2) return true;
+                    }
+                }
+            } catch(e){}
+        }
+    } catch(eFoodApi){}
     try {
         if (__hasMarker14 && __panelCnt14 < 2) {
             for (var __lf14=0; __lf14<__infosTop14.length; __lf14++) {
                 var __lft14 = String(__infosTop14[__lf14].text||"").trim();
                 var __lfcy14 = __infosTop14[__lf14].cy||0;
-                if (__lft14==="美食" && __lfcy14 >= -200 && __lfcy14 < 1300) {
+                if (__lft14==="\u7f8e\u98df" && __lfcy14 >= -200 && __lfcy14 < 1300) {
                     var __lfNear14 = false;
                     try {
                         for (var __lmk14=0; __lmk14<__infosTop14.length; __lmk14++) {
                             var __lmkt14 = String(__infosTop14[__lmk14].text||"").trim();
-                            if (__lmkt14=="全部商区" || __lmkt14=="智能排序" || __lmkt14=="更多筛选") {
+                            if (__lmkt14=="\u5168\u90e8\u5546\u533a" || __lmkt14=="\u667a\u80fd\u6392\u5e8f" || __lmkt14=="\u66f4\u591a\u7b5b\u9009") {
                                 if (Math.abs(__infosTop14[__lmk14].cy - __lfcy14) < 110) { __lfNear14 = true; break; }
                             }
                         }
