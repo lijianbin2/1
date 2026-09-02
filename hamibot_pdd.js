@@ -1,6 +1,6 @@
 auto.waitFor();
 console.show();
-console.log("pdd v1.10 - MCP边看边改修复版");
+console.log("pdd v1.11 - MCP边看边改修复版");
 function swipeEdgeUp(t, interval) { t=t||5; interval=interval||2000; for(let n=0;n<t;n++){ swipe(1150,1400,1150,700,600); sleep(interval);} }
 function swipeToTop(){ swipe(600,700,600,1400,600); sleep(1200); }
 function isInPdd(){ return currentPackage()==="com.xunmeng.pinduoduo"; }
@@ -127,10 +127,38 @@ function s4(){
 }
 function s5(){ console.log("=== s5 back ==="); back(); sleep(1700); }
 function s6(){
-    console.log("=== s6 去抢购 640,770 ===");
-    let ok=clickViaParent("去抢购");
-    if(!ok) click(640,770);
-    sleep(3200);
+    console.log("=== s6 百亿消费券/去抢购 (红块整体可进) ===");
+    let ok=false;
+    // 1. 优先点 去抢购
+    ok=clickViaParent("去抢购");
+    if(ok){ console.log("s6 去抢购点击完成"); sleep(3200); return; }
+    // 2. 点 百亿消费券 整体
+    ok=clickViaParent("百亿消费券");
+    if(ok){ console.log("s6 百亿消费券点击完成"); sleep(3200); return; }
+    // 3. 消费券 模糊
+    let n=textContains("消费券").findOne(800) || descContains("消费券").findOne(500);
+    if(n){
+        console.log("找到消费券文本 "+n.text()+" "+n.bounds()+" 尝试父容器+shell");
+        let cur=n; let clicked=false;
+        for(let i=0;i<4;i++){ if(cur.clickable()){ try{cur.click();}catch(e){} clicked=true; break; } let pp=cur.parent(); if(!pp) break; cur=pp; }
+        if(!clicked) try{n.click();}catch(e){}
+        try{ let b=n.bounds(); shell("input tap "+b.centerX()+" "+b.centerY(), true); }catch(e){}
+        // 再尝试父容器中心 shell
+        try{ let b2=cur.bounds(); shell("input tap "+b2.centerX()+" "+b2.centerY(), true); }catch(e){}
+        sleep(3200); return;
+    }
+    // 4. 兜底坐标：红色方块中心区域多点尝试
+    console.log("s6 文本均未找到，坐标兜底红块");
+    let pts=[[640,770],[640,650],[640,850],[900,700]];
+    for(let pt of pts){
+        console.log("尝试坐标 "+pt[0]+","+pt[1]);
+        try{ click(pt[0],pt[1]); }catch(e){}
+        try{ shell("input tap "+pt[0]+" "+pt[1], true); }catch(e){}
+        sleep(800);
+        // 检查是否已进入领取页
+        if(text("立即领取").exists() || textContains("消费券").exists()){ console.log("坐标 "+pt+" 似乎已进入"); break; }
+    }
+    sleep(2000);
 }
 function s7(){
     console.log("=== s7 立即领取 ===");
@@ -165,7 +193,7 @@ function s8(){
     }
 }
 function main(){
-    console.log("=== main 开始 v1.10 ===");
+    console.log("=== main 开始 v1.11 ===");
     sleep(800); ensurePdd(); 
     let inPdd=isInPdd();
     console.log("ensure后 inPdd="+inPdd+" isHome="+isHome());
@@ -173,7 +201,7 @@ function main(){
     goHome();
     console.log("goHome后 isHome="+isHome());
     s1(); s2(); s3(); s4(); s5(); s6(); s7(); s8();
-    toast("v1.10 完成");
-    console.log("=== all done v1.10 ===");
+    toast("v1.11 完成");
+    console.log("=== all done v1.11 ===");
 }
 main();
