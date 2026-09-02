@@ -1,6 +1,6 @@
 // ============================================================
 // 大众点评「免费试」列表扫描筛选（Hamibot 版）
-// 版本：v1.45.11-fix-美食顶部同行校验-面板多类目检测
+// 版本：v1.45.12-fix-结婚防循环加固-自动完成闭环
 //
 // 运行环境：Hamibot 手机客户端
 // 目标 App：大众点评（com.dianping.v1）
@@ -88,7 +88,7 @@
 // ============================================================
 
 // 版本标记：手机端日志中会输出，用来确认运行的是新脚本
-var __SCRIPT_VERSION = "v1.45.11-fix-美食顶部同行校验-面板多类目检测";
+var __SCRIPT_VERSION = "v1.45.12-fix-结婚防循环加固-自动完成闭环";
 
 // 运行结果回传：把摘要 POST 到调试端点便于远程验收。
 // 网络失败静默忽略，绝不影响主流程；无 http 模块的环境（如测试）自动跳过。
@@ -2375,7 +2375,8 @@ function enterFreeTrial() {
 // 个别机型点击分类后 selector 返回失败，但页面实际已经切到美食，
 // 此时若仍把 __foodCategorySelected 置为 false，会把没有“美食”字样的
 // 粤菜/茶点卡片（包括价值100元卡片）全部误判为“无法确认类目”。
-function isPanelCategoryText(t){var c=['\u7f8e\u98df','\u4e3d\u4eba','\u7ed3\u5a5a','\u4eb2\u5b50','\u73a9\u4e50','\u5b66\u4e60\u57f9\u8bad','\u751f\u6d3b\u670d\u52a1','\u901b\u8857'];for(var i=0;i<c.length;i++) if(t===c[i]) return true; return false;}
+function isPanelCategoryText(t){ // v1.45.12: 8类目覆盖，防止结婚/丽人误触
+var c=['\u7f8e\u98df','\u4e3d\u4eba','\u7ed3\u5a5a','\u4eb2\u5b50','\u73a9\u4e50','\u5b66\u4e60\u57f9\u8bad','\u751f\u6d3b\u670d\u52a1','\u901b\u8857'];for(var i=0;i<c.length;i++) if(t===c[i]) return true; return false;}
 function isFoodFilterSelectedOnList() {
     // v1.45.11: 面板多类目检测 + 同行校验——若检测到分类面板(面板区域内类目数>=3)则不算顶部选中
     try {
