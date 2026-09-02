@@ -1,6 +1,6 @@
 // ============================================================
 // 大众点评「免费试」列表扫描筛选（Hamibot 版）
-// 版本：v1.45.9-fix-美食检测兜底-防循环
+// 版本：v1.45.10-fix-美食顶部检测收紧-面板关闭等待
 //
 // 运行环境：Hamibot 手机客户端
 // 目标 App：大众点评（com.dianping.v1）
@@ -88,7 +88,7 @@
 // ============================================================
 
 // 版本标记：手机端日志中会输出，用来确认运行的是新脚本
-var __SCRIPT_VERSION = "v1.45.9-fix-美食检测兜底-防循环";
+var __SCRIPT_VERSION = "v1.45.10-fix-美食顶部检测收紧-面板关闭等待";
 
 // 运行结果回传：把摘要 POST 到调试端点便于远程验收。
 // 网络失败静默忽略，绝不影响主流程；无 http 模块的环境（如测试）自动跳过。
@@ -2372,7 +2372,7 @@ function enterFreeTrial() {
 // 此时若仍把 __foodCategorySelected 置为 false，会把没有“美食”字样的
 // 粤菜/茶点卡片（包括价值100元卡片）全部误判为“无法确认类目”。
 function isFoodFilterSelectedOnList() {
-    // v1.45.9: 宽松检测——兼容 TextView/Button，阈值放宽到650，避免控制台遮挡/负坐标导致误判
+    // v1.45.10: 收紧顶部检测——顶部筛选栏 cy < 320 才算选中，避免把分类面板里的美食(320-1150)误判为顶部
     try {
         var probeNodes = [];
         try { eachNode(text("美食").find(), function(n){ probeNodes.push(n); }); } catch(e) {}
@@ -2382,18 +2382,16 @@ function isFoodFilterSelectedOnList() {
             try {
                 var nb = probeNodes[pi].bounds();
                 var ncy = (nb.top + nb.bottom)/2;
-                if (ncy < 650) return true;
-                if (nb && nb.top >= -200) return true;
-            } catch(eB) {
-                return true;
-            }
+                if (ncy >= -80 && ncy < 320) return true;
+                
+            } catch(eB) {}
         }
     } catch(e) {}
     try {
         var infos = getVisibleTextInfos();
         for (var i = 0; i < infos.length; i++) {
             var t = String(infos[i].text||"").trim();
-            if ((t === "美食" || t.indexOf("美食")>=0) && infos[i].cy < 650 && infos[i].cy > -200) {
+            if ((t === "美食" || t.indexOf("美食")>=0) && infos[i].cy >= -80 && infos[i].cy < 320) {
                 return true;
             }
         }
@@ -6079,7 +6077,26 @@ function main() {
 
     // v1.28.0：选完分类后短暂等待，然后立即验证是否仍在列表页，
     // 避免在等待期间误点右下角商户卡片
-    log("[列表] 等待列表稳定...");
+    log("[列表] 等待列表稳定(等待面板关闭+列表刷新)...");
+    sleepMs(1200);
+    // v1.45.10: 等待分类面板关闭——面板里的"美食" cy 350-1150 消失才算关闭
+    try {
+        var panelCloseDeadline = Date.now() + 4000;
+        while (Date.now() < panelCloseDeadline) {
+            var panelStillOpen = false;
+            try {
+                var chkInfos = getVisibleTextInfos();
+                for (var _pi=0; _pi<chkInfos.length; _pi++) {
+                    if (chkInfos[_pi].text === "美食" && chkInfos[_pi].cy > 350 && chkInfos[_pi].cy < 1150) { panelStillOpen = true; break; }
+                }
+            } catch(e){}
+            if (!panelStillOpen) break;
+            sleepMs(400);
+            try { if (waitForListMarkers(800)) break; } catch(e){}
+        }
+        log("[列表] 面板关闭等待完成");
+    } catch(ePanelWait){ logError("面板关闭等待异常", ePanelWait); }
+    try { waitForListMarkers(2500); } catch(eWM2){}
     sleepMs(800);
     if (!isListPage()) {
         log("[列表] 选完分类后离开了列表页，尝试返回");
@@ -6137,6 +6154,8 @@ if (Date.now() - __scriptStartTime < 5000) {
     log("脚本在 5 秒内提前结束，请把上方所有日志发给开发者排查");
     toastMsg("脚本提前结束，请查看 Hamibot 日志");
 }
+
+
 
 
 
