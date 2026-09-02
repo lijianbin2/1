@@ -1,6 +1,6 @@
 // ============================================================
 // 大众点评「免费试」列表扫描筛选（Hamibot 版）
-// 版本：v1.45.5-bottom-card-click
+// 版本：v1.45.6-fix-card-center-丽人-early-stop
 //
 // 运行环境：Hamibot 手机客户端
 // 目标 App：大众点评（com.dianping.v1）
@@ -88,7 +88,7 @@
 // ============================================================
 
 // 版本标记：手机端日志中会输出，用来确认运行的是新脚本
-var __SCRIPT_VERSION = "v1.45.5-bottom-card-click";
+var __SCRIPT_VERSION = "v1.45.6-fix-card-center-丽人-early-stop";
 
 // 运行结果回传：把摘要 POST 到调试端点便于远程验收。
 // 网络失败静默忽略，绝不影响主流程；无 http 模块的环境（如测试）自动跳过。
@@ -1620,48 +1620,57 @@ function returnToList(maxBacks) {
         log("[返回] 已触发等级资格不足安全停止，保留当前提示页，不返回列表");
         return false;
     }
-
-    // v1.43.0：简化返回逻辑——v1.43.0 报名成功后直接用 back()，
-    // 不再点击「完成」按钮，避免被短信/通知抢前台。
-    // 最多按 4 次返回键，每次检查是否已回到列表页。
     var maxAttempts = maxBacks || 4;
     for (var i = 0; i < maxAttempts; i++) {
         if (isListPage()) {
-            return true;
+            break;
         }
-
-        // 检测是否被通知拉到其他应用
         var curPkg2 = "";
         try { curPkg2 = getCurrentPackage(); } catch (ePkg2) {}
         if (curPkg2 && curPkg2.indexOf("dianping") < 0) {
             log("[返回] 当前不在大众点评：" + curPkg2 + "，重新拉起");
             try { app.launch("com.dianping.v1"); sleepMs(2000); } catch (eL2) {}
-            if (isListPage()) return true;
+            if (isListPage()) break;
         }
-
-        // v1.45.0: 删除"橙V专享价"——底部导航栏每个页面都包含此文字，会导致每次返回都额外按一次返回键
         var isBadPage = anyTextContains("立即购买") || anyTextContains("立即兑换") ||
                         anyTextContains("零售价") || anyTextContains("会员专享价");
         if (isBadPage) {
             log("[返回] 第" + (i + 1) + "次：检测到非列表页面，额外返回");
             goBack();
             sleepMs(500);
-            if (isListPage()) {
-                return true;
-            }
+            if (isListPage()) break;
         }
-
         goBack();
         sleepMs(500);
     }
-
+    // v1.45.6: 返回后等待列表标记，确认为免费试列表页
+    var listMarker = null;
+    try { listMarker = waitForListMarkers(2000); } catch(eWM) {}
     var finalCheck = isListPage();
     if (!finalCheck) {
-        log("[返回] " + maxAttempts + "次返回后仍未到列表页");
+        log("[返回] " + maxAttempts + "次返回后仍未到列表页 marker=" + (listMarker||"无"));
+        return false;
     }
-    return finalCheck;
+    // v1.45.6: 修复误触导致跳到丽人分类——返回后校验美食筛选是否仍选中
+    try {
+        if (!isFoodFilterSelectedOnList()) {
+            log("[返回] 检测到美食筛选未选中（可能误触丽人），重新选择美食");
+            var selOk = false;
+            try { selOk = selectFoodCategory(); } catch(eSel) { logError("重选美食异常", eSel); }
+            if (selOk) {
+                log("[返回] 已重新选中美食，等待列表刷新");
+                sleepMs(1200);
+                try { waitForListMarkers(3000); } catch(eW2) {}
+            } else {
+                log("[返回] 重选美食失败，尝试等待后继续");
+                sleepMs(800);
+            }
+        } else {
+            log("[返回] 美食筛选仍选中，列表正常");
+        }
+    } catch(eChk) { logError("校验美食筛选异常", eChk); }
+    return isListPage();
 }
-
 // ---------- 文本与价格解析 ----------
 
 function isFunctionalText(t) {
@@ -3918,18 +3927,22 @@ function scanFreeTrialList() {
         // v1.11.0：「已报名」是图片水印，无障碍文字无法检测。
         // 启发式：如果当前屏没有任何「免费抽」按钮且已找到活动，
         // 连续2屏即判定已进入「已报名」区域，提前停止扫描。
-        if (result.freeDrawCount <= 0 && totalNew > 0) {
+                // v1.45.6: 修复过早判定已报名区域——加载中/返回列表瞬间可能出现 0 按钮，需同时满足可见文本充足且已扫一定数量才计数
+        var visibleCountForGate = 0;
+        try { visibleCountForGate = getVisibleTextInfos().length; } catch(eVG) {}
+        if (result.freeDrawCount <= 0 && totalNew > 0 && totalNew >= 6 && visibleCountForGate >= 80) {
             consecutiveNoFreeDraw++;
-            log("[列表] 当前屏「免费抽」按钮数：0（连续第 " + consecutiveNoFreeDraw + " 屏）");
+            log("[列表] 当前屏「免费抽」按钮数：0（连续第 " + consecutiveNoFreeDraw + " 屏，visible=" + visibleCountForGate + " totalNew=" + totalNew + "）");
             if (consecutiveNoFreeDraw >= 2) {
                 endReason = "连续2屏无免费抽按钮，判定已进入已报名区域";
                 log("[扫描] " + endReason + "，提前停止扫描");
                 break;
             }
+        } else if (result.freeDrawCount <= 0 && totalNew > 0) {
+            log("[列表] 当前屏「免费抽」按钮数：0（visible=" + visibleCountForGate + " totalNew=" + totalNew + " 未达阈值，暂不计入连续计数）");
         } else {
             consecutiveNoFreeDraw = 0;
         }
-
         if (page % 10 === 9) {
             postTelemetry({ event: "scan_page", version: __SCRIPT_VERSION, page: page + 1, found: totalNew });
         }
@@ -4846,141 +4859,156 @@ function clickNodeCenter(node) {
 // 策略：找到卡片根节点 → 点击卡片中心坐标 → 验证页面变化 → 确认目标活动
 function diagnoseFreeDrawClick(activity) {
     var btn = activity.node;
-
-    log("[免费试定位] ========== v1.39.0 卡片点击 ==========");
+    log("[免费试定位] ========== v1.45.6 卡片点击 ==========");
     log("[免费试定位] 目标活动：" + (activity.name || "未知"));
     log("[免费试定位] 目标商户：" + (activity.merchant || "未知"));
-
-    // 1. 获取卡片根节点（从「免费抽」按钮向上找到卡片容器）
+    var before = capturePageSignature();
+    function tryClickFreeDrawButton() {
+        var cur = btn;
+        for (var depth = 0; depth < 6; depth++) {
+            if (!cur) break;
+            try {
+                var t = "";
+                try { t = String(cur.text() || "").trim(); } catch(e) {}
+                var clickable = false;
+                try { clickable = cur.clickable && cur.clickable(); } catch(e2) {}
+                if (t === "免费抽" && clickable) {
+                    log("[免费试定位] 尝试点击「免费抽」按钮自身 depth=" + depth);
+                    try { cur.click(); sleepMs(400); return true; } catch(e3) { logError("点击免费抽自身失败", e3); }
+                }
+                if (t === "免费抽") {
+                    try {
+                        var b = safeBounds(cur);
+                        if (b && b.right > b.left && b.bottom > b.top) {
+                            var cx = (b.left + b.right)/2;
+                            var cy = (b.top + b.bottom)/2;
+                            log("[免费试定位] 尝试坐标点击「免费抽」 bounds 中心 (" + Math.round(cx) + "," + Math.round(cy) + ")");
+                            click(cx, cy);
+                            sleepMs(400);
+                            return true;
+                        }
+                    } catch(e4) {}
+                }
+                if (clickable) {
+                    var hasFreeDrawChild = false;
+                    try {
+                        var kids = cur.find(text("免费抽"));
+                        if (kids && ( (typeof kids.size==="function" && kids.size()>0) || (typeof kids.length==="number" && kids.length>0) )) hasFreeDrawChild = true;
+                    } catch(e6) {}
+                    if (hasFreeDrawChild || t === "免费抽") {
+                        log("[免费试定位] 尝试点击祖先 depth=" + depth + " clickable=" + clickable + " text=" + t);
+                        try { cur.click(); sleepMs(400); return true; } catch(e7) {}
+                    }
+                }
+            } catch(e) {}
+            try { cur = cur.parent(); } catch(e8) { break; }
+            if (!cur) break;
+        }
+        return false;
+    }
+    var clickedFreeDraw = tryClickFreeDrawButton();
+    if (clickedFreeDraw) {
+        log("[免费试定位] 已尝试「免费抽」按钮点击，验证页面变化");
+        sleepMs(800);
+        var afterBtn = capturePageSignature();
+        var diffBtn = diffPageSignature(before, afterBtn);
+        log("[点击后] 页面差异：新增文本 " + diffBtn.newTexts.length + " 条，消失文本 " + diffBtn.missingCount + " 条，包名变化：" + diffBtn.pkgChanged);
+        if (diffBtn.changed) {
+            log("[点击后] 页面已变化（免费抽按钮触发）");
+            if (afterBtn.count < 10) {
+                for (var w=0; w<6; w++) { sleepMs(500); afterBtn = capturePageSignature(); if (afterBtn.count>=10) break; }
+                diffBtn = diffPageSignature(before, afterBtn);
+            }
+            var isWrongPageBtn = anyTextContains("零售价");
+            if (isWrongPageBtn) {
+                log("[点击后] 进入了零售价错误页面，判定为点击失败（免费抽路径）");
+            } else {
+                var matchedBtn = dumpPostClickState(before, afterBtn, diffBtn, activity);
+                if (matchedBtn) {
+                    log("[v1.45.6] TARGET_DETAIL_CONFIRMED(免费抽)：" + matchedBtn);
+                    return { ok: true, matched: matchedBtn };
+                }
+                log("[v1.45.6] 免费抽点击后页面变化但标题未精确匹配，继续尝试卡片兜底前先判断是否已进入详情");
+            }
+            log("[免费试定位] 免费抽路径未确认，尝试返回列表后重试卡片点击");
+            try { returnToList(2); sleepMs(800); } catch(eRet) {}
+            before = capturePageSignature();
+        } else {
+            log("[点击后] 免费抽点击后页面未变化，降级到卡片点击");
+        }
+    } else {
+        log("[免费试定位] 未能通过「免费抽」按钮直接点击，降级到卡片点击");
+    }
     var cardRoot = null;
-    try {
-        cardRoot = getSingleCardRoot(btn);
-    } catch (e) {}
-
+    try { cardRoot = getSingleCardRoot(btn); } catch(e) {}
     if (!cardRoot) {
         log("[免费试定位] 未找到卡片根节点，使用免费抽按钮节点作为点击目标");
         cardRoot = btn;
     }
-
-    // 2. 获取卡片 bounds
     var cardBounds = safeBounds(cardRoot);
-
     if (!cardBounds || cardBounds.right <= cardBounds.left || cardBounds.bottom <= cardBounds.top) {
         log("[免费试定位] 卡片 bounds 无效，尝试免费抽按钮 bounds");
         cardBounds = safeBounds(btn);
         cardRoot = btn;
     }
-
     if (!cardBounds || cardBounds.right <= cardBounds.left || cardBounds.bottom <= cardBounds.top) {
         log("[免费试定位] 无法获取有效的 bounds，无法点击");
         return { ok: false, reason: "bounds无效" };
     }
-
-    // 3. 计算卡片中心坐标
     var clickX = (cardBounds.left + cardBounds.right) / 2;
-    var clickY = (cardBounds.top + cardBounds.bottom) / 2;
-
-    // 4. 底部区域保护：排除屏幕底部 10% 区域（导航栏/底部标签栏）。
-    // v1.45.5：卡片可能只有下半部分被底部导航遮挡，但卡片上半部分仍然可见可点击；
-    // 不能因为“卡片中心”落入底部区域就整张放弃，否则会漏掉最后一张商户卡片。
+    var cardHeight = cardBounds.bottom - cardBounds.top;
+    var clickY = cardBounds.top + cardHeight * 0.72;
+    if (clickY > device.height * 0.88) {
+        clickY = Math.min(cardBounds.bottom - 30, device.height * 0.88 - 10);
+    }
     var bottomThreshold = device.height * 0.90;
     var bottomSafeY = bottomThreshold - 35;
     if (clickY > bottomThreshold) {
-        var cardHeight = cardBounds.bottom - cardBounds.top;
-        var upperClickY = cardBounds.top + Math.min(cardHeight * 0.25, 120);
+        var upperClickY = cardBounds.top + Math.min(cardHeight * 0.35, 140);
         upperClickY = Math.min(upperClickY, bottomSafeY);
-        log("[免费试定位] 卡片中心在底部区域，尝试点击卡片上部：(" + Math.round(clickX) + "," + Math.round(upperClickY) + ")");
-
-        // 仅当卡片上部仍位于底部导航上方时才允许点击；整张卡片都在底部时继续拒绝。
+        log("[免费试定位] 卡片下半部在底部区域，尝试点击卡片上部：(" + Math.round(clickX) + "," + Math.round(upperClickY) + ")");
         if (cardBounds.top >= bottomSafeY || upperClickY <= cardBounds.top || upperClickY >= cardBounds.bottom) {
             log("[免费试定位] 卡片上部也进入底部导航区域，拒绝点击（防止误点底部导航）");
             return { ok: false, reason: "卡片在底部导航区域" };
         }
         clickY = upperClickY;
     }
-
     log("[免费试定位] 卡片 bounds：[" + cardBounds.left + "," + cardBounds.top + "," + cardBounds.right + "," + cardBounds.bottom + "]");
     log("[免费试定位] 点击坐标：(" + Math.round(clickX) + "," + Math.round(clickY) + ")");
-    log("[免费试定位] 点击目标：卡片中心（非免费抽按钮）");
-
-    // 5. 记录点击前页面状态
-    var before = capturePageSignature();
-
+    log("[免费试定位] 点击目标：卡片下半部（非卡片中心，避免误点商户图）");
     log("[点击] click attempt");
     log("[点击] 点击前前台包名：" + before.pkg);
     log("[点击] 点击前文本数量：" + before.count);
-
-    // 6. 执行点击：卡片中心坐标
     var rawRet = "异常";
-    try {
-        rawRet = String(click(clickX, clickY));
-    } catch (e) {
-        logError("点击执行异常", e);
-        rawRet = "异常";
-    }
-
+    try { rawRet = String(click(clickX, clickY)); } catch(e) { logError("点击执行异常", e); rawRet = "异常"; }
     log("[点击] click 返回值：" + rawRet + "（仅参考）");
     sleepMs(1500);
-
-    // 7. 验证点击后页面变化
     var after = capturePageSignature();
     var diff = diffPageSignature(before, after);
-
-    log("[点击后] 页面差异：新增文本 " + diff.newTexts.length +
-        " 条，消失文本 " + diff.missingCount +
-        " 条，包名变化：" + diff.pkgChanged);
-
+    log("[点击后] 页面差异：新增文本 " + diff.newTexts.length + " 条，消失文本 " + diff.missingCount + " 条，包名变化：" + diff.pkgChanged);
     if (!diff.changed) {
         log("[点击后] 页面未发生变化，点击无效");
         return { ok: false, reason: "点击未触发页面变化" };
     }
-
     log("[点击后] 页面已变化");
-
-    // 8. 等待详情页加载
     if (after.count < 10) {
         log("[点击后] 点击后文本数仅 " + after.count + " 条，等待加载...");
-        for (var w = 0; w < 10; w++) {
-            sleepMs(1000);
-            after = capturePageSignature();
-            if (after.count >= 10) {
-                log("[点击后] 页面已加载（" + after.count + " 条文本）");
-                break;
-            }
-        }
+        for (var w2=0; w2<10; w2++) { sleepMs(1000); after = capturePageSignature(); if (after.count >= 10) { log("[点击后] 页面已加载（" + after.count + " 条文本）"); break; } }
         diff = diffPageSignature(before, after);
     }
-
-    // 9. 错误页面检测
-    // v1.45.0: 删除单命中"橙V专享价"检查——底部导航栏在每个页面都包含此文字，
-    // 导致合法详情页被误判为"错误页面"，报名按钮永远不会被点击。
-    // 错误页面检测已由 dumpPostClickState 的双重信号检查覆盖（需同时命中2+橙V特征）。
-    // 只保留"零售价"检查——零售价不在底部导航栏中，是橙V专享推荐区的明确标志。
     var isWrongPage = anyTextContains("零售价");
-
     if (isWrongPage) {
         log("[点击后] 进入了零售价错误页面，判定为点击失败");
         return { ok: false, reason: "进入了零售价错误页面" };
     }
-
-    // 10. 通过 dumpPostClickState 验证目标活动匹配
     var matched = dumpPostClickState(before, after, diff, activity);
-
     if (matched) {
-        log("[v1.39.0] TARGET_DETAIL_CONFIRMED：" + matched);
+        log("[v1.45.6] TARGET_DETAIL_CONFIRMED：" + matched);
         return { ok: true, matched: matched };
     }
-
-    // matched 为 null → dumpPostClickState 判定为 TARGET_DETAIL_UNCONFIRMED
-    log("[v1.39.0] TARGET_DETAIL_UNCONFIRMED：页面变化但无法确认目标活动");
+    log("[v1.45.6] TARGET_DETAIL_UNCONFIRMED：页面变化但无法确认目标活动");
     return { ok: false, reason: "TARGET_DETAIL_UNCONFIRMED" };
 }
-
-// v1.7.1：定位目标卡片的容错匹配。
-// 处理阶段重新解析卡片时，卡片可能半加载（价值节点还没出来）或长标题
-// 被省略号截断，导致重建的唯一键与扫描阶段的键精确不相等而误判找不到。
-// 规则：唯一键一致直接命中；否则名称归一化后相等或互相包含（短者>=8字符），
-// 且价值/商户两边都解析出来时不得冲突（防止误点其他活动的免费抽）。
 function normalizeNameForMatch(name) {
     return String(name || "")
         .replace(/[\s\uFFFC\u200B-\u200D\uFEFF]/g, "")
@@ -5928,3 +5956,7 @@ if (Date.now() - __scriptStartTime < 5000) {
     log("脚本在 5 秒内提前结束，请把上方所有日志发给开发者排查");
     toastMsg("脚本提前结束，请查看 Hamibot 日志");
 }
+
+
+
+
