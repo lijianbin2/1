@@ -1,6 +1,6 @@
 // ============================================================
 // 大众点评「免费试」列表扫描筛选（Hamibot 版）
-// 版本：v1.45.38-fix-卡片无变化祖先重试
+// 版本：v1.45.39-fix-等级不足立即停止
 //
 // 运行环境：Hamibot 手机客户端
 // 目标 App：大众点评（com.dianping.v1）
@@ -88,7 +88,7 @@
 // ============================================================
 
 // 版本标记：手机端日志中会输出，用来确认运行的是新脚本
-var __SCRIPT_VERSION = "v1.45.38-fix-卡片无变化祖先重试";
+var __SCRIPT_VERSION = "v1.45.39-fix-等级不足立即停止";
 
 var CONFIG = {
     PACKAGE: "com.dianping.v1",
@@ -5984,32 +5984,15 @@ function hasLevelRequirementPrompt() {
 }
 
 function requestLevelRequirementStop() {
-    log("[等级不足] 检测到「你暂未满足报名要求」弹窗，该活动等级不足跳过，继续下一个");
-    // v1.45.36: 不再全局 SAFE_STOP，改为点击「我知道了」关闭弹窗后返回列表继续扫，避免漏掉后续商户
-    try {
-        var __kdNodes = [];
-        try { eachNode(text("我知道了").find(), function(n){ __kdNodes.push(n); }); } catch(eKd1){}
-        try { eachNode(desc("我知道了").find(), function(n){ __kdNodes.push(n); }); } catch(eKd2){}
-                  try { eachNode(textContains("我知道了").find(), function(n){ __kdNodes.push(n); }); } catch(eKd3){}
-          try { eachNode(descContains("我知道了").find(), function(n){ __kdNodes.push(n); }); } catch(eKd4){}
-          try { eachNode(textContains("知道").find(), function(n){ var t=""; try{t=n.text()||"";}catch(e){} var d=""; try{d=n.desc()||"";}catch(e){} if((t&&t.indexOf("我知道了")>=0)||(d&&d.indexOf("我知道了")>=0)) __kdNodes.push(n); }); } catch(eKd5){}
-          try { eachNode(descContains("知道").find(), function(n){ var t=""; try{t=n.text()||"";}catch(e){} var d=""; try{d=n.desc()||"";}catch(e){} if((t&&t.indexOf("我知道了")>=0)||(d&&d.indexOf("我知道了")>=0)) __kdNodes.push(n); }); } catch(eKd6){}
-          try { var __allBtns=[]; try{ eachNode(className("android.widget.Button").find(),function(n){__allBtns.push(n);});}catch(e){} for(var __bi=0;__bi<__allBtns.length;__bi++){ var __bn=__allBtns[__bi]; var __bt=""; try{__bt=(__bn.text()||"")+( __bn.desc()||"");}catch(e){} if(__bt.indexOf("我知道了")>=0) __kdNodes.push(__bn);} } catch(eKd7){}
-          try { var __allTvs=[]; try{ eachNode(className("android.widget.TextView").find(),function(n){__allTvs.push(n);});}catch(e){} for(var __ti=0;__ti<__allTvs.length;__ti++){ var __tn=__allTvs[__ti]; var __tt=""; try{__tt=(__tn.text()||"")+( __tn.desc()||"");}catch(e){} __tt=__tt.replace(/\s+/g,""); if(__tt.indexOf("我知道了")>=0) __kdNodes.push(__tn);} } catch(eKd8){}
-        var __kdClicked = false;
-        for (var __kdi=0; __kdi<__kdNodes.length; __kdi++) {
-            var __kdn = __kdNodes[__kdi];
-            if (!safeVisible(__kdn) || !safeEnabled(__kdn)) continue;
-            if (clickNodeCenter(__kdn)) { __kdClicked = true; log("[等级不足] 已点击「我知道了」关闭弹窗 (bounds中心)"); break; }
-            try { if (__kdn.click()) { __kdClicked = true; log("[等级不足] 已点击「我知道了」关闭弹窗 (click)"); break; } } catch(eKdC){}
-        }
-        if (!__kdClicked) log("[等级不足] 未找到「我知道了」按钮，尝试按返回键");
-        sleepMs(600);
-    } catch(eKdAll){}
-    try { if (hasLevelRequirementPrompt()) { goBack(); sleepMs(500); log("[等级不足] 按返回键关闭弹窗"); } } catch(eKdBack){}
-    try { sleepMs(400); if (!isListPage()) { goBack(); sleepMs(800); log("[等级不足] 已返回列表继续扫描"); } } catch(eKdRet){}
-    try { toastMsg("等级不足，已跳过继续"); } catch(eT){}
-    return "等级不足，跳过此活动";
+    if (!gStopAfterLevelRequirement) {
+        gStopAfterLevelRequirement = true;
+        gStopAfterLevelRequirementReason = "等级资格不足，停止后续报名";
+        log("[安全停止] 检测到「你暂未满足报名要求」弹窗");
+        log("[安全停止] 当前账号等级不满足该批次报名条件，立即停止脚本（用户要求等级不足即停止）");
+        try { setScriptState("SAFE_STOP"); } catch(eSt){}
+        try { toastMsg("等级不足，脚本已停止"); } catch(eT2){}
+    }
+    return "等级不足，停止脚本";
 }
 
 function hasSignupConfirmationPrompt() {
