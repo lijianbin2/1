@@ -1,6 +1,6 @@
-﻿// ============================================================
+// ============================================================
 // 大众点评「免费试」列表扫描筛选（Hamibot 版）
-// 版本：v1.45.14-fix-美食防误判-返回去重
+// 版本：v1.45.16-fix-美食强校验-坐标去属性
 //
 // 运行环境：Hamibot 手机客户端
 // 目标 App：大众点评（com.dianping.v1）
@@ -88,7 +88,7 @@
 // ============================================================
 
 // 版本标记：手机端日志中会输出，用来确认运行的是新脚本
-var __SCRIPT_VERSION = "v1.45.15-fix-美食强校验-未进不扫";
+var __SCRIPT_VERSION = "v1.45.16-fix-美食强校验-坐标去属性";
 
 var CONFIG = {
     PACKAGE: "com.dianping.v1",
@@ -2417,6 +2417,7 @@ function selectFoodCategory() {
         sleepMs(300);
     }
     var food = null;
+    var isCoordClicked = false;
     if (foodCoord) {
         try {
             var panelNodes = [];
@@ -2450,25 +2451,28 @@ function selectFoodCategory() {
                 log("面板美食节点点击未命中，改用坐标点击 ("+Math.round(foodCoord.cx)+","+Math.round(foodCoord.cy)+")");
                 click(foodCoord.cx, foodCoord.cy);
                 sleepMs(200);
-                food = { _coordClicked:true };
+                isCoordClicked = true;
             } else {
-                food._coordClicked = false;
+                isCoordClicked = false;
             }
         } else {
             log("面板内找到美食坐标但未找到节点，坐标点击");
             click(foodCoord.cx, foodCoord.cy);
             sleepMs(200);
-            food = { _coordClicked:true };
+            isCoordClicked = true;
+            food = { __dummy:true };
         }
     }
-    if (!food) {
+    if (!food && !isCoordClicked) {
         log("分类中没有\u7f8e\u98df");
         dumpVisibleTexts(25);
         try { goBack(); sleepMs(600); } catch(e){ }
         return false;
     }
+    // v1.45.16 wait panel close
+    try { var __waitEnd = Date.now() + 2500; while (Date.now() < __waitEnd) { var __pc=0; try{var __infosW=getVisibleTextInfos(); for(var __wi=0;__wi<__infosW.length;__wi++){if(isPanelCategoryText(String(__infosW[__wi].text||'').trim())&&__infosW[__wi].cy>300&&__infosW[__wi].cy<1300&&__infosW[__wi].cx<320)__pc++;}}catch(e){} if(__pc<2)break; sleepMs(300);} }catch(e){}
     sleepMs(1100);
-    if (food._coordClicked) {
+    if (isCoordClicked) {
         log("已选择\u7f8e\u98df(面板坐标点击)");
         dumpVisibleTexts(18);
         sleepMs(800);
@@ -2479,6 +2483,7 @@ function selectFoodCategory() {
         log("警告：坐标点击美食后顶部仍未出现\u7f8e\u98df，视为未选中");
         return false;
     }
+    try { var __waitEnd2=Date.now()+1500; while(Date.now()<__waitEnd2){ var __pc2=0; try{var __infosW2=getVisibleTextInfos(); for(var __wi2=0;__wi2<__infosW2.length;__wi2++){if(isPanelCategoryText(String(__infosW2[__wi2].text||'').trim())&&__infosW2[__wi2].cy>300&&__infosW2[__wi2].cy<1300&&__infosW2[__wi2].cx<320)__pc2++;}}catch(e){} if(__pc2<2)break; sleepMs(300);} }catch(e){}
     sleepMs(900);
     log("已选择\u7f8e\u98df");
     dumpVisibleTexts(18);
@@ -5960,6 +5965,13 @@ function main() {
             }
         } catch (e) {
             logError("选择「美食」分类异常", e);
+            try { __foodCategorySelected = isFoodFilterSelectedOnList(); } catch(e2){}
+            log("[列表] 异常后校验：" + (__foodCategorySelected ? "已选择" : "未选中"));
+            if (!__foodCategorySelected) {
+                log("[列表] 未能进入美食分类(异常分支)，停止扫描以免误扫其他分类");
+                toastMsg("未进入美食分类，已停止");
+                return;
+            }
         }
     }
 
@@ -6024,3 +6036,6 @@ if (Date.now() - __scriptStartTime < 5000) {
     log("脚本在 5 秒内提前结束，请把上方所有日志发给开发者排查");
     toastMsg("脚本提前结束，请查看 Hamibot 日志");
 }
+
+
+
