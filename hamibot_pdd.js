@@ -1,4 +1,4 @@
-﻿auto.waitFor();
+auto.waitFor();
 console.show();
 console.log("pdd 省钱月卡百亿补贴会员打卡 v1");
 // 边缘滑动防误点商品，底部→中部
