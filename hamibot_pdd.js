@@ -1,6 +1,6 @@
 auto.waitFor();
 console.show();
-console.log("pdd v1.7 - 父容器点击修复 (MCP联调版)");
+console.log("pdd v1.8 - 父容器点击修复 (MCP联调版)");
 
 function swipeEdgeUp(t, interval) {
     t = t || 5; interval = interval || 2000;
@@ -69,7 +69,7 @@ function s1() {
     if(!isHome()) goHome();
     // 滚动查找
     let ok=false;
-    for(let k=0;k<4;k++){
+    for(let k=0;k<5;k++){
         if(clickViaParent("省钱月卡")){ ok=true; break; }
         console.log("省钱月卡未找到，下滑 "+(k+1)+"/4");
         swipe(600,1300,600,650,600); sleep(1200);
@@ -81,7 +81,7 @@ function s1() {
         let x=Math.round(w*0.83),y=Math.round(h*0.285);
         console.log("点击比例 "+x+","+y);
         click(x,y); sleep(500);
-        if(!isHome()) click(896,784); // 1280x2772绝对
+        if(isHome()) click(896,784); // 1280x2772绝对
     }
     sleep(2600);
     // 验证进入月卡页后立即back（按用户要求）
@@ -162,7 +162,7 @@ function main(){
     console.log("=== main 开始 ===");
     sleep(800); ensurePdd(); goHome();
     s1(); s2(); s3(); s4(); s5(); s6(); s7(); s8();
-    toast("v1.7 完成");
-    console.log("=== all done ===");
+    toast("v1.8 完成");
+    console.log("=== all done v1.8 ===");
 }
 main();
