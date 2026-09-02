@@ -1,6 +1,6 @@
 // ============================================================
 // 大众点评「免费试」列表扫描筛选（Hamibot 版）
-// 版本：v1.45.13-fix-移除埋点-分类直连坐标-防循环
+// 版本：v1.45.14-fix-美食防误判-返回去重
 //
 // 运行环境：Hamibot 手机客户端
 // 目标 App：大众点评（com.dianping.v1）
@@ -88,7 +88,7 @@
 // ============================================================
 
 // 版本标记：手机端日志中会输出，用来确认运行的是新脚本
-var __SCRIPT_VERSION = "v1.45.13-fix-移除埋点-分类直连坐标-防循环";
+var __SCRIPT_VERSION = "v1.45.14-fix-美食防误判-返回去重";
 
 var CONFIG = {
     PACKAGE: "com.dianping.v1",
@@ -1573,24 +1573,55 @@ function returnToList(maxBacks) {
         log("[返回] " + maxAttempts + "次返回后仍未到列表页 marker=" + (listMarker||"无"));
         return false;
     }
-    // v1.45.6: 修复误触导致跳到丽人分类——返回后校验美食筛选是否仍选中
+    // v1.45.14: 返回后仅在面板敞开/其它类目占顶/丢失列表标记时才重选美食，避免离屏误判导致结婚/丽人循环
     try {
-        if (!isFoodFilterSelectedOnList()) {
-            log("[返回] 检测到美食筛选未选中（可能误触非美食分类），重新选择美食");
-            var selOk = false;
-            try { selOk = selectFoodCategory(); } catch(eSel) { logError("重选美食异常", eSel); }
-            if (selOk) {
-                log("[返回] 已重新选中美食，等待列表刷新");
-                sleepMs(1200);
-                try { waitForListMarkers(3000); } catch(eW2) {}
+        var __needReselect14 = false;
+        var __panelCntRet14 = 0;
+        var __otherCatRet14 = false;
+        try {
+            var __infosRet14 = getVisibleTextInfos();
+            for (var __ci14=0; __ci14<__infosRet14.length; __ci14++) {
+                var __ctRet14 = String(__infosRet14[__ci14].text||"").trim();
+                var __cyRet14 = __infosRet14[__ci14].cy||0, __cxRet14 = __infosRet14[__ci14].cx||0;
+                if (isPanelCategoryText(__ctRet14) && __cyRet14 > 300 && __cyRet14 < 1300 && __cxRet14 < 320) __panelCntRet14++;
+            }
+            for (var __oiRet14=0; __oiRet14<__infosRet14.length; __oiRet14++) {
+                var __otRet14 = String(__infosRet14[__oiRet14].text||"").trim();
+                var __ocyRet14 = __infosRet14[__oiRet14].cy||0;
+                if (__ocyRet14 >= -100 && __ocyRet14 < 600 && (__otRet14=="丽人"||__otRet14=="结婚"||__otRet14=="亲子"||__otRet14=="玩乐"||__otRet14=="逛街"||__otRet14=="生活服务"||__otRet14=="学习培训")) {
+                    for (var __kjRet14=0; __kjRet14<__infosRet14.length; __kjRet14++) {
+                        var __mkRet14 = String(__infosRet14[__kjRet14].text||"").trim();
+                        if ((__mkRet14=="全部商区"||__mkRet14=="智能排序"||__mkRet14=="更多筛选") && Math.abs(__infosRet14[__kjRet14].cy - __ocyRet14) < 110) { __otherCatRet14 = true; break; }
+                    }
+                    if (__otherCatRet14) break;
+                }
+            }
+        } catch(eRetChk14) {}
+        if (__panelCntRet14 >= 2) __needReselect14 = true;
+        else if (!listMarker) __needReselect14 = true;
+        else if (__otherCatRet14) __needReselect14 = true;
+        else __needReselect14 = false;
+        if (__needReselect14) {
+            if (!isFoodFilterSelectedOnList()) {
+                log("[返回] 检测到美食筛选未选中（可能误触非美食分类），重新选择美食");
+                var selOk = false;
+                try { selOk = selectFoodCategory(); } catch(eSel) { logError("重选美食异常", eSel); }
+                if (selOk) {
+                    log("[返回] 已重新选中美食，等待列表刷新");
+                    sleepMs(1200);
+                    try { waitForListMarkers(3000); } catch(eW2) {}
+                } else {
+                    log("[返回] 重选美食失败，尝试等待后继续");
+                    sleepMs(800);
+                }
             } else {
-                log("[返回] 重选美食失败，尝试等待后继续");
-                sleepMs(800);
+                log("[返回] 美食筛选仍选中，列表正常");
             }
         } else {
-            log("[返回] 美食筛选仍选中，列表正常");
+            log("[返回] 列表标记正常且无其它类目占顶，跳过重选（防误判）");
+            try { if (isFoodFilterSelectedOnList()) log("[返回] 美食筛选仍选中，列表正常"); else log("[返回] 美食顶部离屏但列表标记正常，跳过重选避免误触"); } catch(eSkip14) {}
         }
-    } catch(eChk) { logError("校验美食筛选异常", eChk); }
+    } catch(e14) { logError("返回重选校验异常", e14); }
     return isListPage();
 }
 // ---------- 文本与价格解析 ----------
@@ -2254,57 +2285,82 @@ function enterFreeTrial() {
 function isPanelCategoryText(t){ // v1.45.12: 8类目覆盖，防止结婚/丽人误触
 var c=['\u7f8e\u98df','\u4e3d\u4eba','\u7ed3\u5a5a','\u4eb2\u5b50','\u73a9\u4e50','\u5b66\u4e60\u57f9\u8bad','\u751f\u6d3b\u670d\u52a1','\u901b\u8857'];for(var i=0;i<c.length;i++) if(t===c[i]) return true; return false;}
 function isFoodFilterSelectedOnList() {
-    // v1.45.11: 面板多类目检测 + 同行校验——若检测到分类面板(面板区域内类目数>=3)则不算顶部选中
+    var __panelCnt14 = 0;
     try {
-        var __infosPC = getVisibleTextInfos();
-        var __panelCnt = 0;
-        for (var __pi=0; __pi<__infosPC.length; __pi++) {
-            var __tt = String(__infosPC[__pi].text||"").trim();
-            var __cx = __infosPC[__pi].cx||0, __cy = __infosPC[__pi].cy||0;
-            if (isPanelCategoryText(__tt) && __cy > 300 && __cy < 1300 && __cx < 320) __panelCnt++;
+        var __infosPC14 = getVisibleTextInfos();
+        for (var __pi14=0; __pi14<__infosPC14.length; __pi14++) {
+            var __tt14 = String(__infosPC14[__pi14].text||"").trim();
+            var __cx14 = __infosPC14[__pi14].cx||0, __cy14 = __infosPC14[__pi14].cy||0;
+            if (isPanelCategoryText(__tt14) && __cy14 > 300 && __cy14 < 1300 && __cx14 < 320) __panelCnt14++;
         }
-        if (__panelCnt >= 3) return false;
-    } catch(ePC) {}
-    // v1.45.11: 收紧顶部检测——顶部筛选栏 cy < 520 才算选中
-
+        if (__panelCnt14 >= 3) return false;
+    } catch(ePC14) {}
     try {
-        var probeNodes = [];
-        try { eachNode(text("美食").find(), function(n){ probeNodes.push(n); }); } catch(e) {}
-        try { eachNode(descContains("美食").find(), function(n){ probeNodes.push(n); }); } catch(e2) {}
-        try { eachNode(textContains("美食").find(), function(n){ probeNodes.push(n); }); } catch(e3) {}
-        for (var pi=0; pi<probeNodes.length; pi++) {
+        var probeNodes14 = [];
+        try { eachNode(text("美食").find(), function(n){ probeNodes14.push(n); }); } catch(e) {}
+        try { eachNode(descContains("美食").find(), function(n){ probeNodes14.push(n); }); } catch(e2) {}
+        try { eachNode(textContains("美食").find(), function(n){ probeNodes14.push(n); }); } catch(e3) {}
+        for (var pi14=0; pi14<probeNodes14.length; pi14++) {
             try {
-                var nb = probeNodes[pi].bounds();
-                var ncy = (nb.top + nb.bottom)/2;
-                if (ncy >= -80 && ncy < 520) return true;
-                
-            } catch(eB) {}
+                var nb14 = probeNodes14[pi14].bounds();
+                var ncy14 = (nb14.top + nb14.bottom)/2;
+                if (ncy14 >= -100 && ncy14 < 600) return true;
+            } catch(eB14) {}
         }
-    } catch(e) {}
+    } catch(e14) {}
+    var __infosTop14 = null;
+    var __hasMarker14 = false;
+    var __otherCatAtTop14 = false;
     try {
-        var infos = getVisibleTextInfos();
-        for (var i = 0; i < infos.length; i++) {
-            var t = String(infos[i].text||"").trim();
-            if ((t === "美食" || t.indexOf("美食")>=0) && infos[i].cy >= -80 && infos[i].cy < 520) {
-                var __nearTop = false;
-                try {
-                    for (var __k=0; __k<infos.length; __k++) {
-                        var __ot = String(infos[__k].text||"").trim();
-                        if (__ot==="全部商区" || __ot==="智能排序" || __ot==="更多筛选") {
-                            if (Math.abs(infos[__k].cy - infos[i].cy) < 90) { __nearTop = true; break; }
-                        }
+        __infosTop14 = getVisibleTextInfos();
+        for (var __m14=0; __m14<__infosTop14.length; __m14++) {
+            var __mt14 = String(__infosTop14[__m14].text||"").trim();
+            if (__mt14=="全部商区" || __mt14=="智能排序" || __mt14=="更多筛选") { __hasMarker14 = true; break; }
+        }
+        for (var __oi14=0; __oi14<__infosTop14.length; __oi14++) {
+            var __ot14 = String(__infosTop14[__oi14].text||"").trim();
+            var __ocy14 = __infosTop14[__oi14].cy||0;
+            if (__ocy14 >= -100 && __ocy14 < 600) {
+                if (__ot14=="丽人"||__ot14=="结婚"||__ot14=="亲子"||__ot14=="玩乐"||__ot14=="逛街"||__ot14=="生活服务"||__ot14=="学习培训") {
+                    var __nearTop14 = false;
+                    for (var __kj14=0; __kj14<__infosTop14.length; __kj14++) {
+                        var __otj14 = String(__infosTop14[__kj14].text||"").trim();
+                        if ((__otj14=="全部商区"||__otj14=="智能排序"||__otj14=="更多筛选") && Math.abs(__infosTop14[__kj14].cy - __ocy14) < 110) { __nearTop14 = true; break; }
                     }
-                } catch(eNear) {}
-                if (__nearTop) return true;
-                var __hasMarker = false;
-                for (var __m=0; __m<infos.length; __m++) {
-                    var __mt = String(infos[__m].text||"").trim();
-                    if (__mt==="全部商区" || __mt==="智能排序" || __mt==="更多筛选") { __hasMarker = true; break; }
+                    if (__nearTop14 || __hasMarker14) { __otherCatAtTop14 = true; break; }
                 }
-                if (!__hasMarker) return true;
             }
         }
-    } catch (e2) {}
+    } catch(eTop14) {}
+    try {
+        if (__infosTop14) {
+            for (var i14 = 0; i14 < __infosTop14.length; i14++) {
+                var t14 = String(__infosTop14[i14].text||"").trim();
+                if ((t14 === "美食" || t14.indexOf("美食")>=0) && __infosTop14[i14].cy >= -100 && __infosTop14[i14].cy < 600) {
+                    var __nearTop2_14 = false;
+                    try {
+                        for (var __k14=0; __k14<__infosTop14.length; __k14++) {
+                            var __otk14 = String(__infosTop14[__k14].text||"").trim();
+                            if (__otk14=="全部商区" || __otk14=="智能排序" || __otk14=="更多筛选") {
+                                if (Math.abs(__infosTop14[__k14].cy - __infosTop14[i14].cy) < 110) { __nearTop2_14 = true; break; }
+                            }
+                        }
+                    } catch(eNear14) {}
+                    if (__nearTop2_14) return true;
+                    if (!__hasMarker14) return true;
+                    if (__otherCatAtTop14) return false;
+                    return true;
+                }
+            }
+        }
+    } catch (e2_14) {}
+    try {
+        if (__panelCnt14 < 2 && !__otherCatAtTop14) {
+            var __mk14 = null;
+            try { __mk14 = waitForListMarkers(800); } catch(eMk14) {}
+            if (__mk14) return true;
+        }
+    } catch(eFallback14) {}
     return false;
 }
 
@@ -2323,7 +2379,7 @@ function selectFoodCategory() {
             log("未找到\u5168\u90e8\u5206\u7c7b，但页面已有\u7f8e\u98df且已选中，继续");
             return true;
         }
-        // v1.45.13: 移除 结婚/丽人兜底点击，改为坐标直连
+        // v1.45.14-fix-美食防误判-返回去重: 移除 结婚/丽人兜底点击，改为坐标直连
         if (!catOpened) {
             try {
                 var infos = getVisibleTextInfos();
