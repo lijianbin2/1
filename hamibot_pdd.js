@@ -1,17 +1,17 @@
 auto.waitFor();
 console.show();
-console.log("pdd v1.12 - MCP联调修复版 s1/s6/s7坐标兜底 + isHome增强 + console.hide");
+console.log("pdd v1.13 - MCP联调修复版 s1/s6/s7坐标兜底 + isHome增强 + console.hide");
 function hideConsoleSoon(){ try{ console.hide(); }catch(e){} sleep(600); }
 function showConsoleSoon(){ try{ console.show(); }catch(e){} sleep(300); }
 function swipeEdgeUp(t, interval) { t=t||5; interval=interval||2000; for(let n=0;n<t;n++){ swipe(1150,1400,1150,700,600); sleep(interval);} }
 function swipeToTop(){ swipe(600,700,600,1400,600); sleep(1200); }
 function isInPdd(){ return currentPackage()==="com.xunmeng.pinduoduo"; }
 function isHome(){
-    if(textContains("省钱月卡").exists()||descContains("省钱月卡").exists()) return true;
+    // v1.13 removed early return for isHome
     let hasHome = text("首页").exists()||desc("首页").exists();
     let hasMe = text("个人中心").exists()||desc("个人中心").exists();
     if(hasHome && hasMe && isInPdd()){
-        if(textContains("共200元券").exists()||text("消费券").exists()) return false;
+        if(textContains("共200元券").exists()) return false;
         return true;
     }
     return false;
@@ -136,22 +136,26 @@ function s1(){
     console.log("s1结束 isHome="+isHome());
 }
 function s2(){
-    console.log("=== s2 百亿补贴 ===");
+    console.log("=== s2 百亿补贴 (滚动查找) ===");
     hideConsoleSoon();
     if(!isHome()) goHome();
-    let ok=clickViaParent("百亿补贴");
-    if(!ok){
-        let n=textContains("百亿").findOne(600);
-        if(n){ console.log("百亿模糊 "+n.text()); try{n.click();}catch(e){} try{shell("input tap "+n.bounds().centerX()+" "+n.bounds().centerY(), true);}catch(e){} }
-        else{
-            let w=device.width,h=device.height;
-            let x=Math.round(w*0.50),y=Math.round(h*0.35);
-            console.log("百亿兜底 "+x+","+y);
-            try{ click(x,y);}catch(e){}
-            try{ shell("input tap "+x+" "+y, true);}catch(e){}
-        }
+    swipeToTop(); sleep(600);
+    let ok=false;
+    for(let k=0;k<6;k++){
+        if(clickViaParent("百亿补贴")){ ok=true; console.log("百亿补贴点击 k="+k); sleep(3000); break; }
+        let n=textContains("百亿").findOne(400);
+        if(n){ console.log("百亿模糊 "+n.text()+" "+n.bounds()); try{n.click();}catch(e){} try{shell("input tap "+n.bounds().centerX()+" "+n.bounds().centerY(), true);}catch(e){} ok=true; sleep(3000); break; }
+        console.log("百亿补贴未找到，下滑 "+(k+1)+"/6");
+        swipe(600,1350,600,750,600); sleep(1300);
     }
-    sleep(3500);
+    if(!ok){
+        let w=device.width,h=device.height;
+        let x=Math.round(w*0.50),y=Math.round(h*0.35);
+        console.log("百亿兜底 "+x+","+y);
+        try{ click(x,y);}catch(e){}
+        try{ shell("input tap "+x+" "+y, true);}catch(e){}
+        sleep(3000);
+    }
     showConsoleSoon();
 }
 function s3(){
@@ -172,13 +176,35 @@ function s4(){
 }
 function s5(){ console.log("=== s5 back ==="); hideConsoleSoon(); back(); sleep(1700); showConsoleSoon(); }
 function s6(){
-    console.log("=== s6 百亿消费券/去抢购 (红块整体可进) ===");
+    console.log("=== s6 百亿消费券/去抢购 (红块整体可进+滚动) ===");
     hideConsoleSoon();
+    if(!isHome()) goHome();
+    swipeToTop(); sleep(600);
     let ok=false;
-    ok=clickViaParent("去抢购");
-    if(ok){ console.log("s6 去抢购点击完成"); sleep(3200); showConsoleSoon(); return; }
-    ok=clickViaParent("百亿消费券");
-    if(ok){ console.log("s6 百亿消费券点击完成"); sleep(3200); showConsoleSoon(); return; }
+    for(let k=0;k<5;k++){
+        ok=clickViaParent("去抢购");
+        if(ok){ console.log("s6 去抢购点击 k="+k); sleep(3200); showConsoleSoon(); return; }
+        ok=clickViaParent("百亿消费券");
+        if(ok){ console.log("s6 百亿消费券点击 k="+k); sleep(3200); showConsoleSoon(); return; }
+        let n=textContains("消费券").findOne(500) || descContains("消费券").findOne(300);
+        if(n && !textContains("开学消费券").exists()){
+            // 避免底部导航的开学消费券
+        }
+        if(n){
+            let txt=n.text();
+            if(txt.includes("开学")){ /* skip bottom nav */ } else {
+                console.log("找到消费券文本 "+txt+" "+n.bounds()+" k="+k);
+                let cur=n; let clicked=false;
+                for(let i=0;i<4;i++){ if(cur.clickable()){ try{cur.click();}catch(e){} clicked=true; try{ let b=cur.bounds(); shell("input tap "+b.centerX()+" "+b.centerY(), true);}catch(e){} break; } let pp=cur.parent(); if(!pp) break; cur=pp; }
+                if(!clicked) try{n.click();}catch(e){}
+                try{ let b=n.bounds(); shell("input tap "+b.centerX()+" "+b.centerY(), true); }catch(e){}
+                try{ let b2=cur.bounds(); shell("input tap "+b2.centerX()+" "+b2.centerY(), true); }catch(e){}
+                sleep(3200); showConsoleSoon(); return;
+            }
+        }
+        console.log("s6 未找到，下滑 "+(k+1)+"/5");
+        swipe(600,1350,600,750,600); sleep(1300);
+    }
     let n=textContains("消费券").findOne(800) || descContains("消费券").findOne(500);
     if(n){
         console.log("找到消费券文本 "+n.text()+" "+n.bounds()+" 尝试父容器+shell");
@@ -263,7 +289,7 @@ function s8(){
     showConsoleSoon();
 }
 function main(){
-    console.log("=== main 开始 v1.12 ===");
+    console.log("=== main 开始 v1.13 ===");
     sleep(800); ensurePdd(); 
     let inPdd=isInPdd();
     console.log("ensure后 inPdd="+inPdd+" isHome="+isHome());
@@ -271,8 +297,10 @@ function main(){
     goHome();
     console.log("goHome后 isHome="+isHome());
     s1(); s2(); s3(); s4(); s5(); s6(); s7(); s8();
-    toast("v1.12 完成");
-    console.log("=== all done v1.12 ===");
+    toast("v1.13 完成");
+    console.log("=== all done v1.13 ===");
 }
 main();
+
+
 
