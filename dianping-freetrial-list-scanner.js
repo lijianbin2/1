@@ -1,6 +1,6 @@
 // ============================================================
 // 大众点评「免费试」列表扫描筛选（Hamibot 版）
-// 版本：v1.45.39-fix-等级不足立即停止
+// 版本：v1.45.40-fix-美食单次点击即扫
 //
 // 运行环境：Hamibot 手机客户端
 // 目标 App：大众点评（com.dianping.v1）
@@ -88,7 +88,7 @@
 // ============================================================
 
 // 版本标记：手机端日志中会输出，用来确认运行的是新脚本
-var __SCRIPT_VERSION = "v1.45.39-fix-等级不足立即停止";
+var __SCRIPT_VERSION = "v1.45.40-fix-美食单次点击即扫";
 
 var CONFIG = {
     PACKAGE: "com.dianping.v1",
@@ -6334,7 +6334,7 @@ function main() {
         try {
             var foodClickConfirmed = selectFoodCategory();
             // 点击结果不可靠时，以列表顶部实际显示的“美食”筛选标签兜底。
-            __foodCategorySelected = foodClickConfirmed && isFoodFilterSelectedOnList();
+            __foodCategorySelected = !!foodClickConfirmed; // v1.45.40 单次即放行
             log("[列表] 美食分类筛选：" +
                 (__foodCategorySelected ? "已选择" : "未选中"));
             if (!__foodCategorySelected) {
