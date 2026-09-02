@@ -1,6 +1,6 @@
 // ============================================================
 // 大众点评「免费试」列表扫描筛选（Hamibot 版）
-// 版本：v1.45.6-fix-card-center-丽人-early-stop
+// 版本：v1.45.7-fix-丽人重选全部分类兜底
 //
 // 运行环境：Hamibot 手机客户端
 // 目标 App：大众点评（com.dianping.v1）
@@ -88,7 +88,7 @@
 // ============================================================
 
 // 版本标记：手机端日志中会输出，用来确认运行的是新脚本
-var __SCRIPT_VERSION = "v1.45.6-fix-card-center-丽人-early-stop";
+var __SCRIPT_VERSION = "v1.45.7-fix-丽人重选全部分类兜底";
 
 // 运行结果回传：把摘要 POST 到调试端点便于远程验收。
 // 网络失败静默忽略，绝不影响主流程；无 http 模块的环境（如测试）自动跳过。
@@ -2385,36 +2385,66 @@ function isFoodFilterSelectedOnList() {
 
 function selectFoodCategory() {
     log("选择「全部分类」");
-
-    if (!clickText("全部分类", 3000)) {
-        if (existsText("美食")) {
-            log("未找到「全部分类」，但页面已有「美食」，继续");
+    var catOpened = false;
+    if (clickText("全部分类", 2000)) {
+        catOpened = true;
+    } else {
+        if (existsText("美食") && isFoodFilterSelectedOnList()) {
+            log("未找到「全部分类」，但页面已有「美食」且已选中，继续");
             return true;
         }
-
-        log("找不到「全部分类」");
-        return false;
+        if (clickText("丽人", 1500)) {
+            log("点击「丽人」打开分类面板（全部分类兜底）");
+            catOpened = true;
+        } else {
+            try {
+                var infos = getVisibleTextInfos();
+                var catChip = null;
+                for (var i = 0; i < infos.length; i++) {
+                    if (infos[i].cy < 420 && infos[i].cy > 120 && infos[i].cx > 180 && infos[i].cx < 520) {
+                        if (infos[i].text.length <= 6) { catChip = infos[i]; break; }
+                    }
+                }
+                if (catChip) {
+                    log("坐标兜底点击类目筛选: " + catChip.text + " (" + catChip.cx + "," + catChip.cy + ")");
+                    click(catChip.cx, catChip.cy);
+                    sleepMs(300);
+                    catOpened = true;
+                } else {
+                    var fx = Math.round(device.width * 0.32);
+                    var fy = Math.round(device.height * 0.14);
+                    log("固定坐标兜底点击类目筛选 (" + fx + "," + fy + ")");
+                    click(fx, fy);
+                    sleepMs(300);
+                    catOpened = true;
+                }
+            } catch (eCoord) {
+                logError("类目筛选坐标兜底异常", eCoord);
+            }
+        }
+        if (!catOpened) {
+            log("找不到「全部分类」/「丽人」且坐标兜底失败");
+            return false;
+        }
     }
-
     sleepMs(800);
-
-    var food = waitText("美食", 3000);
-
+    var food = waitText("美食", 3500);
     if (!food) {
         log("分类中没有「美食」");
-        goBack();
+        try { goBack(); } catch(e){ }
         return false;
     }
-
     if (!clickObj(food) && !clickNodeSmart(food)) {
         log("点击「美食」失败");
-        goBack();
+        try { goBack(); } catch(e2){ }
         return false;
     }
-
     sleepMs(1200);
     log("已选择「美食」");
     dumpVisibleTexts(15);
+    if (!isFoodFilterSelectedOnList()) {
+        log("警告：点击美食后顶部仍未出现「美食」，可能未切换成功");
+    }
     return true;
 }
 
@@ -5956,6 +5986,8 @@ if (Date.now() - __scriptStartTime < 5000) {
     log("脚本在 5 秒内提前结束，请把上方所有日志发给开发者排查");
     toastMsg("脚本提前结束，请查看 Hamibot 日志");
 }
+
+
 
 
 
