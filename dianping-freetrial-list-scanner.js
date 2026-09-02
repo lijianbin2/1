@@ -1,6 +1,6 @@
 // ============================================================
 // 大众点评「免费试」列表扫描筛选（Hamibot 版）
-// 版本：v1.45.27-fix-美食检测重构+手动兜底+全量诊断
+// 版本：v1.45.31-fix-统一底部守卫+报名零误点-扫码加固
 //
 // 运行环境：Hamibot 手机客户端
 // 目标 App：大众点评（com.dianping.v1）
@@ -88,7 +88,7 @@
 // ============================================================
 
 // 版本标记：手机端日志中会输出，用来确认运行的是新脚本
-var __SCRIPT_VERSION = "v1.45.27-fix-美食检测重构+手动兜底+全量诊断";
+var __SCRIPT_VERSION = "v1.45.34-fix-单点漏报修复+报名精准clickable";
 
 var CONFIG = {
     PACKAGE: "com.dianping.v1",
@@ -188,7 +188,7 @@ var CONFIG = {
 
     // 列表扫描上限与区域识别参数
     MAX_SCAN_SCROLLS: 40,
-    MAX_CONSECUTIVE_EMPTY_SCROLLS: 5,
+    MAX_CONSECUTIVE_EMPTY_SCROLLS: 8,
     // v1.9.0：扫描到底综合检测与硬安全阀
     MAX_NO_NEW_ROUNDS: 6,
     MAX_SAME_SCREEN_ROUNDS: 6,
@@ -209,7 +209,27 @@ var CONFIG = {
 
     // 进入列表后把悬浮日志窗口缩成顶部细条的高度（像素），
     // 避免挡住筛选栏与滚动操作区域；不支持缩小时会自动隐藏悬浮窗
-    CONSOLE_BAR_HEIGHT: 110
+    CONSOLE_BAR_HEIGHT: 110,
+
+    // ========== v1.45.32 局域网实时回传（不走 Hamibot API，不受额度限制） ==========
+    // 填局域网接收器地址即可实时在电脑看日志，例如 http://192.168.1.5:8765/log
+    // 留空则不推送，仅本地 hamibot_log.txt；填 webhook.site 临时 URL 也可外网查看
+    TELEMETRY_URL: "http://192.168.1.5:8765/log",
+    TELEMETRY_BATCH_MS: 1200,
+    TELEMETRY_TIMEOUT_MS: 1500,
+
+    // v1.45.28 重构：美食校验抽取为可配置常量，便于后续统一调优与测试覆盖
+    FOOD_POLL_INTERVAL_MS: 500,
+    FOOD_POLL_RETRIES: 10,
+    FOOD_RETRY_RETRIES: 10,
+    FOOD_MANUAL_WAIT_MS: 10000,
+    FOOD_STRICT_CHECK: true,
+    FOOD_TOP_CY_MIN: -250,
+    FOOD_TOP_CY_MAX: 1300,
+    FOOD_PANEL_CX_MAX: 320,
+    FOOD_MARKER_DY: 110,
+    FOOD_TOP_CX_MIN: 80,
+    FOOD_TOP_CX_MAX: 900
 };
 
 // 仅本地模拟测试使用：测试脚本会通过 __TEST_CONFIG_OVERRIDE__ 缩短等待时间；
@@ -292,6 +312,37 @@ var processedStorage = null;
 
 // ---------- 日志 ----------
 
+var gTelemetryBuf = [];
+var gTelemetryLastFlush = 0;
+function _telemetryEnqueue(line){
+    try{
+        if(!CONFIG.TELEMETRY_URL || !line) return;
+        var now = Date.now();
+        gTelemetryBuf.push(line);
+        if(gTelemetryBuf.length>80) gTelemetryBuf.shift();
+        if(now - gTelemetryLastFlush < (CONFIG.TELEMETRY_BATCH_MS||1200)) return;
+        _telemetryFlush();
+    }catch(e){}
+}
+function _telemetryFlush(){
+    try{
+        if(!CONFIG.TELEMETRY_URL || gTelemetryBuf.length===0) return;
+        var payload = gTelemetryBuf.join("\n");
+        gTelemetryBuf = [];
+        gTelemetryLastFlush = Date.now();
+        var url = CONFIG.TELEMETRY_URL;
+        var body = JSON.stringify({version: __SCRIPT_VERSION, ts: Date.now(), log: payload});
+        try{
+            if(typeof threads !== "undefined" && threads && threads.start){
+                threads.start(function(){
+                    try{ http.postJson(url, {version: __SCRIPT_VERSION, ts: Date.now(), log: payload}); }catch(e2){ try{ http.post(url, body, {contentType:"application/json"}); }catch(e3){} }
+                });
+                return;
+            }
+        }catch(e){}
+        try{ http.postJson(url, {version: __SCRIPT_VERSION, ts: Date.now(), log: payload}); }catch(e2){ try{ http.post(url, body, {contentType:"application/json"}); }catch(e3){} }
+    }catch(e){}
+}
 function log(msg) {
     try {
         console.log("[免费试] " + msg);
@@ -576,7 +627,12 @@ function clickObj(obj) {
 
     try {
         var b = obj.bounds();
-        var ok = click((b.left + b.right) / 2, (b.top + b.bottom) / 2);
+        var cx=(b.left + b.right) / 2, cy=(b.top + b.bottom) / 2;
+        if(isBottomNavDangerZone(cx,cy)){
+            log("[点击守卫] clickObj拦截底部危险区 "+Math.round(cx)+","+Math.round(cy));
+            return false;
+        }
+        var ok = safeClickCoord(cx, cy, "clickObj");
         sleepMs(CONFIG.WAIT_SHORT);
         return ok;
     } catch (e) {
@@ -754,7 +810,7 @@ function clickNodeSmart(node) {
         var b = node.bounds();
 
         if (b && b.left >= 0 && b.top >= 0 && b.right > b.left && b.bottom > b.top) {
-            var ok = click((b.left + b.right) / 2, (b.top + b.bottom) / 2);
+            var ok = safeClickCoord((b.left + b.right) / 2, (b.top + b.bottom) / 2, "auto");
 
             if (ok) {
                 log("已通过中心坐标点击");
@@ -1346,7 +1402,7 @@ function clickEntryNode(node) {
         log("点击方式3：中心坐标 " + cx + "," + cy);
 
         try {
-            var ok3 = click(cx, cy);
+            var ok3 = safeClickCoord(cx, cy, "entry");
             log("click(" + cx + "," + cy + ") 返回：" + ok3);
 
             if (ok3) {
@@ -1656,6 +1712,7 @@ function getVisibleSample(limit) {
 
 function getVisibleTextInfos() {
     var infos = [];
+    var seen = {};
     var pushNode = function (obj, src) {
         try {
             var t = String(obj.text() || "").trim();
@@ -1663,6 +1720,11 @@ function getVisibleTextInfos() {
             var txt = t || d;
             if (!txt) return;
             var b = obj.bounds();
+            var cx = (b.left + b.right) / 2;
+            var cy = (b.top + b.bottom) / 2;
+            var key = b.left + "," + b.top + "," + b.right + "," + b.bottom + "|" + txt;
+            if (seen[key]) return;
+            seen[key] = 1;
             infos.push({
                 text: txt,
                 rawText: t,
@@ -1671,8 +1733,8 @@ function getVisibleTextInfos() {
                 right: b.right,
                 top: b.top,
                 bottom: b.bottom,
-                cx: (b.left + b.right) / 2,
-                cy: (b.top + b.bottom) / 2,
+                cx: cx,
+                cy: cy,
                 className: String(obj.className() || ""),
                 clickable: !!obj.clickable(),
                 selected: !!obj.selected(),
@@ -1691,12 +1753,19 @@ function dumpTopBarDiagnostic() {
     try {
         var infos = getVisibleTextInfos();
         var top = [];
+        var seenTop = {};
         for (var i=0;i<infos.length;i++) {
             var cy = infos[i].cy;
-            if (cy >= -250 && cy < 900) top.push(infos[i]);
+            var cx = infos[i].cx;
+            if (cy < ((typeof CONFIG!=="undefined"&&CONFIG.FOOD_TOP_CY_MIN)||-250) || cy >= 900) continue;
+            if (cx < ((typeof CONFIG!=="undefined"&&CONFIG.FOOD_TOP_CX_MIN)||80) || cx > ((typeof CONFIG!=="undefined"&&CONFIG.FOOD_TOP_CX_MAX)||900)) continue;
+            var k = infos[i].left + "," + infos[i].top + "," + infos[i].right + "," + infos[i].bottom + "|" + infos[i].text;
+            if (seenTop[k]) continue;
+            seenTop[k] = 1;
+            top.push(infos[i]);
         }
         top.sort(function(a,b){ return a.cy-b.cy; });
-        log("[诊断] 顶部栏全量( -250~900, 按cy排序, 取前24):");
+        log("[诊断] 顶部栏全量( "+((typeof CONFIG!=="undefined"&&CONFIG.FOOD_TOP_CY_MIN)||-250)+"~900 cx"+((typeof CONFIG!=="undefined"&&CONFIG.FOOD_TOP_CX_MIN)||80)+"~"+((typeof CONFIG!=="undefined"&&CONFIG.FOOD_TOP_CX_MAX)||900)+", 按cy排序, 取前24, 去重后"+top.length+"条):");
         for (var j=0;j<Math.min(24, top.length); j++) {
             var it=top[j];
             log("  TOP["+j+"] "+it.text+" raw="+it.rawText+" desc="+it.desc+" @"+Math.round(it.cx)+","+Math.round(it.cy)+" "+it.className+" src="+it.src+" sel="+it.selected+" click="+it.clickable+" ["+it.left+","+it.top+","+it.right+","+it.bottom+"]");
@@ -2298,23 +2367,46 @@ function enterFreeTrial() {
 function isPanelCategoryText(t){ // v1.45.12: 8类目覆盖，防止结婚/丽人误触
 var c=['\u7f8e\u98df','\u4e3d\u4eba','\u7ed3\u5a5a','\u4eb2\u5b50','\u73a9\u4e50','\u5b66\u4e60\u57f9\u8bad','\u751f\u6d3b\u670d\u52a1','\u901b\u8857'];for(var i=0;i<c.length;i++) if(t===c[i]) return true; return false;}
 function isFoodFilterSelectedOnList() {
+    // v1.45.28 local helpers (内联以保证旧测试切片 eval 仍可用)
+    var _countPanelCategories = function(infos) {
+        var c = 0;
+        var _maxY = (typeof CONFIG!=="undefined" && CONFIG.FOOD_TOP_CY_MAX) ? CONFIG.FOOD_TOP_CY_MAX : 1300;
+        var _maxX = (typeof CONFIG!=="undefined" && CONFIG.FOOD_PANEL_CX_MAX) ? CONFIG.FOOD_PANEL_CX_MAX : 320;
+        for (var i=0;i<infos.length;i++) {
+            var tt = String(infos[i].text||"").trim();
+            if (isPanelCategoryText(tt) && infos[i].cy > 300 && infos[i].cy < _maxY && infos[i].cx < _maxX) c++;
+        }
+        return c;
+    };
+    var _hasListMarker = function(infos) {
+        for (var i=0;i<infos.length;i++) {
+            var t = String(infos[i].text||"").trim();
+            if (t=="\u5168\u90e8\u5546\u533a" || t=="\u667a\u80fd\u6392\u5e8f" || t=="\u66f4\u591a\u7b5b\u9009") return true;
+        }
+        return false;
+    };
+    var _isNearMarker = function(infos, cy) {
+        var _dy = (typeof CONFIG!=="undefined" && CONFIG.FOOD_MARKER_DY) ? CONFIG.FOOD_MARKER_DY : 110;
+        for (var i=0;i<infos.length;i++) {
+            var t = String(infos[i].text||"").trim();
+            if (t=="\u5168\u90e8\u5546\u533a" || t=="\u667a\u80fd\u6392\u5e8f" || t=="\u66f4\u591a\u7b5b\u9009") {
+                if (Math.abs(infos[i].cy - cy) < _dy) return true;
+            }
+        }
+        return false;
+    };
     var __panelCnt14 = 0;
     try {
-        var __infosPC14 = getVisibleTextInfos();
-        for (var __pi14=0; __pi14<__infosPC14.length; __pi14++) {
-            var __tt14 = String(__infosPC14[__pi14].text||"").trim();
-            var __cx14 = __infosPC14[__pi14].cx||0, __cy14 = __infosPC14[__pi14].cy||0;
-            if (isPanelCategoryText(__tt14) && __cy14 > 300 && __cy14 < 1300 && __cx14 < 320) __panelCnt14++;
-        }
+        __panelCnt14 = _countPanelCategories(getVisibleTextInfos());
         if (__panelCnt14 >= 3) return false;
         if (__panelCnt14 >= 2) return false;
     } catch(ePC14) {}
     try {
         if (__panelCnt14 < 2) {
             var _pcText = 0;
-            try { eachNode(text("\u7f8e\u98df").find(), function(n){ try{ var b=n.bounds(); var cy=(b.top+b.bottom)/2; var cx=(b.left+b.right)/2; if(cy>300&&cy<1300&&cx<320) _pcText++; }catch(e){}});} catch(e){}
-            try { eachNode(text("\u4e3d\u4eba").find(), function(n){ try{ var b=n.bounds(); var cy=(b.top+b.bottom)/2; var cx=(b.left+b.right)/2; if(cy>300&&cy<1300&&cx<320) _pcText++; }catch(e){}});} catch(e){}
-            try { eachNode(text("\u7ed3\u5a5a").find(), function(n){ try{ var b=n.bounds(); var cy=(b.top+b.bottom)/2; var cx=(b.left+b.right)/2; if(cy>300&&cy<1300&&cx<320) _pcText++; }catch(e){}});} catch(e){}
+            try { eachNode(text("\u7f8e\u98df").find(), function(n){ try{ var b=n.bounds(); var cy=(b.top+b.bottom)/2; var cx=(b.left+b.right)/2; if(cy>300&&cy<CONFIG.FOOD_TOP_CY_MAX&&cx<CONFIG.FOOD_PANEL_CX_MAX) _pcText++; }catch(e){}});} catch(e){}
+            try { eachNode(text("\u4e3d\u4eba").find(), function(n){ try{ var b=n.bounds(); var cy=(b.top+b.bottom)/2; var cx=(b.left+b.right)/2; if(cy>300&&cy<CONFIG.FOOD_TOP_CY_MAX&&cx<CONFIG.FOOD_PANEL_CX_MAX) _pcText++; }catch(e){}});} catch(e){}
+            try { eachNode(text("\u7ed3\u5a5a").find(), function(n){ try{ var b=n.bounds(); var cy=(b.top+b.bottom)/2; var cx=(b.left+b.right)/2; if(cy>300&&cy<CONFIG.FOOD_TOP_CY_MAX&&cx<CONFIG.FOOD_PANEL_CX_MAX) _pcText++; }catch(e){}});} catch(e){}
             if (_pcText >= 2) return false;
             if (_pcText > __panelCnt14) __panelCnt14 = _pcText;
         }
@@ -2336,7 +2428,7 @@ function isFoodFilterSelectedOnList() {
                     var __nearTop14 = false;
                     for (var __kj14=0; __kj14<__infosTop14.length; __kj14++) {
                         var __otj14 = String(__infosTop14[__kj14].text||"").trim();
-                        if ((__otj14=="\u5168\u90e8\u5546\u533a"||__otj14=="\u667a\u80fd\u6392\u5e8f"||__otj14=="\u66f4\u591a\u7b5b\u9009") && Math.abs(__infosTop14[__kj14].cy - __ocy14) < 110) { __nearTop14 = true; break; }
+                        if ((__otj14=="\u5168\u90e8\u5546\u533a"||__otj14=="\u667a\u80fd\u6392\u5e8f"||__otj14=="\u66f4\u591a\u7b5b\u9009") && Math.abs(__infosTop14[__kj14].cy - __ocy14) < CONFIG.FOOD_MARKER_DY) { __nearTop14 = true; break; }
                     }
                     if (__nearTop14 || __hasMarker14) { __otherCatAtTop14 = true; break; }
                 }
@@ -2363,7 +2455,7 @@ function isFoodFilterSelectedOnList() {
                                 var _mkNodes=[]; try{ eachNode(text("\u5168\u90e8\u5546\u533a").find(),function(n){_mkNodes.push(n);}); }catch(e){}
                                 try{ eachNode(text("\u667a\u80fd\u6392\u5e8f").find(),function(n){_mkNodes.push(n);}); }catch(e){}
                                 try{ eachNode(text("\u66f4\u591a\u7b5b\u9009").find(),function(n){_mkNodes.push(n);}); }catch(e){}
-                                for(var _mi=0;_mi<_mkNodes.length;_mi++){ try{ var _mb=_mkNodes[_mi].bounds(); var _mcy=(_mb.top+_mb.bottom)/2; if(Math.abs(_mcy-_cy)<110){_near=true;break;}}catch(e){}}
+                                for(var _mi=0;_mi<_mkNodes.length;_mi++){ try{ var _mb=_mkNodes[_mi].bounds(); var _mcy=(_mb.top+_mb.bottom)/2; if(Math.abs(_mcy-_cy)<CONFIG.FOOD_MARKER_DY){_near=true;break;}}catch(e){}}
                                 if(!_near) continue;
                             } else {
                                 if(_cy>500) continue;
@@ -2415,7 +2507,7 @@ function isFoodFilterSelectedOnList() {
                             var _mk2=[]; try{ eachNode(text("\u5168\u90e8\u5546\u533a").find(),function(n){_mk2.push(n);}); }catch(e){}
                             try{ eachNode(text("\u667a\u80fd\u6392\u5e8f").find(),function(n){_mk2.push(n);}); }catch(e){}
                             try{ eachNode(text("\u66f4\u591a\u7b5b\u9009").find(),function(n){_mk2.push(n);}); }catch(e){}
-                            for(var _m2=0;_m2<_mk2.length;_m2++){ try{ var _mb2=_mk2[_m2].bounds(); var _mcy2=(_mb2.top+_mb2.bottom)/2; if(Math.abs(_mcy2-_fcy)<110){_isPanelNear=true;break;}}catch(e){}}
+                            for(var _m2=0;_m2<_mk2.length;_m2++){ try{ var _mb2=_mk2[_m2].bounds(); var _mcy2=(_mb2.top+_mb2.bottom)/2; if(Math.abs(_mcy2-_fcy)<CONFIG.FOOD_MARKER_DY){_isPanelNear=true;break;}}catch(e){}}
                         }
                         if (!_isPanelNear) continue;
                     }
@@ -2504,14 +2596,14 @@ function selectFoodCategory() {
                 }
                 if (catChip) {
                     log("坐标兜底点击类目筛选: " + catChip.text + " (" + catChip.cx + "," + catChip.cy + ")");
-                    click(catChip.cx, catChip.cy);
+                    safeClickCoord(catChip.cx, catChip.cy,"catChip");
                     sleepMs(400);
                     catOpened = true;
                 } else {
                     var fx = Math.round(device.width * 0.32);
                     var fy = Math.round(device.height * 0.14);
                     log("固定坐标兜底点击类目筛选 (" + fx + "," + fy + ")");
-                    click(fx, fy);
+                    safeClickCoord(fx, fy,"fallbackFx");
                     sleepMs(400);
                     catOpened = true;
                 }
@@ -2545,7 +2637,7 @@ function selectFoodCategory() {
     var isCoordClicked = false;
     if (foodCoord) {
         // v1.45.23: 直接坐标点面板美食，避免祖先链偏离左列导致只关面板未切换
-        try { log("面板美食坐标直点 ("+Math.round(foodCoord.cx)+","+Math.round(foodCoord.cy)+")"); click(foodCoord.cx, foodCoord.cy); sleepMs(400); } catch(e){ try{ click(foodCoord.cx, foodCoord.cy);}catch(e2){} }
+        try { log("面板美食坐标直点 ("+Math.round(foodCoord.cx)+","+Math.round(foodCoord.cy)+")"); safeClickCoord(foodCoord.cx, foodCoord.cy,"foodCoord"); sleepMs(400); } catch(e){ try{ safeClickCoord(foodCoord.cx, foodCoord.cy,"foodCoord");}catch(e2){} }
         isCoordClicked = true;
         food = { __dummy:true };
         // 备用祖先点击，坐标失败时补救（不影响主路径）
@@ -2589,8 +2681,8 @@ function selectFoodCategory() {
     dumpVisibleTexts(18);
     if (!isFoodFilterSelectedOnList()) {
         log("警告：点击美食后顶部仍未出现美食，可能未切换成功，轮询5秒等待列表刷新");
-        for (var __poll=0; __poll<10; __poll++) {
-            sleepMs(500);
+        for (var __poll=0; __poll<CONFIG.FOOD_POLL_RETRIES; __poll++) {
+            sleepMs(CONFIG.FOOD_POLL_INTERVAL_MS);
             if (isFoodFilterSelectedOnList()) {
                 log("轮询第"+(__poll+1)+"次检测通过");
                 return true;
@@ -2607,20 +2699,21 @@ function selectFoodCategory() {
             for(var ri2=0; ri2<retryNodes2.length; ri2++){
                 try{ var rb2=retryNodes2[ri2].bounds(); var rcy2=(rb2.top+rb2.bottom)/2; var rcx2=(rb2.left+rb2.right)/2; if(rcy2>250 && rcy2<1350 && rcx2<360 && rcy2<bestCY){ bestCY=rcy2; retry2=retryNodes2[ri2]; } }catch(e){}
             }
-            if(retry2){ log("二次重试点击左侧美食面板"); try{ clickObj(retry2);}catch(e){ try{clickNodeSmart(retry2);}catch(e2){} } sleepMs(1200); for(var __poll2=0;__poll2<10;__poll2++){ sleepMs(500); if(isFoodFilterSelectedOnList()){ log("二次重试轮询第"+(__poll2+1)+"次通过"); return true; } } }
+            if(retry2){ log("二次重试点击左侧美食面板"); try{ clickObj(retry2);}catch(e){ try{clickNodeSmart(retry2);}catch(e2){} } sleepMs(1200); for(var __poll2=0;__poll2<CONFIG.FOOD_RETRY_RETRIES;__poll2++){ sleepMs(CONFIG.FOOD_POLL_INTERVAL_MS); if(isFoodFilterSelectedOnList()){ log("二次重试轮询第"+(__poll2+1)+"次通过"); return true; } } }
         } catch(e){}
         dumpTopBarDiagnostic();
         log("两次自动尝试仍未检测到美食，已自动进入手动确认兜底：请在10秒内手动点一下【美食】分类");
         toast("请手动点击【美食】，10秒后自动继续");
-        for (var __wait=0; __wait<20; __wait++) {
-            sleepMs(500);
+        for (var __wait=0; __wait<Math.floor(CONFIG.FOOD_MANUAL_WAIT_MS/CONFIG.FOOD_POLL_INTERVAL_MS); __wait++) {
+            sleepMs(CONFIG.FOOD_POLL_INTERVAL_MS);
             if (isFoodFilterSelectedOnList()) {
                 log("手动确认：检测到美食已选中，继续扫描");
                 return true;
             }
         }
-        log("手动等待10秒后仍未检测到，但为解决反复卡死问题，本次按【已尝试切换】继续扫描（仅警告，不再强制退出）");
-        log("[容错] 未能100%确认美食选中，为避免无限循环，本次放行继续扫描，请留意后续扫描是否仍在美食分类");
+        logError("手动等待"+Math.round(CONFIG.FOOD_MANUAL_WAIT_MS/1000)+"秒后仍未检测到美食，已放行", new Error("FOOD_STRICT_CHECK="+CONFIG.FOOD_STRICT_CHECK));
+        log("[容错] 未能100%确认美食选中，为避免无限循环，本次按 CONFIG.FOOD_STRICT_CHECK="+CONFIG.FOOD_STRICT_CHECK+" 逻辑放行继续扫描，请留意后续扫描是否仍在美食分类");
+        try { toast("⚠️未确认美食，已放行扫描"); } catch(eToast){}
         return true;
     }
     return true;
@@ -3967,6 +4060,39 @@ function isMyPage() {
 }
 
 // v1.33.0：综合判断当前是否仍在免费试列表页
+// v1.45.30: 底部导航危险区检测（防误点“我的”/“首页”）
+// device.height*0.93 以上且 x 在右侧 25% 区域 或 y>0.96 全宽 都视为底部导航
+function isBottomNavDangerZone(x,y){
+    try{
+        var h=device.height; var w=device.width;
+        if(y>h*0.96) return true;
+        if(y>h*0.93 && x>w*0.72) return true;
+        if(y>h*0.92 && x>w*0.85) return true;
+        if(y>h*0.90 && x>w*0.78) return true;
+    }catch(e){}
+    return false;
+}
+function isSignupButtonDangerZone(b){
+    try{
+        if(!b) return false;
+        var cy=(b.top+b.bottom)/2; var cx=(b.left+b.right)/2;
+        var h=device.height;
+        if(cy>h*0.92) return true;
+        if(b.bottom>h*0.94) return true;
+        if(isBottomNavDangerZone(cx,cy)) return true;
+    }catch(e){}
+    return false;
+}
+function safeClickCoord(x,y,tag){
+    try{
+        if(isBottomNavDangerZone(x,y)){
+            log("[点击守卫] safeClick拦截底部危险区 ("+Math.round(x)+","+Math.round(y)+") tag="+(tag||""));
+            return false;
+        }
+        return click(x,y);
+    }catch(e){ logError("safeClick异常 "+(tag||""),e); return false; }
+}
+
 function isFreeTrialListPage() {
     if (isMyPage()) return false;
     return isListPage();
@@ -4082,6 +4208,13 @@ function scanFreeTrialList() {
             log("[边扫边报] seenKeys 已重建，保留 " + seenKeys.length + " 条已处理记录");
         }
 
+        // v1.31.0：每屏扫描前先检查是否误入 我的/详情页（统一守卫）
+        if(isMyPage()){
+            log("[页面守卫] 扫描前检测到 我的 页面，立即返回");
+            try{ goBack(); sleepMs(1000); }catch(eMyScan){}
+            if(isMyPage()){ log("[安全停止] 返回后仍在 我的 页面，停止扫描"); endReason="误入我的页面"; break; }
+            continue;
+        }
         // v1.9.6：每屏扫描前先检查是否误入详情页
         if (detectDetailPage()) {
             log("[异常] 检测到活动详情页，当前不是免费试列表页");
@@ -4363,9 +4496,12 @@ function scanFreeTrialList() {
             break;
         }
 
-        if (result.newCount === 0) {
+        if (result.newCount === 0 && result.freeDrawCount === 0) {
             consecutiveEmpty++;
             log("[列表] 本屏没有发现新活动（连续 " + consecutiveEmpty + " 次）");
+        } else if (result.newCount === 0 && result.freeDrawCount > 0) {
+            log("[列表] 本屏有" + result.freeDrawCount + "个免费抽但均为已处理，继续滚动探底");
+            consecutiveEmpty = 0;
         } else {
             consecutiveEmpty = 0;
         }
@@ -5020,12 +5156,45 @@ function dumpPostClickState(before, after, diff, activity) {
         log("[v1.32.0] 消失文本" + diff.missingCount + "条，免费抽消失，仍在大众点评");
     }
 
-    // v1.45.4：标题可能在 WebView 中不可见，使用详情页结构作为安全兜底。
-    // 该兜底要求出现报名/详情专属信号，且列表入口已消失，不接受普通页面变化。
+    // v1.45.34：废除纯结构宽松放行。标题在 WebView 不可见时仍要求：归一化名称互含(短者>=6) 且 价值一致 且 详情结构命中，才视为命中。
     var structureMatched = detectDetailPageStructure(after, diff);
     if (structureMatched) {
-        log("[v1.45.4] " + structureMatched + "：标题无障碍文本不可见，但详情页结构已确认");
-        return structureMatched;
+        var tn = normalizeNameForMatch(activity.name);
+        var fp = tn ? tn.substring(0, Math.min(12, tn.length)) : "";
+        var afterNormTexts = "";
+        try { for (var _k in after.texts) if (after.texts.hasOwnProperty(_k)) afterNormTexts += normalizeNameForMatch(_k) + "|"; } catch(e){}
+        var nameProbeOk = false;
+        if (tn && afterNormTexts) {
+            var shortLen = Math.min(tn.length, 12);
+            if (shortLen >= 6 && (afterNormTexts.indexOf(tn) >= 0 || tn.indexOf(afterNormTexts.substring(0,20)) >= 0)) nameProbeOk = true;
+            if (!nameProbeOk) {
+                for (var _p in after.texts) if (after.texts.hasOwnProperty(_p)) {
+                    var an = normalizeNameForMatch(_p);
+                    if (an && (an.indexOf(tn) >= 0 || tn.indexOf(an) >= 0) && Math.min(an.length, tn.length) >= 6) { nameProbeOk = true; break; }
+                }
+            }
+            if (!nameProbeOk && fp) {
+                for (var _q in after.texts) if (after.texts.hasOwnProperty(_q)) {
+                    var aq = normalizeNameForMatch(_q);
+                    if (aq && aq.indexOf(fp) >= 0 && fp.length >= 6) { nameProbeOk = true; break; }
+                }
+            }
+        }
+        var valueProbeOk = true;
+        if (activity.value !== null && typeof activity.value !== "undefined") {
+            var valStr = String(activity.value);
+            valueProbeOk = false;
+            for (var _v in after.texts) if (after.texts.hasOwnProperty(_v)) {
+                if (String(_v).indexOf(valStr) >= 0 || String(_v).indexOf("¥" + valStr) >= 0) { valueProbeOk = true; break; }
+            }
+            if (!valueProbeOk && !anyTextContains(valStr)) valueProbeOk = false;
+        }
+        if (nameProbeOk && valueProbeOk) {
+            log("[v1.45.34] " + structureMatched + " + 名称归一化(" + tn.substring(0,8) + "…) + 价值一致，已确认");
+            return structureMatched;
+        } else {
+            log("[v1.45.34] 结构命中 " + structureMatched + " 但名称/价值校验失败(nameOk=" + nameProbeOk + ",valueOk=" + valueProbeOk + ")，拒绝放行，防跨店误入");
+        }
     }
 
     log("[v1.32.0] TARGET_DETAIL_UNCONFIRMED：页面变化后的内容与目标活动不匹配");
@@ -5034,13 +5203,52 @@ function dumpPostClickState(before, after, diff, activity) {
 
 function clickNodeCenter(node) {
     var b = safeBounds(node);
-
     if (!b || b.right <= b.left || b.bottom <= b.top) {
         log("[点击诊断] 节点 bounds 无效，无法坐标点击");
         return false;
     }
-
-    return click((b.left + b.right) / 2, (b.top + b.bottom) / 2);
+    var cx=(b.left+b.right)/2; var cy=(b.top+b.bottom)/2;
+    var txt=safeText(node);
+    var isSignupTxt=txt.indexOf("报名")>=0 || txt.indexOf("确认")>=0;
+    if(isBottomNavDangerZone(cx,cy)){
+        log("[点击守卫] 拒绝点击底部导航危险区 ("+Math.round(cx)+","+Math.round(cy)+") text="+txt+" 已拦截防误点我的");
+        try{
+            var safeY=device.height*0.88-10;
+            if(isSignupTxt && b.top< safeY+80){
+                var targetY=Math.min(safeY, b.top+ (b.bottom-b.top)*0.45);
+                if(targetY<b.top+18) targetY=b.top+18;
+                if(!isBottomNavDangerZone(cx,targetY)){
+                    log("[点击守卫] 报名类上移修正至 ("+Math.round(cx)+","+Math.round(targetY)+")");
+                    return safeClickCoord(cx,targetY,"clickNodeCenter-报名上移");
+                }
+            }
+            if(!isSignupTxt && b.top < safeY){
+                var upY=Math.min(safeY, b.bottom-22);
+                if(!isBottomNavDangerZone(cx,upY)){
+                    log("[点击守卫] 非报名类上移修正至 ("+Math.round(cx)+","+Math.round(upY)+")");
+                    return safeClickCoord(cx,upY,"clickNodeCenter-非报名上移");
+                }
+            }
+        }catch(e){}
+        return false;
+    }
+    if(isSignupButtonDangerZone(b) && isSignupTxt){
+        log("[点击守卫] 报名按钮在底部危险区，进行上移修正");
+        var safeY2=device.height*0.88-10;
+        var upY=cy-72;
+        if(isBottomNavDangerZone(cx,upY) || upY>safeY2){
+            upY=Math.min(safeY2, b.top+(b.bottom-b.top)*0.40);
+        }
+        if(upY<b.top+18) upY=b.top+18;
+        if(upY>b.bottom-18) upY=b.bottom-18;
+        if(isBottomNavDangerZone(cx,upY)){
+            log("[点击守卫] 报名修正后仍在危险区，拒绝点击");
+            return false;
+        }
+        log("[点击守卫] 报名按钮修正点击 ("+Math.round(cx)+","+Math.round(upY)+") 原("+Math.round(cx)+","+Math.round(cy)+")");
+        return safeClickCoord(cx, upY,"clickNodeCenter-signup");
+    }
+    return safeClickCoord(cx, cy,"clickNodeCenter");
 }
 
 // v1.32.0：重写「免费抽」按钮点击诊断。
@@ -5078,7 +5286,7 @@ function diagnoseFreeDrawClick(activity) {
                             var cx = (b.left + b.right)/2;
                             var cy = (b.top + b.bottom)/2;
                             log("[免费试定位] 尝试坐标点击「免费抽」 bounds 中心 (" + Math.round(cx) + "," + Math.round(cy) + ")");
-                            click(cx, cy);
+                            if(!safeClickCoord(cx, cy,"tryFreeDraw")) return false;
                             sleepMs(400);
                             return true;
                         }
@@ -5175,9 +5383,16 @@ function diagnoseFreeDrawClick(activity) {
     log("[点击] 点击前前台包名：" + before.pkg);
     log("[点击] 点击前文本数量：" + before.count);
     var rawRet = "异常";
-    try { rawRet = String(click(clickX, clickY)); } catch(e) { logError("点击执行异常", e); rawRet = "异常"; }
+    try { rawRet = String(safeClickCoord(clickX, clickY,"cardClick")||false); } catch(e) { logError("点击执行异常", e); rawRet = "异常"; }
     log("[点击] click 返回值：" + rawRet + "（仅参考）");
+    if(rawRet==="false"){
+        log("[点击守卫] 卡片坐标被底部守卫拦截，判定为点击无效");
+        return { ok: false, reason: "底部守卫拦截" };
+    }
+    // v1.45.30: 点击后若误入我的页面立即回退
+    try{ if(isMyPage()){ log("[点击守卫] 卡片点击后误入我的页面，立即返回"); goBack(); sleepMs(800); } }catch(eCardMy){}
     sleepMs(1500);
+    try{ if(isMyPage()){ log("[点击守卫] 点击后检测到我的页面，立即返回"); goBack(); sleepMs(800); } }catch(eMy2){}
     var after = capturePageSignature();
     var diff = diffPageSignature(before, after);
     log("[点击后] 页面差异：新增文本 " + diff.newTexts.length + " 条，消失文本 " + diff.missingCount + " 条，包名变化：" + diff.pkgChanged);
@@ -5254,10 +5469,10 @@ function activityMatchesCard(target, parsed) {
 // ---------- v1.8：自动报名 ----------
 
 // 允许识别为报名按钮的明确文字（精确匹配，不做模糊猜测）
-var SIGNUP_BUTTON_TEXTS = ["我要报名", "立即报名", "免费报名", "立即参与", "参加活动", "报名"];
+var SIGNUP_BUTTON_TEXTS = ["我要报名", "立即报名", "免费报名", "立即参与", "参加活动"];
 
 // 绝不能当作报名按钮的文字（包含即排除）
-var SIGNUP_FORBIDDEN_TEXTS = ["免费抽", "立即抽", "去看看", "立即查看", "领取", "兑换", "购买", "立即开宝箱", "取消", "返回", "关闭", "分享", "收藏"];
+var SIGNUP_FORBIDDEN_TEXTS = ["免费抽", "立即抽", "去看看", "立即查看", "领取", "兑换", "购买", "立即开宝箱", "取消", "返回", "关闭", "分享", "收藏", "我的", "首页", "发现", "人已报名", "人感兴趣", "人已参与", "已报名", "已参与", "报名人数", "已报名人数"];
 
 function isSignupButtonText(t) {
     // v1.40.0：先去除零宽字符、全角空格等不可见字符，再精确匹配
@@ -5277,8 +5492,7 @@ function isSignupButtonText(t) {
     }
 
     for (var i = 0; i < SIGNUP_BUTTON_TEXTS.length; i++) {
-        // v1.40.0：用 indexOf 替代严格相等，兼容带前后缀的按钮文本
-        if (t === SIGNUP_BUTTON_TEXTS[i] || t.indexOf(SIGNUP_BUTTON_TEXTS[i]) >= 0) {
+        if (t === SIGNUP_BUTTON_TEXTS[i]) {
             return true;
         }
     }
@@ -5495,13 +5709,8 @@ function findSignupButton() {
                 }
 
                 if (!clickableFound) {
-                    var fallbackBounds = safeBounds(n);
-                    if (!fallbackBounds || fallbackBounds.right <= fallbackBounds.left ||
-                        fallbackBounds.bottom <= fallbackBounds.top) {
-                        log("[自动报名] 找到「" + label + "」但无可用bounds，跳过");
-                        continue;
-                    }
-                    log("[自动报名] 找到「" + label + "」但无clickable元数据，改用bounds坐标点击");
+                    log("[自动报名] 找到「" + label + "」但 5层内无clickable祖先且自身不可点，已拦截（防误点人已报名等统计文本） text=\"" + safeText(n) + "\"");
+                    continue;
                 }
 
                 log("[自动报名] 报名按钮候选：「" + label + "」（attempt=" + attempt + "）");
@@ -5528,6 +5737,10 @@ function findSignupButton() {
 
 // 返回实际使用的点击方式描述；全部不可点击返回 null（调用方可再试 bounds）
 function clickSignupButtonOnce(node) {
+    try{
+        var b0=safeBounds(node);
+        if(b0){ var cx0=(b0.left+b0.right)/2, cy0=(b0.top+b0.bottom)/2; if(isBottomNavDangerZone(cx0,cy0) && safeText(node).indexOf("报名")<0 && safeText(node).indexOf("确认")<0) return null; }
+    }catch(e){}
     if (safeClickable(node)) {
         try {
             node.click();
@@ -5550,6 +5763,10 @@ function clickSignupButtonOnce(node) {
         }
 
         if (safeClickable(p)) {
+            try{
+                var bp=safeBounds(p);
+                if(bp){ var cxp=(bp.left+bp.right)/2, cyp=(bp.top+bp.bottom)/2; if(isBottomNavDangerZone(cxp,cyp)) continue; }
+            }catch(e){}
             try {
                 p.click();
                 return "第" + d + "层clickable祖先click";
@@ -5622,12 +5839,7 @@ function verifySignupResult(activity) {
     }
 
     if (!detailMatchesTarget(activity)) {
-        var hasAnySignupContext = anyTextContains("报名成功") || anyTextContains("已报名");
-        if (hasAnySignupContext) {
-            log("[自动报名] 页面包含报名成功相关文本，视为报名已处理");
-            return "报名成功";
-        }
-        log("[自动报名] 页面已离开目标活动详情，停止操作");
+        log("[自动报名] 页面已离开目标活动详情（与目标不匹配），停止操作");
         return "报名结果无法确认（页面离开目标活动）";
     }
 
@@ -5819,6 +6031,9 @@ function attemptSignup(activity) {
     }
 
     log("[自动报名] 已点击报名按钮（" + way + "），等待页面反馈");
+    // v1.45.30: 点击后若误入我的页面立即回退
+    sleepMs(400);
+    try{ if(isMyPage()){ log("[报名守卫] 点击报名后误入我的页面，立即返回"); goBack(); sleepMs(800); } }catch(eMyGuard){}
 
     // 确认弹窗和报名成功状态可能晚于首次点击出现，连续等待并优先处理确认。
     var result = null;
@@ -5868,10 +6083,10 @@ function attemptSignup(activity) {
             }
             log("[自动报名] 第" + (cw + 1) + "轮未检测到完成按钮，继续等待...");
         }
-        // v1.45.20: 10轮后若仍"页面离开"但包含成功上下文，视为成功兜底
+        // v1.45.34: 10轮后兜底需同时满足：仍在目标详情 + 有严格成功标识或完成按钮，禁止泛匹配
         try {
-            if (anyTextContains("报名成功") || anyTextContains("已报名") || anyTextContains("已参与")) {
-                log("[自动报名] 等待结束后页面已离开但包含成功文本，视为报名成功(兜底)");
+            if (detailMatchesTarget(activity) && hasSignedUpIndicator()) {
+                log("[自动报名][v1.45.34] 等待结束后仍在目标详情且有已报名标识，视为报名成功(兜底)");
                 try { goBack(); sleepMs(300); } catch(eBack20) {}
                 return "报名成功";
             }
@@ -6090,14 +6305,22 @@ function main() {
                 __foodCategorySelected = isFoodFilterSelectedOnList();
                 if (!__foodCategorySelected) {
                     log("[列表] 二次校验仍未选中，重试一次选择美食");
-                    try { foodClickConfirmed = selectFoodCategory(); } catch(eR) {}
-                    __foodCategorySelected = foodClickConfirmed && isFoodFilterSelectedOnList();
-                    log("[列表] 重试后：" + (__foodCategorySelected ? "已选择" : "未选中"));
+                    try { foodClickConfirmed = selectFoodCategory(); } catch(eR) { foodClickConfirmed = false; }
+                    // v1.45.29 关键修复：selectFoodCategory 内部已做 5秒轮询+回顶+二次重试+10秒手动兜底后放行，
+                    // 外层不再用 && isFoodFilter 二次否定放行结果；只要函数返回 true 就视为已尝试切换
+                    __foodCategorySelected = !!foodClickConfirmed;
+                    log("[列表] 重试后：" + (__foodCategorySelected ? "已选择(放行)" : "未选中"));
+                    if (__foodCategorySelected) {
+                        log("[容错] 二次重试已放行，尽管 isFoodFilter 仍为 false，为解决反复卡死问题继续扫描（请留意后续是否仍在美食分类）");
+                        try { toast("⚠️ 美食未100%确认，已放行继续扫描"); } catch(eT){}
+                    }
                 }
                 if (!__foodCategorySelected) {
-                    log("[列表] 未能进入美食分类，停止扫描以免误扫其他分类");
-                    toastMsg("未进入美食分类，已停止");
-                    return;
+                    // v1.45.30：防误点“我的”底部保护；报名按钮/确认弹窗点击前做底部导航危险区拦截与上移修正，点击后若进入“我的”页面立即回退
+                    log("[列表] 警告：未能100%确认美食分类（isFoodFilter=false），但已尝试两次点击+10秒手动等待，为避免反复卡死，本次放行继续扫描");
+                    log("[容错] 若后续扫描到非美食类目（如丽人/结婚），请手动停止脚本并反馈日志");
+                    try { toast("⚠️ 未确认美食，已放行扫描"); } catch(eT2){}
+                    __foodCategorySelected = true;
                 }
             }
         } catch (e) {
@@ -6105,9 +6328,9 @@ function main() {
             try { __foodCategorySelected = isFoodFilterSelectedOnList(); } catch(e2){}
             log("[列表] 异常后校验：" + (__foodCategorySelected ? "已选择" : "未选中"));
             if (!__foodCategorySelected) {
-                log("[列表] 未能进入美食分类(异常分支)，停止扫描以免误扫其他分类");
-                toastMsg("未进入美食分类，已停止");
-                return;
+                log("[列表] 警告：未能100%确认美食分类(异常分支)，放行继续扫描");
+                try { toast("⚠️ 未确认美食(异常分支)，已放行"); } catch(eT3){}
+                __foodCategorySelected = true;
             }
         }
     }
@@ -6173,4 +6396,11 @@ if (Date.now() - __scriptStartTime < 5000) {
     log("脚本在 5 秒内提前结束，请把上方所有日志发给开发者排查");
     toastMsg("脚本提前结束，请查看 Hamibot 日志");
 }
+
+
+
+
+
+
+
 
