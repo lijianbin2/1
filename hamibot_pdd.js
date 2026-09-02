@@ -1,6 +1,6 @@
 auto.waitFor();
 console.show();
-console.log("pdd v1.9 - MCP边看边改修复版");
+console.log("pdd v1.10 - MCP边看边改修复版");
 function swipeEdgeUp(t, interval) { t=t||5; interval=interval||2000; for(let n=0;n<t;n++){ swipe(1150,1400,1150,700,600); sleep(interval);} }
 function swipeToTop(){ swipe(600,700,600,1400,600); sleep(1200); }
 function isInPdd(){ return currentPackage()==="com.xunmeng.pinduoduo"; }
@@ -18,6 +18,7 @@ function clickViaParent(selectorText){
     try{ node.click(); }catch(e){}
     sleep(300);
     try{ click(b.centerX(), b.centerY()); }catch(e){}
+    try{ shell("input tap "+b.centerX()+" "+b.centerY(), true); }catch(e){ console.log("shell tap失败 "+e); }
     return true;
 }
 function ensurePdd(){
@@ -69,12 +70,18 @@ function s1(){
     if(isHome()){
         console.log("仍在首页，重试坐标兜底 isHome=true ok="+ok);
         let w=device.width,h=device.height;
-        let x=Math.round(w*0.83),y=Math.round(h*0.285);
-        console.log("点击比例 "+x+","+y+" (w*0.83,h*0.285)");
-        click(x,y); sleep(2500);
+        let x=Math.round(w*0.70),y=Math.round(h*0.285);
+        console.log("点击比例 "+x+","+y+" (w*0.70,h*0.285)");
+        click(x,y); sleep(300);
+        try{ shell("input tap "+x+" "+y, true); }catch(e){}
+        sleep(2200);
         if(isHome()){
             console.log("比例点击后仍在首页，再点绝对 896,784");
-            click(896,784); sleep(2500);
+            click(896,784); sleep(300);
+            try{ shell("input tap 896 784", true); }catch(e){}
+            sleep(2200);
+            // 最后再试一次按当前实际bounds中心 shell
+            try{ let n=text("省钱月卡").findOne(500); if(n){ let bb=n.bounds(); shell("input tap "+bb.centerX()+" "+bb.centerY(), true); sleep(2000); } }catch(e){}
         }
     } else {
         console.log("已离开首页，说明已进入月卡页 s1成功");
@@ -158,7 +165,7 @@ function s8(){
     }
 }
 function main(){
-    console.log("=== main 开始 v1.9 ===");
+    console.log("=== main 开始 v1.10 ===");
     sleep(800); ensurePdd(); 
     let inPdd=isInPdd();
     console.log("ensure后 inPdd="+inPdd+" isHome="+isHome());
@@ -166,7 +173,7 @@ function main(){
     goHome();
     console.log("goHome后 isHome="+isHome());
     s1(); s2(); s3(); s4(); s5(); s6(); s7(); s8();
-    toast("v1.9 完成");
-    console.log("=== all done v1.9 ===");
+    toast("v1.10 完成");
+    console.log("=== all done v1.10 ===");
 }
 main();
