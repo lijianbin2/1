@@ -88,7 +88,7 @@
 // ============================================================
 
 // 版本标记：手机端日志中会输出，用来确认运行的是新脚本
-var __SCRIPT_VERSION = "v1.45.36-fix-等级不足跳过继续";
+var __SCRIPT_VERSION = "v1.45.37-fix-我知道了全节点兜底";
 
 var CONFIG = {
     PACKAGE: "com.dianping.v1",
@@ -5951,7 +5951,12 @@ function requestLevelRequirementStop() {
         var __kdNodes = [];
         try { eachNode(text("我知道了").find(), function(n){ __kdNodes.push(n); }); } catch(eKd1){}
         try { eachNode(desc("我知道了").find(), function(n){ __kdNodes.push(n); }); } catch(eKd2){}
-        try { eachNode(textContains("我知道了").find(), function(n){ __kdNodes.push(n); }); } catch(eKd3){}
+                  try { eachNode(textContains("我知道了").find(), function(n){ __kdNodes.push(n); }); } catch(eKd3){}
+          try { eachNode(descContains("我知道了").find(), function(n){ __kdNodes.push(n); }); } catch(eKd4){}
+          try { eachNode(textContains("知道").find(), function(n){ var t=""; try{t=n.text()||"";}catch(e){} var d=""; try{d=n.desc()||"";}catch(e){} if((t&&t.indexOf("我知道了")>=0)||(d&&d.indexOf("我知道了")>=0)) __kdNodes.push(n); }); } catch(eKd5){}
+          try { eachNode(descContains("知道").find(), function(n){ var t=""; try{t=n.text()||"";}catch(e){} var d=""; try{d=n.desc()||"";}catch(e){} if((t&&t.indexOf("我知道了")>=0)||(d&&d.indexOf("我知道了")>=0)) __kdNodes.push(n); }); } catch(eKd6){}
+          try { var __allBtns=[]; try{ eachNode(className("android.widget.Button").find(),function(n){__allBtns.push(n);});}catch(e){} for(var __bi=0;__bi<__allBtns.length;__bi++){ var __bn=__allBtns[__bi]; var __bt=""; try{__bt=(__bn.text()||"")+( __bn.desc()||"");}catch(e){} if(__bt.indexOf("我知道了")>=0) __kdNodes.push(__bn);} } catch(eKd7){}
+          try { var __allTvs=[]; try{ eachNode(className("android.widget.TextView").find(),function(n){__allTvs.push(n);});}catch(e){} for(var __ti=0;__ti<__allTvs.length;__ti++){ var __tn=__allTvs[__ti]; var __tt=""; try{__tt=(__tn.text()||"")+( __tn.desc()||"");}catch(e){} __tt=__tt.replace(/\s+/g,""); if(__tt.indexOf("我知道了")>=0) __kdNodes.push(__tn);} } catch(eKd8){}
         var __kdClicked = false;
         for (var __kdi=0; __kdi<__kdNodes.length; __kdi++) {
             var __kdn = __kdNodes[__kdi];
