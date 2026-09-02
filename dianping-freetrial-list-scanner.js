@@ -1,6 +1,6 @@
 // ============================================================
 // 大众点评「免费试」列表扫描筛选（Hamibot 版）
-// 版本：v1.45.18-fix-美食同行校验放宽
+// 版本：v1.45.19-fix-美食兜底宽松+全部分类精确定位
 //
 // 运行环境：Hamibot 手机客户端
 // 目标 App：大众点评（com.dianping.v1）
@@ -88,7 +88,7 @@
 // ============================================================
 
 // 版本标记：手机端日志中会输出，用来确认运行的是新脚本
-var __SCRIPT_VERSION = "v1.45.18-fix-美食同行校验放宽";
+var __SCRIPT_VERSION = "v1.45.19-fix-美食兜底宽松+全部分类精确定位";
 
 var CONFIG = {
     PACKAGE: "com.dianping.v1",
@@ -2350,6 +2350,14 @@ function isFoodFilterSelectedOnList() {
             }
         }
     } catch (e2_14) {}
+    // v1.45.19 lenient: hasMarker + 美食存在 + 面板已关 即可视为已选（兼容负坐标/中部1042等非标准cy）
+    try {
+        if (__hasMarker14 && __panelCnt14 < 2) {
+            for (var __lf14=0; __lf14<__infosTop14.length; __lf14++) {
+                if (String(__infosTop14[__lf14].text||"").trim()==="美食") return true;
+            }
+        }
+    } catch(eLen19) {}
     return false;
 }
 
@@ -2374,9 +2382,7 @@ function selectFoodCategory() {
                 var infos = getVisibleTextInfos();
                 var catChip = null;
                 for (var i2 = 0; i2 < infos.length; i2++) {
-                    if (infos[i2].cy < 500 && infos[i2].cy > 120 && infos[i2].cx > 180 && infos[i2].cx < 620) {
-                        if (infos[i2].text.length <= 6 && infos[i2].text.length>=2) { catChip = infos[i2]; break; }
-                    }
+                    if (infos[i2].text==="全部分类" && infos[i2].cy < 500 && infos[i2].cy > 80 && infos[i2].cx > 80 && infos[i2].cx < 700) { catChip = infos[i2]; break; }
                 }
                 if (catChip) {
                     log("坐标兜底点击类目筛选: " + catChip.text + " (" + catChip.cx + "," + catChip.cy + ")");
