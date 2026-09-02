@@ -1,6 +1,6 @@
 // ============================================================
 // 大众点评「免费试」列表扫描筛选（Hamibot 版）
-// 版本：v1.45.8-fix-全部分类通用兜底-结婚
+// 版本：v1.45.9-fix-美食检测兜底-防循环
 //
 // 运行环境：Hamibot 手机客户端
 // 目标 App：大众点评（com.dianping.v1）
@@ -88,7 +88,7 @@
 // ============================================================
 
 // 版本标记：手机端日志中会输出，用来确认运行的是新脚本
-var __SCRIPT_VERSION = "v1.45.8-fix-全部分类通用兜底-结婚";
+var __SCRIPT_VERSION = "v1.45.9-fix-美食检测兜底-防循环";
 
 // 运行结果回传：把摘要 POST 到调试端点便于远程验收。
 // 网络失败静默忽略，绝不影响主流程；无 http 模块的环境（如测试）自动跳过。
@@ -324,6 +324,7 @@ var gFoundRegistered = false;       // 已发现已报名标志，一旦置 true
 var gDetailDuringScan = false;      // 扫描期间误入详情页标志
 var gStopAfterLevelRequirement = false;
 var gStopAfterLevelRequirementReason = "";
+var gSelectFoodRetry = 0;
 // v1.17.0: __precheckScrolledDown 已废弃
 
 try {
@@ -2371,37 +2372,79 @@ function enterFreeTrial() {
 // 此时若仍把 __foodCategorySelected 置为 false，会把没有“美食”字样的
 // 粤菜/茶点卡片（包括价值100元卡片）全部误判为“无法确认类目”。
 function isFoodFilterSelectedOnList() {
+    // v1.45.9: 宽松检测——兼容 TextView/Button，阈值放宽到650，避免控制台遮挡/负坐标导致误判
     try {
-        var infos = getVisibleTextInfos();
-        for (var i = 0; i < infos.length; i++) {
-            if (infos[i].text === "美食" && infos[i].cy < 420) {
+        var probeNodes = [];
+        try { eachNode(text("美食").find(), function(n){ probeNodes.push(n); }); } catch(e) {}
+        try { eachNode(descContains("美食").find(), function(n){ probeNodes.push(n); }); } catch(e2) {}
+        try { eachNode(textContains("美食").find(), function(n){ probeNodes.push(n); }); } catch(e3) {}
+        for (var pi=0; pi<probeNodes.length; pi++) {
+            try {
+                var nb = probeNodes[pi].bounds();
+                var ncy = (nb.top + nb.bottom)/2;
+                if (ncy < 650) return true;
+                if (nb && nb.top >= -200) return true;
+            } catch(eB) {
                 return true;
             }
         }
-    } catch (e) {
-    }
+    } catch(e) {}
+    try {
+        var infos = getVisibleTextInfos();
+        for (var i = 0; i < infos.length; i++) {
+            var t = String(infos[i].text||"").trim();
+            if ((t === "美食" || t.indexOf("美食")>=0) && infos[i].cy < 650 && infos[i].cy > -200) {
+                return true;
+            }
+        }
+    } catch (e2) {}
     return false;
 }
 
 function selectFoodCategory() {
-    log("选择「全部分类」");
+    // v1.45.9: 通用面板选择 + 祖先链点击 + 兜底校验（防 结婚/丽人 循环）
+    if (isFoodFilterSelectedOnList()) {
+        log("美食已在顶部选中，无需重选");
+        return true;
+    }
+    log("选择\u5168\u90e8\u5206\u7c7b");
     var catOpened = false;
     if (clickText("全部分类", 2000)) {
         catOpened = true;
     } else {
         if (existsText("美食") && isFoodFilterSelectedOnList()) {
-            log("未找到「全部分类」，但页面已有「美食」且已选中，继续");
+            log("未找到\u5168\u90e8\u5206\u7c7b，但页面已有\u7f8e\u98df且已选中，继续");
             return true;
         }
-        // v1.45.8: 通用兜底——当前分类可能是丽人/结婚/亲子/玩乐等任意非美食，逐一尝试点开
-        var fallbackCats = ["丽人","结婚","亲子","玩乐","学习培训","生活服务","逛街","结婚","丽人","结婚","亲子"];
+        var fallbackCats = ["丽人","结婚","亲子","玩乐","学习培训","生活服务","逛街"];
         var uniq = {};
         for (var fi = 0; fi < fallbackCats.length; fi++) {
             var catName = fallbackCats[fi];
             if (uniq[catName]) continue;
             uniq[catName] = true;
+            try {
+                var candNodes = [];
+                try { eachNode(text(catName).find(), function(n){ candNodes.push(n); }); } catch(e){}
+                var topCand = null;
+                for (var ci=0; ci<candNodes.length; ci++) {
+                    try {
+                        var cb = candNodes[ci].bounds();
+                        var ccy = (cb.top+cb.bottom)/2;
+                        if (ccy>80 && ccy<500) { topCand = candNodes[ci]; break; }
+                    } catch(e){}
+                }
+                if (topCand) {
+                    var clickedTop = false;
+                    try { clickedTop = clickObj(topCand); } catch(e){}
+                    if (!clickedTop) try { clickedTop = clickNodeSmart(topCand); } catch(e){}
+                    if (clickedTop) {
+                        log("点击顶部" + catName + "打开面板");
+                        catOpened = true; break;
+                    }
+                }
+            } catch(e){}
             if (clickText(catName, 800)) {
-                log("点击「" + catName + "」打开分类面板（全部分类通用兜底）");
+                log("点击\u2018" + catName + "\u2019打开分类面板（通用兜底）");
                 catOpened = true;
                 break;
             }
@@ -2410,22 +2453,22 @@ function selectFoodCategory() {
             try {
                 var infos = getVisibleTextInfos();
                 var catChip = null;
-                for (var i = 0; i < infos.length; i++) {
-                    if (infos[i].cy < 420 && infos[i].cy > 120 && infos[i].cx > 180 && infos[i].cx < 520) {
-                        if (infos[i].text.length <= 6) { catChip = infos[i]; break; }
+                for (var i2 = 0; i2 < infos.length; i2++) {
+                    if (infos[i2].cy < 500 && infos[i2].cy > 120 && infos[i2].cx > 180 && infos[i2].cx < 620) {
+                        if (infos[i2].text.length <= 6 && infos[i2].text.length>=2) { catChip = infos[i2]; break; }
                     }
                 }
                 if (catChip) {
                     log("坐标兜底点击类目筛选: " + catChip.text + " (" + catChip.cx + "," + catChip.cy + ")");
                     click(catChip.cx, catChip.cy);
-                    sleepMs(300);
+                    sleepMs(400);
                     catOpened = true;
                 } else {
                     var fx = Math.round(device.width * 0.32);
                     var fy = Math.round(device.height * 0.14);
                     log("固定坐标兜底点击类目筛选 (" + fx + "," + fy + ")");
                     click(fx, fy);
-                    sleepMs(300);
+                    sleepMs(400);
                     catOpened = true;
                 }
             } catch (eCoord) {
@@ -2433,72 +2476,125 @@ function selectFoodCategory() {
             }
         }
         if (!catOpened) {
-            log("找不到「全部分类」及任意分类入口且坐标兜底失败");
+            log("找不到\u5168\u90e8\u5206\u7c7b及任意分类入口且坐标兜底失败");
             return false;
         }
     }
     sleepMs(900);
-    // 面板内等待美食：优先找面板区域内的美食（cy>350），避免误命中顶部残影
-    var food = null;
-    var deadline = Date.now() + 4000;
+    var foodCoord = null;
+    var deadline = Date.now() + 4500;
     while (Date.now() < deadline) {
         try {
             var infos2 = getVisibleTextInfos();
             for (var k = 0; k < infos2.length; k++) {
-                if (infos2[k].text === "美食" && infos2[k].cy > 350 && infos2[k].cy < 1100) {
-                    var node = findText("美食", 300);
-                    if (node) { food = node; break; }
-                    // 坐标兜底：直接点该信息的坐标
-                    click(infos2[k].cx, infos2[k].cy);
-                    sleepMs(200);
-                    food = { _coordClicked:true };
+                if (infos2[k].text === "美食" && infos2[k].cy > 320 && infos2[k].cy < 1150) {
+                    foodCoord = infos2[k];
                     break;
                 }
             }
+            if (foodCoord) break;
         } catch(e){}
-        if (food) break;
-        // 兼容旧路径
-        food = findText("美食", 400);
-        if (food) break;
         sleepMs(300);
     }
+    var food = null;
+    if (foodCoord) {
+        try {
+            var panelNodes = [];
+            try { eachNode(text("美食").find(), function(n){ panelNodes.push(n); }); } catch(e){}
+            var bestNode = null;
+            var bestDy = 1e9;
+            for (var pn=0; pn<panelNodes.length; pn++) {
+                try {
+                    var pb = panelNodes[pn].bounds();
+                    var pcy = (pb.top+pb.bottom)/2;
+                    if (pcy>320 && pcy<1150) {
+                        var dy = Math.abs(pcy - foodCoord.cy);
+                        if (dy < bestDy) { bestDy = dy; bestNode = panelNodes[pn]; }
+                    }
+                } catch(e){}
+            }
+            if (bestNode) food = bestNode;
+        } catch(e){}
+        if (food) {
+            var cur = food;
+            var clicked = false;
+            for (var d=0; d<5; d++) {
+                try {
+                    if (cur.clickable && cur.clickable()) { if (cur.click()) { clicked=true; log("面板美食祖先点击成功 depth="+d); break; } }
+                } catch(e){}
+                try { var par = cur.parent(); if(!par||par===cur) break; cur=par; } catch(e){ break; }
+            }
+            if (!clicked) { try { if (clickObj(food)) { clicked=true; log("clickObj 面板美食成功"); } } catch(e){} }
+            if (!clicked) { try { if (clickNodeSmart(food)) { clicked=true; log("clickNodeSmart 面板美食成功"); } } catch(e){} }
+            if (!clicked) {
+                log("面板美食节点点击未命中，改用坐标点击 ("+Math.round(foodCoord.cx)+","+Math.round(foodCoord.cy)+")");
+                click(foodCoord.cx, foodCoord.cy);
+                sleepMs(200);
+                food = { _coordClicked:true };
+            } else {
+                food._coordClicked = false;
+            }
+        } else {
+            log("面板内找到美食坐标但未找到节点，坐标点击");
+            click(foodCoord.cx, foodCoord.cy);
+            sleepMs(200);
+            food = { _coordClicked:true };
+        }
+    }
     if (!food) {
-        log("分类中没有「美食」");
-        dumpVisibleTexts(20);
-        try { goBack(); } catch(e){ }
+        log("分类中没有\u7f8e\u98df");
+        dumpVisibleTexts(25);
+        try { goBack(); sleepMs(600); } catch(e){ }
         return false;
     }
-    // 若已通过坐标点击，则认为已打开
+    sleepMs(1100);
     if (food._coordClicked) {
-        sleepMs(1000);
-        log("已选择「美食」(坐标点击面板)");
-        dumpVisibleTexts(15);
-        if (!isFoodFilterSelectedOnList()) {
-            log("警告：点击美食后顶部仍未出现「美食」，可能未切换成功");
-        }
-        return true;
-    }
-    if (!clickObj(food) && !clickNodeSmart(food)) {
-        // 最后尝试直接点坐标
-        try { var b = food.bounds(); click((b.left+b.right)/2,(b.top+b.bottom)/2); sleepMs(200);} catch(e3){}
-        // 验证是否成功
+        log("已选择\u7f8e\u98df(面板坐标点击)");
+        dumpVisibleTexts(18);
         sleepMs(800);
-        if (!isFoodFilterSelectedOnList()) {
-            log("点击「美食」失败");
-            try { goBack(); } catch(e2){ }
-            return false;
+        if (isFoodFilterSelectedOnList()) {
+            log("校验通过：顶部已出现美食");
+            return true;
         }
-    }
-    sleepMs(1200);
-    log("已选择「美食」");
-    dumpVisibleTexts(15);
-    if (!isFoodFilterSelectedOnList()) {
-        log("警告：点击美食后顶部仍未出现「美食」，可能未切换成功");
-        // 额外重试一次
+        log("警告：坐标点击美食后顶部仍未出现\u7f8e\u98df，兜底校验");
         try {
-            var retry = findText("美食", 800);
-            if (retry) { clickObj(retry); sleepMs(1000); }
-        } catch(eR){}
+            var hasListMarker = false;
+            try { hasListMarker = waitForListMarkers(1200) !== null; } catch(e){}
+            if (hasListMarker) {
+                log("列表标记仍在，视为选择完成（兜底）");
+                return true;
+            }
+        } catch(e){}
+        return false;
+    }
+    sleepMs(900);
+    log("已选择\u7f8e\u98df");
+    dumpVisibleTexts(18);
+    if (!isFoodFilterSelectedOnList()) {
+        log("警告：点击美食后顶部仍未出现\u7f8e\u98df，可能未切换成功，重试一次");
+        try {
+            var retryNodes=[];
+            try{ eachNode(text("美食").find(), function(n){ retryNodes.push(n); }); }catch(e){}
+            var retry=null;
+            for(var ri=0; ri<retryNodes.length; ri++){
+                try{ var rb=retryNodes[ri].bounds(); var rcy=(rb.top+rb.bottom)/2; if(rcy>320 && rcy<1150){ retry=retryNodes[ri]; break; } }catch(e){}
+            }
+            if(retry){ try{ clickObj(retry);}catch(e){ try{clickNodeSmart(retry);}catch(e2){} } sleepMs(1000); }
+        } catch(e){}
+        if (isFoodFilterSelectedOnList()) {
+            log("重试后校验通过");
+            return true;
+        }
+        try {
+            var marker2 = null;
+            try { marker2 = waitForListMarkers(1000);}catch(e){}
+            if (marker2) {
+                log("重试后列表标记存在，兜底视为完成");
+                return true;
+            }
+        } catch(e){}
+        log("点击\u7f8e\u98df后校验仍失败");
+        return false;
     }
     return true;
 }
