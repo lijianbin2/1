@@ -1,6 +1,6 @@
 // ============================================================
 // 大众点评「免费试」列表扫描筛选（Hamibot 版）
-// 版本：v1.45.22-fix-美食检测鲁棒化+文本API兜底
+// 版本：v1.45.23-fix-面板坐标直点+等待延长+诊断
 //
 // 运行环境：Hamibot 手机客户端
 // 目标 App：大众点评（com.dianping.v1）
@@ -2441,6 +2441,7 @@ function isFoodFilterSelectedOnList() {
             }
         }
     } catch(eLen20) {}
+    try { var _dbgFood=0; try{ _dbgFood=text("美食").find().length; }catch(e){} log("[诊断] 美食校验失败 panelCnt="+__panelCnt14+" hasMarker="+__hasMarker14+" otherCat="+__otherCatAtTop14+" foodTextNodes="+_dbgFood); } catch(e){}
     return false;
 }
 
@@ -2508,49 +2509,20 @@ function selectFoodCategory() {
     var food = null;
     var isCoordClicked = false;
     if (foodCoord) {
+        // v1.45.23: 直接坐标点面板美食，避免祖先链偏离左列导致只关面板未切换
+        try { log("面板美食坐标直点 ("+Math.round(foodCoord.cx)+","+Math.round(foodCoord.cy)+")"); click(foodCoord.cx, foodCoord.cy); sleepMs(400); } catch(e){ try{ click(foodCoord.cx, foodCoord.cy);}catch(e2){} }
+        isCoordClicked = true;
+        food = { __dummy:true };
+        // 备用祖先点击，坐标失败时补救（不影响主路径）
         try {
-            var panelNodes = [];
-            try { eachNode(text("美食").find(), function(n){ panelNodes.push(n); }); } catch(e){}
-            var bestNode = null;
-            var bestDy = 1e9;
-            for (var pn=0; pn<panelNodes.length; pn++) {
-                try {
-                    var pb = panelNodes[pn].bounds();
-                    var pcy = (pb.top+pb.bottom)/2;
-                    if (pcy>320 && pcy<1150) {
-                        var dy = Math.abs(pcy - foodCoord.cy);
-                        if (dy < bestDy) { bestDy = dy; bestNode = panelNodes[pn]; }
-                    }
-                } catch(e){}
+            var panelNodes2 = [];
+            try { eachNode(text("美食").find(), function(n){ panelNodes2.push(n); }); } catch(e){}
+            var bestNode2 = null; var bestDy2=1e9;
+            for (var pn2=0; pn2<panelNodes2.length; pn2++) {
+                try { var pb2 = panelNodes2[pn2].bounds(); var pcy2=(pb2.top+pb2.bottom)/2; if(pcy2>320&&pcy2<1150){ var dy2=Math.abs(pcy2-foodCoord.cy); if(dy2<bestDy2){bestDy2=dy2; bestNode2=panelNodes2[pn2];}} }catch(e){}
             }
-            if (bestNode) food = bestNode;
+            if(bestNode2){ try{ var cur2=bestNode2; for(var d2=0;d2<2;d2++){ try{ if(cur2.clickable&&cur2.clickable()){ if(cur2.click()){ log("备用祖先点击成功 depth="+d2); break;}} }catch(e){} try{ var par2=cur2.parent(); if(!par2||par2===cur2) break; cur2=par2;}catch(e){break;} } }catch(e){} }
         } catch(e){}
-        if (food) {
-            var cur = food;
-            var clicked = false;
-            for (var d=0; d<5; d++) {
-                try {
-                    if (cur.clickable && cur.clickable()) { if (cur.click()) { clicked=true; log("面板美食祖先点击成功 depth="+d); break; } }
-                } catch(e){}
-                try { var par = cur.parent(); if(!par||par===cur) break; cur=par; } catch(e){ break; }
-            }
-            if (!clicked) { try { if (clickObj(food)) { clicked=true; log("clickObj 面板美食成功"); } } catch(e){} }
-            if (!clicked) { try { if (clickNodeSmart(food)) { clicked=true; log("clickNodeSmart 面板美食成功"); } } catch(e){} }
-            if (!clicked) {
-                log("面板美食节点点击未命中，改用坐标点击 ("+Math.round(foodCoord.cx)+","+Math.round(foodCoord.cy)+")");
-                click(foodCoord.cx, foodCoord.cy);
-                sleepMs(200);
-                isCoordClicked = true;
-            } else {
-                isCoordClicked = false;
-            }
-        } else {
-            log("面板内找到美食坐标但未找到节点，坐标点击");
-            click(foodCoord.cx, foodCoord.cy);
-            sleepMs(200);
-            isCoordClicked = true;
-            food = { __dummy:true };
-        }
     }
     if (!food && !isCoordClicked) {
         log("分类中没有\u7f8e\u98df");
@@ -2559,8 +2531,8 @@ function selectFoodCategory() {
         return false;
     }
     // v1.45.16 wait panel close
-    try { var __waitEnd = Date.now() + 2500; while (Date.now() < __waitEnd) { var __pc=0; try{var __infosW=getVisibleTextInfos(); for(var __wi=0;__wi<__infosW.length;__wi++){if(isPanelCategoryText(String(__infosW[__wi].text||'').trim())&&__infosW[__wi].cy>300&&__infosW[__wi].cy<1300&&__infosW[__wi].cx<320)__pc++;}}catch(e){} if(__pc<2)break; sleepMs(300);} }catch(e){}
-    sleepMs(1100);
+    try { var __waitEnd = Date.now() + 4000; while (Date.now() < __waitEnd) { var __pc=0; try{var __infosW=getVisibleTextInfos(); for(var __wi=0;__wi<__infosW.length;__wi++){if(isPanelCategoryText(String(__infosW[__wi].text||'').trim())&&__infosW[__wi].cy>300&&__infosW[__wi].cy<1300&&__infosW[__wi].cx<320)__pc++;}}catch(e){} if(__pc<2)break; sleepMs(300);} }catch(e){}
+    sleepMs(1800);
     if (isCoordClicked) {
         log("已选择\u7f8e\u98df(面板坐标点击)");
         dumpVisibleTexts(18);
@@ -2575,7 +2547,7 @@ function selectFoodCategory() {
         log("坐标点击回顶后仍未选中");
         return false;
     }
-    try { var __waitEnd2=Date.now()+1500; while(Date.now()<__waitEnd2){ var __pc2=0; try{var __infosW2=getVisibleTextInfos(); for(var __wi2=0;__wi2<__infosW2.length;__wi2++){if(isPanelCategoryText(String(__infosW2[__wi2].text||'').trim())&&__infosW2[__wi2].cy>300&&__infosW2[__wi2].cy<1300&&__infosW2[__wi2].cx<320)__pc2++;}}catch(e){} if(__pc2<2)break; sleepMs(300);} }catch(e){}
+    try { var __waitEnd2=Date.now()+2000; while(Date.now()<__waitEnd2){ var __pc2=0; try{var __infosW2=getVisibleTextInfos(); for(var __wi2=0;__wi2<__infosW2.length;__wi2++){if(isPanelCategoryText(String(__infosW2[__wi2].text||'').trim())&&__infosW2[__wi2].cy>300&&__infosW2[__wi2].cy<1300&&__infosW2[__wi2].cx<320)__pc2++;}}catch(e){} if(__pc2<2)break; sleepMs(300);} }catch(e){}
     sleepMs(900);
     log("已选择\u7f8e\u98df");
     dumpVisibleTexts(18);
