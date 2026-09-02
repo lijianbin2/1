@@ -1,6 +1,6 @@
 // ============================================================
 // 大众点评「免费试」列表扫描筛选（Hamibot 版）
-// 版本：v1.45.19-fix-美食兜底宽松+全部分类精确定位
+// 版本：v1.45.20-fix-美食精准判定+成功页等待
 //
 // 运行环境：Hamibot 手机客户端
 // 目标 App：大众点评（com.dianping.v1）
@@ -88,7 +88,7 @@
 // ============================================================
 
 // 版本标记：手机端日志中会输出，用来确认运行的是新脚本
-var __SCRIPT_VERSION = "v1.45.19-fix-美食兜底宽松+全部分类精确定位";
+var __SCRIPT_VERSION = "v1.45.20-fix-美食精准判定+成功页等待";
 
 var CONFIG = {
     PACKAGE: "com.dianping.v1",
@@ -2350,14 +2350,27 @@ function isFoodFilterSelectedOnList() {
             }
         }
     } catch (e2_14) {}
-    // v1.45.19 lenient: hasMarker + 美食存在 + 面板已关 即可视为已选（兼容负坐标/中部1042等非标准cy）
+    // v1.45.20: lenient 仍需顶部同行校验，防卡片内"美食"误判为已选中
     try {
         if (__hasMarker14 && __panelCnt14 < 2) {
             for (var __lf14=0; __lf14<__infosTop14.length; __lf14++) {
-                if (String(__infosTop14[__lf14].text||"").trim()==="美食") return true;
+                var __lft14 = String(__infosTop14[__lf14].text||"").trim();
+                var __lfcy14 = __infosTop14[__lf14].cy||0;
+                if (__lft14==="美食" && __lfcy14 >= -200 && __lfcy14 < 1300) {
+                    var __lfNear14 = false;
+                    try {
+                        for (var __lmk14=0; __lmk14<__infosTop14.length; __lmk14++) {
+                            var __lmkt14 = String(__infosTop14[__lmk14].text||"").trim();
+                            if (__lmkt14=="全部商区" || __lmkt14=="智能排序" || __lmkt14=="更多筛选") {
+                                if (Math.abs(__infosTop14[__lmk14].cy - __lfcy14) < 110) { __lfNear14 = true; break; }
+                            }
+                        }
+                    } catch(eLfNear) {}
+                    if (__lfNear14) return true;
+                }
             }
         }
-    } catch(eLen19) {}
+    } catch(eLen20) {}
     return false;
 }
 
@@ -5746,6 +5759,10 @@ function attemptSignup(activity) {
             }
             result = verifySignupResult(activity);
             if (result) {
+                if (result.indexOf("页面离开") >= 0) {
+                    log("[自动报名] 第" + (cw + 1) + "轮页面暂离目标(可能成功页加载中)，继续等待...");
+                    continue;
+                }
                 log("[自动报名] 第" + (cw + 1) + "轮检测到结果：" + result);
                 if (result === "报名成功") {
                     // v1.43.0：报名成功后直接按返回键，避免点击「完成」时
@@ -5758,6 +5775,21 @@ function attemptSignup(activity) {
             }
             log("[自动报名] 第" + (cw + 1) + "轮未检测到完成按钮，继续等待...");
         }
+        // v1.45.20: 10轮后若仍"页面离开"但包含成功上下文，视为成功兜底
+        try {
+            if (anyTextContains("报名成功") || anyTextContains("已报名") || anyTextContains("已参与")) {
+                log("[自动报名] 等待结束后页面已离开但包含成功文本，视为报名成功(兜底)");
+                try { goBack(); sleepMs(300); } catch(eBack20) {}
+                return "报名成功";
+            }
+            var __hasDone20 = false;
+            try { eachNode(text("完成").find(), function(n){ if(safeEnabled(n)&&safeVisible(n)) __hasDone20=true; }); } catch(eD20) {}
+            if (__hasDone20) {
+                log("[自动报名] 等待结束后检测到完成按钮，视为报名成功(兜底)");
+                try { goBack(); sleepMs(300); } catch(eBack21) {}
+                return "报名成功";
+            }
+        } catch(eSucc20) {}
         log("[自动报名] 轮询5秒结束，未检测到完成按钮，尝试兜底");
     }
 
