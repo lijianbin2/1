@@ -1,6 +1,6 @@
 // ============================================================
 // 大众点评「免费试」列表扫描筛选（Hamibot 版）
-// 版本：v1.45.10-fix-美食顶部检测收紧-面板关闭等待
+// 版本：v1.45.11-fix-美食顶部同行校验-面板多类目检测
 //
 // 运行环境：Hamibot 手机客户端
 // 目标 App：大众点评（com.dianping.v1）
@@ -88,7 +88,7 @@
 // ============================================================
 
 // 版本标记：手机端日志中会输出，用来确认运行的是新脚本
-var __SCRIPT_VERSION = "v1.45.10-fix-美食顶部检测收紧-面板关闭等待";
+var __SCRIPT_VERSION = "v1.45.11-fix-美食顶部同行校验-面板多类目检测";
 
 // 运行结果回传：把摘要 POST 到调试端点便于远程验收。
 // 网络失败静默忽略，绝不影响主流程；无 http 模块的环境（如测试）自动跳过。
@@ -557,8 +557,12 @@ function eachNode(collection, fn) {
 
 function findText(str, timeout) {
     try {
-        return text(str).findOne(timeout || 3000);
-    } catch (e) {
+        var r = text(str).findOne(timeout || 500);
+        if (r) return r;
+    } catch (e) {}
+    try {
+        return textContains(str).findOne(timeout || 500);
+    } catch (e2) {
         return null;
     }
 }
@@ -2371,8 +2375,21 @@ function enterFreeTrial() {
 // 个别机型点击分类后 selector 返回失败，但页面实际已经切到美食，
 // 此时若仍把 __foodCategorySelected 置为 false，会把没有“美食”字样的
 // 粤菜/茶点卡片（包括价值100元卡片）全部误判为“无法确认类目”。
+function isPanelCategoryText(t){var c=['\u7f8e\u98df','\u4e3d\u4eba','\u7ed3\u5a5a','\u4eb2\u5b50','\u73a9\u4e50','\u5b66\u4e60\u57f9\u8bad','\u751f\u6d3b\u670d\u52a1','\u901b\u8857'];for(var i=0;i<c.length;i++) if(t===c[i]) return true; return false;}
 function isFoodFilterSelectedOnList() {
-    // v1.45.10: 收紧顶部检测——顶部筛选栏 cy < 320 才算选中，避免把分类面板里的美食(320-1150)误判为顶部
+    // v1.45.11: 面板多类目检测 + 同行校验——若检测到分类面板(面板区域内类目数>=3)则不算顶部选中
+    try {
+        var __infosPC = getVisibleTextInfos();
+        var __panelCnt = 0;
+        for (var __pi=0; __pi<__infosPC.length; __pi++) {
+            var __tt = String(__infosPC[__pi].text||"").trim();
+            var __cx = __infosPC[__pi].cx||0, __cy = __infosPC[__pi].cy||0;
+            if (isPanelCategoryText(__tt) && __cy > 300 && __cy < 1300 && __cx < 320) __panelCnt++;
+        }
+        if (__panelCnt >= 3) return false;
+    } catch(ePC) {}
+    // v1.45.11: 收紧顶部检测——顶部筛选栏 cy < 520 才算选中
+
     try {
         var probeNodes = [];
         try { eachNode(text("美食").find(), function(n){ probeNodes.push(n); }); } catch(e) {}
@@ -2382,7 +2399,7 @@ function isFoodFilterSelectedOnList() {
             try {
                 var nb = probeNodes[pi].bounds();
                 var ncy = (nb.top + nb.bottom)/2;
-                if (ncy >= -80 && ncy < 320) return true;
+                if (ncy >= -80 && ncy < 520) return true;
                 
             } catch(eB) {}
         }
@@ -2391,8 +2408,23 @@ function isFoodFilterSelectedOnList() {
         var infos = getVisibleTextInfos();
         for (var i = 0; i < infos.length; i++) {
             var t = String(infos[i].text||"").trim();
-            if ((t === "美食" || t.indexOf("美食")>=0) && infos[i].cy >= -80 && infos[i].cy < 320) {
-                return true;
+            if ((t === "美食" || t.indexOf("美食")>=0) && infos[i].cy >= -80 && infos[i].cy < 520) {
+                var __nearTop = false;
+                try {
+                    for (var __k=0; __k<infos.length; __k++) {
+                        var __ot = String(infos[__k].text||"").trim();
+                        if (__ot==="全部商区" || __ot==="智能排序" || __ot==="更多筛选") {
+                            if (Math.abs(infos[__k].cy - infos[i].cy) < 90) { __nearTop = true; break; }
+                        }
+                    }
+                } catch(eNear) {}
+                if (__nearTop) return true;
+                var __hasMarker = false;
+                for (var __m=0; __m<infos.length; __m++) {
+                    var __mt = String(infos[__m].text||"").trim();
+                    if (__mt==="全部商区" || __mt==="智能排序" || __mt==="更多筛选") { __hasMarker = true; break; }
+                }
+                if (!__hasMarker) return true;
             }
         }
     } catch (e2) {}
@@ -6079,16 +6111,20 @@ function main() {
     // 避免在等待期间误点右下角商户卡片
     log("[列表] 等待列表稳定(等待面板关闭+列表刷新)...");
     sleepMs(1200);
-    // v1.45.10: 等待分类面板关闭——面板里的"美食" cy 350-1150 消失才算关闭
+    // v1.45.11: 等待分类面板关闭——面板里的"美食" cy 350-1150 消失才算关闭
     try {
-        var panelCloseDeadline = Date.now() + 4000;
+        var panelCloseDeadline = Date.now() + 6000;
         while (Date.now() < panelCloseDeadline) {
             var panelStillOpen = false;
             try {
                 var chkInfos = getVisibleTextInfos();
+                var __catCnt = 0;
                 for (var _pi=0; _pi<chkInfos.length; _pi++) {
-                    if (chkInfos[_pi].text === "美食" && chkInfos[_pi].cy > 350 && chkInfos[_pi].cy < 1150) { panelStillOpen = true; break; }
+                    var __ct2 = String(chkInfos[_pi].text||"").trim();
+                    var __ccx2 = chkInfos[_pi].cx||0, __ccy2 = chkInfos[_pi].cy||0;
+                    if (isPanelCategoryText(__ct2) && __ccy2 > 300 && __ccy2 < 1300 && __ccx2 < 320) __catCnt++;
                 }
+                if (__catCnt >= 2) panelStillOpen = true;
             } catch(e){}
             if (!panelStillOpen) break;
             sleepMs(400);
