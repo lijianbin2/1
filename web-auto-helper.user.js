@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         网页自动助手
 // @namespace    http://tampermonkey.net/
-// @version      20.8
-// @description  打开仪表板后自动跳转商品页并点击同步闲鱼商品；在“自动发货”页面按容器精确定位开关，持续轮询自动开启，并自动打开最新商品；/goods页未找到Cookie秒级监听自动跳/connection并点首个账号后新标签打开闲鱼；全网检测 Cloudflare Error 1015 限速并自动每 10 秒重试 2 次刷新
+// @version      20.9
+// @description  打开仪表板后自动跳转商品页并点击同步闲鱼商品；在“自动发货”页面按容器精确定位开关，持续轮询自动开启，并自动打开最新商品；/goods页未找到Cookie/令牌已过期秒级监听自动跳/connection并点首个账号后新标签打开闲鱼；全网检测 Cloudflare Error 1015 限速并自动每 10 秒重试 2 次刷新
 // @match        *://*/*
 // @grant        none
 // @run-at       document-idle
@@ -306,6 +306,7 @@
 
     // ===== 新增：未找到 Cookie 自动处理 =====
     const COOKIE_MISSING_TEXTS = ['未找到账号Cookie', '未找到Cookie', '未找到账号 Cookie', '未找到cookies', '未找到 cookies'];
+    const TOKEN_EXPIRED_TEXTS = ['令牌已过期', '令牌过期', 'token已过期', 'Token expired', '登录已过期'];
     const CONNECTION_PATH = '/connection';
     const GOODS_PATH = '/goods';
     const GOOFISH_URL = 'https://www.goofish.com/';
@@ -317,7 +318,7 @@
     function hasCookieMissingTip() {
         if (!document.body) return false;
         const bodyText = (document.body.innerText || '').toLowerCase();
-        const hitText = COOKIE_MISSING_TEXTS.some(t => bodyText.includes(t.toLowerCase())) || (bodyText.includes('未找到') && bodyText.includes('cookie'));
+        const hitText = COOKIE_MISSING_TEXTS.some(t => bodyText.includes(t.toLowerCase())) || (bodyText.includes('未找到') && bodyText.includes('cookie')) || TOKEN_EXPIRED_TEXTS.some(t => bodyText.includes(t.toLowerCase()));
         if (!hitText) return false;
         const toastSelectors = ['.ant-message', '.ant-message-notice', '[class*="toast"]', '[class*="message"]', '[role="alert"]', '.el-message', '.notice'];
         for (const sel of toastSelectors) {
@@ -326,14 +327,16 @@
                 for (const el of els) {
                     const txt = (el.innerText || el.textContent || '').toLowerCase();
                     if (txt.includes('未找到') && txt.includes('cookie')) return true;
+                    if (txt.includes('令牌已过期') || txt.includes('令牌过期') || txt.includes('token已过期')) return true;
                     if (COOKIE_MISSING_TEXTS.some(t => txt.includes(t.toLowerCase()))) return true;
+                    if (TOKEN_EXPIRED_TEXTS.some(t => txt.includes(t.toLowerCase()))) return true;
                 }
             } catch(e) {}
         }
         const tips = Array.from(document.querySelectorAll('body *')).filter(el => {
             if (!el || el.children.length !== 0) return false;
             const txt = (el.textContent || '').trim().toLowerCase();
-            return COOKIE_MISSING_TEXTS.some(t => txt.includes(t.toLowerCase())) || (txt.includes('未找到') && txt.includes('cookie'));
+            return COOKIE_MISSING_TEXTS.some(t => txt.includes(t.toLowerCase())) || (txt.includes('未找到') && txt.includes('cookie')) || TOKEN_EXPIRED_TEXTS.some(t => txt.includes(t.toLowerCase())) || txt.includes('令牌已过期');
         });
         if (tips.length === 0) return hitText;
         return tips.some(isElementVisible) || hitText;
