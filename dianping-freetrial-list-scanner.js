@@ -1,6 +1,6 @@
 // ============================================================
 // 大众点评「免费试」列表扫描筛选（Hamibot 版）
-// 版本：v1.45.25-fix-顶部栏排序诊断+全部分类消失兜底
+// 版本：v1.45.26-fix-移除宽松兜底+保留精准诊断
 //
 // 运行环境：Hamibot 手机客户端
 // 目标 App：大众点评（com.dianping.v1）
@@ -88,7 +88,7 @@
 // ============================================================
 
 // 版本标记：手机端日志中会输出，用来确认运行的是新脚本
-var __SCRIPT_VERSION = "v1.45.22-fix-美食检测鲁棒化+文本API兜底";
+var __SCRIPT_VERSION = "v1.45.26-fix-移除宽松兜底+保留精准诊断";
 
 var CONFIG = {
     PACKAGE: "com.dianping.v1",
@@ -2462,26 +2462,6 @@ function isFoodFilterSelectedOnList() {
             }
         }
     } catch(eLen20) {}
-    // v1.45.25 兜底：如果面板已关且顶部不再显示“全部分类”，说明已切走，视为美食已选中（兼容芯片文本为desc或被遮挡）
-    try {
-        if (__panelCnt14 < 2 && __hasMarker14 && !__otherCatAtTop14) {
-            var __hasAllCat=false;
-            try{
-                for(var __ac=0;__ac<__infosTop14.length;__ac++){
-                    var __act=String(__infosTop14[__ac].text||"").trim();
-                    if(__act==="全部分类" && __infosTop14[__ac].cy>=80 && __infosTop14[__ac].cy<600 && __infosTop14[__ac].cx>80 && __infosTop14[__ac].cx<700) { __hasAllCat=true; break; }
-                }
-                if(!__hasAllCat){
-                    try{ if(text("全部分类").find().length>0){ for(var __ac2=0;__ac2<text("全部分类").find().length;__ac2++){ try{ var __ab=text("全部分类").find()[__ac2].bounds(); var __acy=(__ab.top+__ab.bottom)/2; if(__acy>=80&&__acy<600) {__hasAllCat=true;break;}}catch(e){}} } }catch(e){}
-                    try{ if(!hasAllCat && desc("全部分类").find().length>0) __hasAllCat=true; }catch(e){}
-                }
-            }catch(e){}
-            if(!__hasAllCat){
-                log("[诊断] 美食兜底：面板已关且顶部无全部分类，视为已切美食");
-                return true;
-            }
-        }
-    }catch(eAllCat){}
     try { var _dbgFood=0; var _dbgDesc=0; var _dbgAllTop=""; try{ _dbgFood=text("美食").find().length; }catch(e){} try{ _dbgDesc=desc("美食").find().length; }catch(e){} try{ var __sorted=[]; for(var __si2=0;__si2<__infosTop14.length;__si2++) __sorted.push(__infosTop14[__si2]); __sorted.sort(function(a,b){return a.cy-b.cy;}); var __sample=[]; for(var __si=0;__si<Math.min(12,__sorted.length);__si++){ __sample.push(__sorted[__si].text+"@"+Math.round(__sorted[__si].cy)); } _dbgAllTop=__sample.join("|"); }catch(e){} log("[诊断] 美食校验失败 panelCnt="+__panelCnt14+" hasMarker="+__hasMarker14+" otherCat="+__otherCatAtTop14+" foodTextNodes="+_dbgFood+" descNodes="+_dbgDesc+" topSample="+_dbgAllTop); } catch(e){}
     return false;
 }
@@ -6165,3 +6145,4 @@ if (Date.now() - __scriptStartTime < 5000) {
     log("脚本在 5 秒内提前结束，请把上方所有日志发给开发者排查");
     toastMsg("脚本提前结束，请查看 Hamibot 日志");
 }
+
