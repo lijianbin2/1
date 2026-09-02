@@ -1,6 +1,6 @@
 // ============================================================
 // 大众点评「免费试」列表扫描筛选（Hamibot 版）
-// 版本：v1.45.7-fix-丽人重选全部分类兜底
+// 版本：v1.45.8-fix-全部分类通用兜底-结婚
 //
 // 运行环境：Hamibot 手机客户端
 // 目标 App：大众点评（com.dianping.v1）
@@ -88,7 +88,7 @@
 // ============================================================
 
 // 版本标记：手机端日志中会输出，用来确认运行的是新脚本
-var __SCRIPT_VERSION = "v1.45.7-fix-丽人重选全部分类兜底";
+var __SCRIPT_VERSION = "v1.45.8-fix-全部分类通用兜底-结婚";
 
 // 运行结果回传：把摘要 POST 到调试端点便于远程验收。
 // 网络失败静默忽略，绝不影响主流程；无 http 模块的环境（如测试）自动跳过。
@@ -1654,7 +1654,7 @@ function returnToList(maxBacks) {
     // v1.45.6: 修复误触导致跳到丽人分类——返回后校验美食筛选是否仍选中
     try {
         if (!isFoodFilterSelectedOnList()) {
-            log("[返回] 检测到美食筛选未选中（可能误触丽人），重新选择美食");
+            log("[返回] 检测到美食筛选未选中（可能误触非美食分类），重新选择美食");
             var selOk = false;
             try { selOk = selectFoodCategory(); } catch(eSel) { logError("重选美食异常", eSel); }
             if (selOk) {
@@ -2393,10 +2393,20 @@ function selectFoodCategory() {
             log("未找到「全部分类」，但页面已有「美食」且已选中，继续");
             return true;
         }
-        if (clickText("丽人", 1500)) {
-            log("点击「丽人」打开分类面板（全部分类兜底）");
-            catOpened = true;
-        } else {
+        // v1.45.8: 通用兜底——当前分类可能是丽人/结婚/亲子/玩乐等任意非美食，逐一尝试点开
+        var fallbackCats = ["丽人","结婚","亲子","玩乐","学习培训","生活服务","逛街","结婚","丽人","结婚","亲子"];
+        var uniq = {};
+        for (var fi = 0; fi < fallbackCats.length; fi++) {
+            var catName = fallbackCats[fi];
+            if (uniq[catName]) continue;
+            uniq[catName] = true;
+            if (clickText(catName, 800)) {
+                log("点击「" + catName + "」打开分类面板（全部分类通用兜底）");
+                catOpened = true;
+                break;
+            }
+        }
+        if (!catOpened) {
             try {
                 var infos = getVisibleTextInfos();
                 var catChip = null;
@@ -2423,27 +2433,72 @@ function selectFoodCategory() {
             }
         }
         if (!catOpened) {
-            log("找不到「全部分类」/「丽人」且坐标兜底失败");
+            log("找不到「全部分类」及任意分类入口且坐标兜底失败");
             return false;
         }
     }
-    sleepMs(800);
-    var food = waitText("美食", 3500);
+    sleepMs(900);
+    // 面板内等待美食：优先找面板区域内的美食（cy>350），避免误命中顶部残影
+    var food = null;
+    var deadline = Date.now() + 4000;
+    while (Date.now() < deadline) {
+        try {
+            var infos2 = getVisibleTextInfos();
+            for (var k = 0; k < infos2.length; k++) {
+                if (infos2[k].text === "美食" && infos2[k].cy > 350 && infos2[k].cy < 1100) {
+                    var node = findText("美食", 300);
+                    if (node) { food = node; break; }
+                    // 坐标兜底：直接点该信息的坐标
+                    click(infos2[k].cx, infos2[k].cy);
+                    sleepMs(200);
+                    food = { _coordClicked:true };
+                    break;
+                }
+            }
+        } catch(e){}
+        if (food) break;
+        // 兼容旧路径
+        food = findText("美食", 400);
+        if (food) break;
+        sleepMs(300);
+    }
     if (!food) {
         log("分类中没有「美食」");
+        dumpVisibleTexts(20);
         try { goBack(); } catch(e){ }
         return false;
     }
+    // 若已通过坐标点击，则认为已打开
+    if (food._coordClicked) {
+        sleepMs(1000);
+        log("已选择「美食」(坐标点击面板)");
+        dumpVisibleTexts(15);
+        if (!isFoodFilterSelectedOnList()) {
+            log("警告：点击美食后顶部仍未出现「美食」，可能未切换成功");
+        }
+        return true;
+    }
     if (!clickObj(food) && !clickNodeSmart(food)) {
-        log("点击「美食」失败");
-        try { goBack(); } catch(e2){ }
-        return false;
+        // 最后尝试直接点坐标
+        try { var b = food.bounds(); click((b.left+b.right)/2,(b.top+b.bottom)/2); sleepMs(200);} catch(e3){}
+        // 验证是否成功
+        sleepMs(800);
+        if (!isFoodFilterSelectedOnList()) {
+            log("点击「美食」失败");
+            try { goBack(); } catch(e2){ }
+            return false;
+        }
     }
     sleepMs(1200);
     log("已选择「美食」");
     dumpVisibleTexts(15);
     if (!isFoodFilterSelectedOnList()) {
         log("警告：点击美食后顶部仍未出现「美食」，可能未切换成功");
+        // 额外重试一次
+        try {
+            var retry = findText("美食", 800);
+            if (retry) { clickObj(retry); sleepMs(1000); }
+        } catch(eR){}
     }
     return true;
 }
@@ -5986,6 +6041,7 @@ if (Date.now() - __scriptStartTime < 5000) {
     log("脚本在 5 秒内提前结束，请把上方所有日志发给开发者排查");
     toastMsg("脚本提前结束，请查看 Hamibot 日志");
 }
+
 
 
 
