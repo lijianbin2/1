@@ -1,6 +1,6 @@
 // ============================================================
 // 大众点评「免费试」列表扫描筛选（Hamibot 版）
-// 版本：v1.45.16-fix-美食强校验-坐标去属性
+// 版本：v1.45.17-fix-美食负坐标回顶
 //
 // 运行环境：Hamibot 手机客户端
 // 目标 App：大众点评（com.dianping.v1）
@@ -88,7 +88,7 @@
 // ============================================================
 
 // 版本标记：手机端日志中会输出，用来确认运行的是新脚本
-var __SCRIPT_VERSION = "v1.45.16-fix-美食强校验-坐标去属性";
+var __SCRIPT_VERSION = "v1.45.17-fix-美食负坐标回顶";
 
 var CONFIG = {
     PACKAGE: "com.dianping.v1",
@@ -2309,7 +2309,7 @@ function isFoodFilterSelectedOnList() {
         for (var __oi14=0; __oi14<__infosTop14.length; __oi14++) {
             var __ot14 = String(__infosTop14[__oi14].text||"").trim();
             var __ocy14 = __infosTop14[__oi14].cy||0;
-            if (__ocy14 >= -100 && __ocy14 < 600) {
+            if (__ocy14 >= -200 && __ocy14 < 600) {
                 if (__ot14=="丽人"||__ot14=="结婚"||__ot14=="亲子"||__ot14=="玩乐"||__ot14=="逛街"||__ot14=="生活服务"||__ot14=="学习培训") {
                     var __nearTop14 = false;
                     for (var __kj14=0; __kj14<__infosTop14.length; __kj14++) {
@@ -2326,7 +2326,7 @@ function isFoodFilterSelectedOnList() {
         if (__infosTop14) {
             for (var i14 = 0; i14 < __infosTop14.length; i14++) {
                 var t14 = String(__infosTop14[i14].text||"").trim();
-                if ((t14 === "美食" || t14.indexOf("美食")>=0) && __infosTop14[i14].cy >= -100 && __infosTop14[i14].cy < 600) {
+                if ((t14 === "美食" || t14.indexOf("美食")>=0) && __infosTop14[i14].cy >= -200 && __infosTop14[i14].cy < 600) {
                     var __nearTop2_14 = false;
                     try {
                         for (var __k14=0; __k14<__infosTop14.length; __k14++) {
@@ -2480,7 +2480,10 @@ function selectFoodCategory() {
             log("校验通过：顶部已出现美食");
             return true;
         }
-        log("警告：坐标点击美食后顶部仍未出现\u7f8e\u98df，视为未选中");
+        log("警告：坐标点击美食后顶部仍未出现\u7f8e\u98df，尝试回顶后重检");
+        try { swipe(640, 900, 640, 1600, 400); sleepMs(900); } catch(eTopFix17) {}
+        try { if (isFoodFilterSelectedOnList()) { log("回顶后校验通过"); return true; } } catch(eTT17) {}
+        log("坐标点击回顶后仍未选中");
         return false;
     }
     try { var __waitEnd2=Date.now()+1500; while(Date.now()<__waitEnd2){ var __pc2=0; try{var __infosW2=getVisibleTextInfos(); for(var __wi2=0;__wi2<__infosW2.length;__wi2++){if(isPanelCategoryText(String(__infosW2[__wi2].text||'').trim())&&__infosW2[__wi2].cy>300&&__infosW2[__wi2].cy<1300&&__infosW2[__wi2].cx<320)__pc2++;}}catch(e){} if(__pc2<2)break; sleepMs(300);} }catch(e){}
@@ -2502,7 +2505,10 @@ function selectFoodCategory() {
             log("重试后校验通过");
             return true;
         }
-        log("点击\u7f8e\u98df后校验仍失败");
+        log("点击\u7f8e\u98df后校验仍失败，尝试回顶后重检");
+        try { swipe(640, 900, 640, 1600, 400); sleepMs(900); } catch(eTopFix17b) {}
+        try { if (isFoodFilterSelectedOnList()) { log("回顶后校验通过"); return true; } } catch(eTT17b) {}
+        log("回顶后仍失败");
         return false;
     }
     return true;
@@ -6036,6 +6042,3 @@ if (Date.now() - __scriptStartTime < 5000) {
     log("脚本在 5 秒内提前结束，请把上方所有日志发给开发者排查");
     toastMsg("脚本提前结束，请查看 Hamibot 日志");
 }
-
-
-
