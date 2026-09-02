@@ -1,6 +1,6 @@
 // ============================================================
 // 大众点评「免费试」列表扫描筛选（Hamibot 版）
-// 版本：v1.45.20-fix-美食精准判定+成功页等待
+// 版本：v1.45.21-fix-回顶方向修正+美食宽松校验
 //
 // 运行环境：Hamibot 手机客户端
 // 目标 App：大众点评（com.dianping.v1）
@@ -88,7 +88,7 @@
 // ============================================================
 
 // 版本标记：手机端日志中会输出，用来确认运行的是新脚本
-var __SCRIPT_VERSION = "v1.45.20-fix-美食精准判定+成功页等待";
+var __SCRIPT_VERSION = "v1.45.21-fix-回顶方向修正+美食宽松校验";
 
 var CONFIG = {
     PACKAGE: "com.dianping.v1",
@@ -2338,6 +2338,8 @@ function isFoodFilterSelectedOnList() {
                     } catch(eNear14) {}
                     if (__nearTop2_14) return true;
                     if (!__hasMarker14) {
+                        // v1.45.21: 无标记时放宽——面板已关且美食在顶部即视为选中，兼容标记暂时不可见
+                        if (__panelCnt14 < 2) return true;
                         try {
                             var __mk15 = waitForListMarkers(800);
                             if (__mk15 && __panelCnt14===0) return true;
@@ -2500,7 +2502,7 @@ function selectFoodCategory() {
             return true;
         }
         log("警告：坐标点击美食后顶部仍未出现\u7f8e\u98df，尝试回顶后重检");
-        try { swipe(640, 1200, 640, 500, 500); sleepMs(900); } catch(eTopFix17) {}
+        try { for(var __sw17=0;__sw17<2;__sw17++){ swipe(640, 500, 640, 1500, 500); sleepMs(900); } } catch(eTopFix17) {}
         try { if (isFoodFilterSelectedOnList()) { log("回顶后校验通过"); return true; } } catch(eTT17) {}
         log("坐标点击回顶后仍未选中");
         return false;
@@ -2525,7 +2527,7 @@ function selectFoodCategory() {
             return true;
         }
         log("点击\u7f8e\u98df后校验仍失败，尝试回顶后重检");
-        try { swipe(640, 1200, 640, 500, 500); sleepMs(900); } catch(eTopFix17b) {}
+        try { for(var __sw17b=0;__sw17b<2;__sw17b++){ swipe(640, 500, 640, 1500, 500); sleepMs(900); } } catch(eTopFix17b) {}
         try { if (isFoodFilterSelectedOnList()) { log("回顶后校验通过"); return true; } } catch(eTT17b) {}
         log("回顶后仍失败");
         return false;
