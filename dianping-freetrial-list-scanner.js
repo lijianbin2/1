@@ -1,6 +1,6 @@
 // ============================================================
 // 大众点评「免费试」列表扫描筛选（Hamibot 版）
-// 版本：v1.45.36-fix-等级不足跳过继续
+// 版本：v1.45.38-fix-卡片无变化祖先重试
 //
 // 运行环境：Hamibot 手机客户端
 // 目标 App：大众点评（com.dianping.v1）
@@ -88,7 +88,7 @@
 // ============================================================
 
 // 版本标记：手机端日志中会输出，用来确认运行的是新脚本
-var __SCRIPT_VERSION = "v1.45.37-fix-我知道了全节点兜底";
+var __SCRIPT_VERSION = "v1.45.38-fix-卡片无变化祖先重试";
 
 var CONFIG = {
     PACKAGE: "com.dianping.v1",
@@ -5396,8 +5396,47 @@ function diagnoseFreeDrawClick(activity) {
     var diff = diffPageSignature(before, after);
     log("[点击后] 页面差异：新增文本 " + diff.newTexts.length + " 条，消失文本 " + diff.missingCount + " 条，包名变化：" + diff.pkgChanged);
     if (!diff.changed) {
-        log("[点击后] 页面未发生变化，点击无效");
-        return { ok: false, reason: "点击未触发页面变化" };
+        log("[点击后] 页面未发生变化，尝试祖先可点击节点重试");
+        var __retryOk = false;
+        try {
+            var __anc = cardRoot;
+            for (var __ad=0; __ad<6; __ad++) {
+                try { __anc = __anc.parent(); } catch(e){ break; }
+                if (!__anc) break;
+                var __aclick=false; try{ __aclick=__anc.clickable && __anc.clickable(); }catch(e){}
+                if (__aclick) {
+                    log("[点击重试] 尝试祖先 depth=" + (__ad+1) + " click()");
+                    try { __anc.click(); sleepMs(500); __retryOk=true; break; } catch(eRc){}
+                }
+            }
+            if (!__retryOk) {
+                try {
+                    var __ab = safeBounds(cardRoot);
+                    if (__ab) {
+                        var __acx=(__ab.left+__ab.right)/2, __acy=(__ab.top+__ab.bottom)/2;
+                        log("[点击重试] 祖先不可点，坐标重试 (" + Math.round(__acx) + "," + Math.round(__acy) + ")");
+                        if (safeClickCoord(__acx, __acy,"cardRetry")) __retryOk=true;
+                    }
+                } catch(eRb){}
+            }
+        } catch(eRetry){}
+        if (__retryOk) {
+            sleepMs(1000);
+            try{ if(isMyPage()){ log("[点击重试] 误入我的页面回退"); goBack(); sleepMs(600); } }catch(e){}
+            var afterRetry = capturePageSignature();
+            var diffRetry = diffPageSignature(before, afterRetry);
+            log("[点击重试] 重试后差异：新增 " + diffRetry.newTexts.length + " 消失 " + diffRetry.missingCount + " 变化:" + diffRetry.changed);
+            if (diffRetry.changed) {
+                after = afterRetry; diff = diffRetry;
+                log("[点击后] 祖先重试后页面已变化");
+            } else {
+                log("[点击后] 祖先重试后仍无变化，点击无效");
+                return { ok: false, reason: "点击未触发页面变化" };
+            }
+        } else {
+            log("[点击后] 页面未发生变化，点击无效");
+            return { ok: false, reason: "点击未触发页面变化" };
+        }
     }
     log("[点击后] 页面已变化");
     if (after.count < 10) {
