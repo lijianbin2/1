@@ -1,6 +1,6 @@
 // ============================================================
 // 大众点评「免费试」列表扫描筛选（Hamibot 版）
-// 版本：v1.45.35-fix-美食单次点击即放行
+// 版本：v1.45.36-fix-等级不足跳过继续
 //
 // 运行环境：Hamibot 手机客户端
 // 目标 App：大众点评（com.dianping.v1）
@@ -88,7 +88,7 @@
 // ============================================================
 
 // 版本标记：手机端日志中会输出，用来确认运行的是新脚本
-var __SCRIPT_VERSION = "v1.45.35-fix-美食单次点击即放行";
+var __SCRIPT_VERSION = "v1.45.36-fix-等级不足跳过继续";
 
 var CONFIG = {
     PACKAGE: "com.dianping.v1",
@@ -5945,15 +5945,27 @@ function hasLevelRequirementPrompt() {
 }
 
 function requestLevelRequirementStop() {
-    if (!gStopAfterLevelRequirement) {
-        gStopAfterLevelRequirement = true;
-        gStopAfterLevelRequirementReason = "等级资格不足，停止后续报名";
-        log("[安全停止] 检测到「你暂未满足报名要求」弹窗");
-        log("[安全停止] 当前账号等级不满足该批次报名条件，不点击「我知道了」，立即停止脚本");
-        setScriptState("SAFE_STOP");
-        toastMsg("等级不足，脚本已停止");
-    }
-    return "等级不足，停止脚本";
+    log("[等级不足] 检测到「你暂未满足报名要求」弹窗，该活动等级不足跳过，继续下一个");
+    // v1.45.36: 不再全局 SAFE_STOP，改为点击「我知道了」关闭弹窗后返回列表继续扫，避免漏掉后续商户
+    try {
+        var __kdNodes = [];
+        try { eachNode(text("我知道了").find(), function(n){ __kdNodes.push(n); }); } catch(eKd1){}
+        try { eachNode(desc("我知道了").find(), function(n){ __kdNodes.push(n); }); } catch(eKd2){}
+        try { eachNode(textContains("我知道了").find(), function(n){ __kdNodes.push(n); }); } catch(eKd3){}
+        var __kdClicked = false;
+        for (var __kdi=0; __kdi<__kdNodes.length; __kdi++) {
+            var __kdn = __kdNodes[__kdi];
+            if (!safeVisible(__kdn) || !safeEnabled(__kdn)) continue;
+            if (clickNodeCenter(__kdn)) { __kdClicked = true; log("[等级不足] 已点击「我知道了」关闭弹窗 (bounds中心)"); break; }
+            try { if (__kdn.click()) { __kdClicked = true; log("[等级不足] 已点击「我知道了」关闭弹窗 (click)"); break; } } catch(eKdC){}
+        }
+        if (!__kdClicked) log("[等级不足] 未找到「我知道了」按钮，尝试按返回键");
+        sleepMs(600);
+    } catch(eKdAll){}
+    try { if (hasLevelRequirementPrompt()) { goBack(); sleepMs(500); log("[等级不足] 按返回键关闭弹窗"); } } catch(eKdBack){}
+    try { sleepMs(400); if (!isListPage()) { goBack(); sleepMs(800); log("[等级不足] 已返回列表继续扫描"); } } catch(eKdRet){}
+    try { toastMsg("等级不足，已跳过继续"); } catch(eT){}
+    return "等级不足，跳过此活动";
 }
 
 function hasSignupConfirmationPrompt() {
@@ -6179,7 +6191,7 @@ function categorizeSignupStatus(status) {
     }
 
     if (status === "名额已满" || status === "活动已结束" || status === "不符合报名条件" ||
-        status === "等级不足，停止脚本") {
+        status === "等级不足，停止脚本" || status === "等级不足，跳过此活动") {
         return "unavailable";
     }
 
@@ -6395,6 +6407,7 @@ if (Date.now() - __scriptStartTime < 5000) {
     log("脚本在 5 秒内提前结束，请把上方所有日志发给开发者排查");
     toastMsg("脚本提前结束，请查看 Hamibot 日志");
 }
+
 
 
 
