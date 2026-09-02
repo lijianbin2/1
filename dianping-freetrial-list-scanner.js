@@ -1,6 +1,6 @@
 // ============================================================
 // 大众点评「免费试」列表扫描筛选（Hamibot 版）
-// 版本：v1.45.26-fix-移除宽松兜底+保留精准诊断
+// 版本：v1.45.27-fix-美食检测重构+手动兜底+全量诊断
 //
 // 运行环境：Hamibot 手机客户端
 // 目标 App：大众点评（com.dianping.v1）
@@ -88,7 +88,7 @@
 // ============================================================
 
 // 版本标记：手机端日志中会输出，用来确认运行的是新脚本
-var __SCRIPT_VERSION = "v1.45.26-fix-移除宽松兜底+保留精准诊断";
+var __SCRIPT_VERSION = "v1.45.27-fix-美食检测重构+手动兜底+全量诊断";
 
 var CONFIG = {
     PACKAGE: "com.dianping.v1",
@@ -1656,52 +1656,65 @@ function getVisibleSample(limit) {
 
 function getVisibleTextInfos() {
     var infos = [];
-
-    var pushNode = function (obj) {
+    var pushNode = function (obj, src) {
         try {
             var t = String(obj.text() || "").trim();
-
-            if (!t) {
-                return;
-            }
-
+            var d = String(obj.desc() || "").trim();
+            var txt = t || d;
+            if (!txt) return;
             var b = obj.bounds();
             infos.push({
-                text: t,
+                text: txt,
+                rawText: t,
+                desc: d,
                 left: b.left,
                 right: b.right,
                 top: b.top,
                 bottom: b.bottom,
                 cx: (b.left + b.right) / 2,
-                cy: (b.top + b.bottom) / 2
+                cy: (b.top + b.bottom) / 2,
+                className: String(obj.className() || ""),
+                clickable: !!obj.clickable(),
+                selected: !!obj.selected(),
+                src: src
             });
-        } catch (e) {
-        }
+        } catch (e) {}
     };
-
-    try {
-        eachNode(className("android.widget.TextView").find(), pushNode);
-    } catch (e) {
-    }
-
-    try {
-        eachNode(className("android.view.View").find(), pushNode);
-    } catch (e) {
-    }
-
+    try { eachNode(className("android.widget.TextView").find(), function(n){ pushNode(n, "TV"); }); } catch(e){}
+    try { eachNode(className("android.widget.Button").find(), function(n){ pushNode(n, "BTN"); }); } catch(e){}
+    try { eachNode(className("android.view.View").find(), function(n){ pushNode(n, "VIEW"); }); } catch(e){}
+    try { eachNode(className("android.view.ViewGroup").find(), function(n){ pushNode(n, "VG"); }); } catch(e){}
+    try { eachNode(className("android.widget.ImageView").find(), function(n){ pushNode(n, "IMG"); }); } catch(e){}
     return infos;
 }
-
-function dumpVisibleTexts(limit) {
+function dumpTopBarDiagnostic() {
+    try {
+        var infos = getVisibleTextInfos();
+        var top = [];
+        for (var i=0;i<infos.length;i++) {
+            var cy = infos[i].cy;
+            if (cy >= -250 && cy < 900) top.push(infos[i]);
+        }
+        top.sort(function(a,b){ return a.cy-b.cy; });
+        log("[诊断] 顶部栏全量( -250~900, 按cy排序, 取前24):");
+        for (var j=0;j<Math.min(24, top.length); j++) {
+            var it=top[j];
+            log("  TOP["+j+"] "+it.text+" raw="+it.rawText+" desc="+it.desc+" @"+Math.round(it.cx)+","+Math.round(it.cy)+" "+it.className+" src="+it.src+" sel="+it.selected+" click="+it.clickable+" ["+it.left+","+it.top+","+it.right+","+it.bottom+"]");
+        }
+        var cntFood=0, cntDesc=0, cntBtn=0;
+        try{ cntFood=text("美食").find().length; }catch(e){}
+        try{ cntDesc=desc("美食").find().length; }catch(e){}
+        try{ cntBtn=textContains("美食").find().length; }catch(e){}
+        log("[诊断] text美食="+cntFood+" desc美食="+cntDesc+" contains="+cntBtn);
+    } catch(eDiag){}
+}function dumpVisibleTexts(limit) {
     var infos = getVisibleTextInfos();
     log("当前可见文本数：" + infos.length);
-
     for (var i = 0; i < Math.min(limit || 20, infos.length); i++) {
-        log("TEXT[" + i + "] " + infos[i].text + " @ " + Math.round(infos[i].cx) + "," + Math.round(infos[i].cy));
+        log("TEXT[" + i + "] " + infos[i].text + " @ " + Math.round(infos[i].cx) + "," + Math.round(infos[i].cy) + " " + infos[i].className + " src="+infos[i].src);
     }
-}
-
-function extractValueFromText(str) {
+    dumpTopBarDiagnostic();
+}function extractValueFromText(str) {
     if (!str) {
         return null;
     }
@@ -2575,25 +2588,40 @@ function selectFoodCategory() {
     log("已选择\u7f8e\u98df");
     dumpVisibleTexts(18);
     if (!isFoodFilterSelectedOnList()) {
-        log("警告：点击美食后顶部仍未出现\u7f8e\u98df，可能未切换成功，重试一次");
-        try {
-            var retryNodes=[];
-            try{ eachNode(text("美食").find(), function(n){ retryNodes.push(n); }); }catch(e){}
-            var retry=null;
-            for(var ri=0; ri<retryNodes.length; ri++){
-                try{ var rb=retryNodes[ri].bounds(); var rcy=(rb.top+rb.bottom)/2; if(rcy>320 && rcy<1150){ retry=retryNodes[ri]; break; } }catch(e){}
+        log("警告：点击美食后顶部仍未出现美食，可能未切换成功，轮询5秒等待列表刷新");
+        for (var __poll=0; __poll<10; __poll++) {
+            sleepMs(500);
+            if (isFoodFilterSelectedOnList()) {
+                log("轮询第"+(__poll+1)+"次检测通过");
+                return true;
             }
-            if(retry){ try{ clickObj(retry);}catch(e){ try{clickNodeSmart(retry);}catch(e2){} } sleepMs(1000); }
-        } catch(e){}
-        if (isFoodFilterSelectedOnList()) {
-            log("重试后校验通过");
-            return true;
         }
-        log("点击\u7f8e\u98df后校验仍失败，尝试回顶后重检");
+        log("轮询后仍失败，尝试回顶后重检");
         try { for(var __sw17b=0;__sw17b<2;__sw17b++){ swipe(640, 500, 640, 1500, 500); sleepMs(900); } } catch(eTopFix17b) {}
         try { if (isFoodFilterSelectedOnList()) { log("回顶后校验通过"); return true; } } catch(eTT17b) {}
-        log("回顶后仍失败");
-        return false;
+        try {
+            var retryNodes2=[];
+            try{ eachNode(text("美食").find(), function(n){ retryNodes2.push(n); }); }catch(e){}
+            try{ eachNode(desc("美食").find(), function(n){ retryNodes2.push(n); }); }catch(e){}
+            var retry2=null; var bestCY=9999;
+            for(var ri2=0; ri2<retryNodes2.length; ri2++){
+                try{ var rb2=retryNodes2[ri2].bounds(); var rcy2=(rb2.top+rb2.bottom)/2; var rcx2=(rb2.left+rb2.right)/2; if(rcy2>250 && rcy2<1350 && rcx2<360 && rcy2<bestCY){ bestCY=rcy2; retry2=retryNodes2[ri2]; } }catch(e){}
+            }
+            if(retry2){ log("二次重试点击左侧美食面板"); try{ clickObj(retry2);}catch(e){ try{clickNodeSmart(retry2);}catch(e2){} } sleepMs(1200); for(var __poll2=0;__poll2<10;__poll2++){ sleepMs(500); if(isFoodFilterSelectedOnList()){ log("二次重试轮询第"+(__poll2+1)+"次通过"); return true; } } }
+        } catch(e){}
+        dumpTopBarDiagnostic();
+        log("两次自动尝试仍未检测到美食，已自动进入手动确认兜底：请在10秒内手动点一下【美食】分类");
+        toast("请手动点击【美食】，10秒后自动继续");
+        for (var __wait=0; __wait<20; __wait++) {
+            sleepMs(500);
+            if (isFoodFilterSelectedOnList()) {
+                log("手动确认：检测到美食已选中，继续扫描");
+                return true;
+            }
+        }
+        log("手动等待10秒后仍未检测到，但为解决反复卡死问题，本次按【已尝试切换】继续扫描（仅警告，不再强制退出）");
+        log("[容错] 未能100%确认美食选中，为避免无限循环，本次放行继续扫描，请留意后续扫描是否仍在美食分类");
+        return true;
     }
     return true;
 }
