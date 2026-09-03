@@ -1,6 +1,6 @@
 auto.waitFor();
 console.show();
-console.log("pdd v1.26 - robustBack单拍+activity检测边看边改 推荐tab强制+省钱月卡896,750+百亿banner640,1450");
+console.log("pdd v1.27 - s3坐标优先+s6开学底栏单拍+activity检测边看边改 推荐tab强制+省钱月卡896,750+百亿banner640,1450");
 function tapShell(x,y){ try{ shell("input tap "+x+" "+y); }catch(e){} try{ click(x,y);}catch(e){} }
 function pressBack(){ try{ back(); }catch(e){} sleep(500); try{ shell("input tap 71 177"); }catch(e){} sleep(400); try{ shell("input keyevent 4"); }catch(e){} sleep(200); try{ shell("input keyevent 4"); }catch(e){} try{ back(); }catch(e){} }
 function robustBack(){ try{ back(); }catch(e){} sleep(400); try{ shell("input tap 71 177"); }catch(e){} sleep(700); try{ shell("input keyevent 4"); }catch(e){} sleep(400); try{ back(); }catch(e){} sleep(700); }
@@ -270,10 +270,42 @@ function s2(){
     if(isCommodityPage()){ console.log("s2后误进商品页 回退"); pressBack(); sleep(1500); if(!isHome()) goHome(); }
 }
 function s3(){
-    console.log("=== s3 会员 1130,165 ==="); hideConsoleSoon();
-    let ok=clickViaParent("会员");
-    if(!ok){ console.log("会员文本未找到，坐标兜底"); tapShell(1130,165); }
-    sleep(2800); showConsoleSoon();
+    console.log("=== s3 会员 1130,165 坐标优先防误点 ==="); hideConsoleSoon();
+    // 坐标优先 避免误点 会员专享价 商品卡片 (0,1742大容器)
+    tapShell(1130,165); sleep(600); try{ shell("input tap 1130 165"); }catch(e){}
+    sleep(1800);
+    if(!isHome()){
+        console.log("s3 坐标已离开首页 成功");
+        sleep(1000); showConsoleSoon(); return;
+    }
+    if(isCommodityPage()){
+        console.log("s3 坐标误进商品回退");
+        pressBack(); sleep(1500); if(!isHome()) goHome();
+        showConsoleSoon(); return;
+    }
+    // 仍在首页 说明坐标可能未命中 再尝试文本但过滤大卡片
+    let n=null;
+    try{ n=text("会员").findOne(400); }catch(e){}
+    if(n){
+        let b=n.bounds();
+        // 过滤底部商品卡片 cy>1700 的 会员专享价
+        if(b.centerY()>1700){
+            console.log("s3 过滤底部会员卡片 "+b+" 不点击");
+        } else {
+            console.log("s3 文本会员 "+b+" 尝试点击");
+            let cur=n; let clicked=false;
+            for(let i=0;i<4;i++){
+                if(cur.clickable()){ try{cur.click();}catch(e){} clicked=true; try{ shell("input tap "+cur.bounds().centerX()+" "+cur.bounds().centerY());}catch(e){} break; }
+                let pp=cur.parent(); if(!pp) break; cur=pp;
+            }
+            if(!clicked) try{ n.click(); shell("input tap "+b.centerX()+" "+b.centerY()); }catch(e){}
+            sleep(2800);
+        }
+    } else {
+        console.log("s3 未找到会员文本 已用坐标");
+        sleep(800);
+    }
+    showConsoleSoon();
 }
 function s4(){
     console.log("=== s4 打卡 385,1180 ==="); hideConsoleSoon(); swipeToTop(); sleep(500);
@@ -291,9 +323,43 @@ function s4(){
 }
 function s5(){ console.log("=== s5 back ==="); hideConsoleSoon(); pressBack(); sleep(1700); showConsoleSoon(); }
 function s6(){
-    console.log("=== s6 百亿消费券/去抢购 红块整体可进 过滤开学 cy<=2500 ===");
+    console.log("=== s6 消费券/去抢购 红块+底栏开学兼容 ===");
     hideConsoleSoon();
     if(!isHome()) goHome(); swipeToTop(); sleep(600);
+    // --- v1.27 新增：优先点底部 消费券 Tab (开学/百亿通用) 坐标来自截图 640,2630 ---
+    for(let attempt=0; attempt<2; attempt++){
+        let tab = null;
+        try{ tab=text("开学消费券").findOne(400) || text("百亿消费券").findOne(400) || textContains("消费券").findOne(400); }catch(e){}
+        if(tab){
+            let b=tab.bounds();
+            // 底栏特征 y>2000 或 文本含开学
+            if(b.centerY()>2000 || tab.text().indexOf("消费券")>=0){
+                console.log("s6 底栏消费券 "+tab.text()+" "+b);
+                let cur=tab; let clicked=false;
+                for(let i=0;i<5;i++){ if(cur.clickable()){ try{cur.click();}catch(e){} clicked=true; try{ let bb=cur.bounds(); shell("input tap "+bb.centerX()+" "+bb.centerY());}catch(e){} break; } let pp=cur.parent(); if(!pp) break; cur=pp; }
+                if(!clicked){ try{ tab.click(); }catch(e){} try{ shell("input tap "+b.centerX()+" "+b.centerY()); }catch(e){} }
+                sleep(3200);
+                if(isCommodityPage()){ console.log("s6 底栏误进商品回退"); pressBack(); sleep(1500); if(!isHome()) goHome(); continue; }
+                // 判断是否已进入消费券页
+                if(!isHome() || text("立即领取").exists() || textContains("消费券").exists()){
+                    console.log("s6 底栏已进入消费券页");
+                    showConsoleSoon(); return;
+                }
+            }
+        }
+        console.log("s6 底栏坐标兜底 640,2630 attempt "+attempt);
+        tapShell(640,2630); sleep(600); try{ shell("input tap 640 2630"); }catch(e){}
+        sleep(1800);
+        if(!isHome()){
+            console.log("s6 底栏坐标已离开首页 成功");
+            sleep(1000);
+            if(isCommodityPage()){ pressBack(); sleep(1300); continue; }
+            showConsoleSoon(); return;
+        }
+        // 若点击后仍在首页 说明未命中 再试一次或进入原有逻辑
+        if(attempt==0) { sleep(500); continue; }
+        break;
+    }
     for(let k=0;k<5;k++){
         if(clickViaParent("去抢购")){ console.log("s6 去抢购点击 k="+k); sleep(3200); if(isCommodityPage()){ console.log("s6去抢购后进商品页回退"); pressBack(); sleep(1500); continue; } showConsoleSoon(); return; }
         if(text("百亿消费券").exists()){
@@ -380,7 +446,7 @@ function s8(){
     showConsoleSoon();
 }
 function main(){
-    console.log("=== main 开始 v1.26 ==="); sleep(800); try{ ensurePdd(); }catch(e){ console.log("ensurePdd err "+e); }
+    console.log("=== main 开始 v1.27 ==="); sleep(800); try{ ensurePdd(); }catch(e){ console.log("ensurePdd err "+e); }
     let inPdd=isInPdd(); console.log("ensure后 inPdd="+inPdd+" isHome="+isHome()+" isCommodity="+isCommodityPage());
     if(!inPdd){
         console.log("ensure后误判不在pdd，重试2次");
@@ -393,7 +459,7 @@ function main(){
     }
     goHome(); console.log("goHome后 isHome="+isHome());
     s1(); s2(); s3(); s4(); s5(); s6(); s7(); s8();
-    toast("v1.26 完成"); console.log("=== all done v1.26 ===");
+    toast("v1.27 完成"); console.log("=== all done v1.27 ===");
 }
 main();
 
