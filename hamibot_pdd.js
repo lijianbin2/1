@@ -1,6 +1,6 @@
 ﻿auto.waitFor();
 console.show();
-console.log("pdd v1.20 - robustBack单拍+activity检测边看边改 推荐tab强制+省钱月卡896,750+百亿banner640,1450");
+console.log("pdd v1.21 - robustBack单拍+activity检测边看边改 推荐tab强制+省钱月卡896,750+百亿banner640,1450");
 function tapShell(x,y){ try{ shell("input tap "+x+" "+y, true); }catch(e){} try{ click(x,y);}catch(e){} }
 function pressBack(){ try{ shell("input tap 71 177", true); }catch(e){} sleep(400); try{ shell("input keyevent 4", true); }catch(e){} sleep(200); try{ shell("input keyevent 4", true); }catch(e){} }
 function robustBack(){
@@ -14,7 +14,11 @@ function hideConsoleSoon(){ try{ console.hide(); }catch(e){} sleep(800); }
 function showConsoleSoon(){ try{ console.show(); }catch(e){} sleep(300); }
 function swipeEdgeUp(t, interval) { t=t||5; interval=interval||2000; for(let n=0;n<t;n++){ swipe(1150,1400,1150,700,600); sleep(interval);} }
 function swipeToTop(){ try{ for(let i=0;i<2;i++){ swipe(600,700,600,1400,600); sleep(900);} sleep(300); }catch(e){ console.log("swipeToTop err "+e); try{ shell("input swipe 600 700 600 1400 600", true);}catch(e2){} sleep(800); } }
-function isInPdd(){ return currentPackage()==="com.xunmeng.pinduoduo"; }
+function isInPdd(){
+    try{ if(currentPackage()==="com.xunmeng.pinduoduo") return true; }catch(e){ console.log("isInPdd currentPackage err "+e); }
+    try{ let out=shell("dumpsys window | grep mCurrentFocus", true); if(out && out.indexOf("com.xunmeng.pinduoduo")>=0) return true; }catch(e){ console.log("isInPdd shell err "+e); }
+    return false;
+}
 function isHome(){
     try{
         let hasHome=false,hasMe=false;
@@ -118,8 +122,8 @@ function ensurePdd(){
             sleep(1500);
         }
     }
-    try{ shell("svc power stayon true", true); shell("input keyevent 224", true); }catch(e){}
-    sleep(800);
+    try{ shell("svc power stayon true", true); }catch(e){}
+    sleep(1200);
 }
 function goHome(){
     console.log("goHome 开始 isHome="+isHome()+" pkg="+currentPackage()+" isCommodity="+isCommodityPage());
@@ -177,7 +181,7 @@ function s1(){
             console.log("s1 直点 "+pt+" 已离开首页 成功");
             sleep(1500);
             robustBack(); sleep(2500);
-            // v1.20: avoid over-back flip-flop, check via isHome safe + fallback to pureShellBack once
+            // v1.21: avoid over-back flip-flop, check via isHome safe + fallback to pureShellBack once
             try{
                 if(!isHome()){
                     console.log("s1后仍不在首页 补一次pureShellBack");
@@ -374,11 +378,19 @@ function s8(){
     showConsoleSoon();
 }
 function main(){
-    console.log("=== main 开始 v1.20 ==="); sleep(800); try{ ensurePdd(); }catch(e){ console.log("ensurePdd err "+e); }
+    console.log("=== main 开始 v1.21 ==="); sleep(800); try{ ensurePdd(); }catch(e){ console.log("ensurePdd err "+e); }
     let inPdd=isInPdd(); console.log("ensure后 inPdd="+inPdd+" isHome="+isHome()+" isCommodity="+isCommodityPage());
-    if(!inPdd){ console.log("不在pdd，终止"); toast("不在拼多多"); return; }
+    if(!inPdd){
+        console.log("ensure后误判不在pdd，重试2次");
+        sleep(1500);
+        inPdd=isInPdd();
+        console.log("重试1 inPdd="+inPdd);
+        if(!inPdd){ sleep(1500); inPdd=isInPdd(); console.log("重试2 inPdd="+inPdd); }
+        if(!inPdd){ console.log("仍不在pdd，尝试拉起一次"); try{ shell("monkey -p com.xunmeng.pinduoduo -c android.intent.category.LAUNCHER 1", true);}catch(e){} sleep(3000); inPdd=isInPdd(); console.log("拉起后 inPdd="+inPdd); }
+        if(!inPdd){ console.log("不在pdd，终止"); toast("不在拼多多"); return; }
+    }
     goHome(); console.log("goHome后 isHome="+isHome());
     s1(); s2(); s3(); s4(); s5(); s6(); s7(); s8();
-    toast("v1.20 完成"); console.log("=== all done v1.20 ===");
+    toast("v1.21 完成"); console.log("=== all done v1.21 ===");
 }
 main();
