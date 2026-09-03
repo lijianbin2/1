@@ -1,7 +1,7 @@
-﻿# mcp_pdd_runner.ps1 - 拼多多 MCP 一键直跑 v1.28 (2026-09-03)
+﻿# mcp_pdd_runner.ps1 - 拼多多 MCP 一键直跑 v1.29 (2026-09-03)
 # 纯 ADB，无 Hamibot，对应 pdd_mcp_flow.md 8步
 param([string]$Serial = "")
-$ADB = "C:\platform-tools\adb.exe"
+$ADB = if(Test-Path "C:\Users\1\.phonemcp\platform-tools\adb.exe"){"C:\Users\1\.phonemcp\platform-tools\adb.exe"} elseif(Test-Path "C:\platform-tools\adb.exe"){"C:\platform-tools\adb.exe"} else {"adb"}
 $PKG = "com.xunmeng.pinduoduo"
 function Log($m){ Write-Host ("[{0:HH:mm:ss}] {1}" -f (Get-Date), $m) }
 function Adb($a){ & $ADB @a 2>&1 }
@@ -30,10 +30,13 @@ function WindowDump{
 function GoHome{
   Log "=== goHome 回首页 ==="
   for($i=0;$i -lt 10;$i++){
+    $focus = Shell "dumpsys window | grep mCurrentFocus"
     $dump = WindowDump
-    $isHome = ($dump -match "首页" -and $dump -match "个人中心" -and $dump -notmatch "共200元券") -or (Shell "dumpsys window | grep mCurrentFocus" -match "MainFrameActivity")
-    if($isHome){ Log "已在首页 (try $i)"; return }
+    $inMain = $focus -match "MainFrameActivity"
+    $isHome = $inMain
+    if($isHome){ Log "已在首页 (try $i) focus=$($focus.Trim())"; return }
     if($dump -match "加入购物车|立即购买|收藏|直接拼成|限时直降|退货包运费"){ Log "商品页，back"; PressBack; continue }
+    if($focus -match "NewPageActivity"){ Log "NewPageActivity 非首页，back (try $i)"; PressBack; Start-Sleep 1; continue }
     if($i % 2 -eq 0){ Tap 128 2640 } else { Tap 30 380 }
     if($i -ge 5){ PressBack }
     Start-Sleep 1
@@ -62,7 +65,7 @@ function S1_ShengQianYueKa{
     Tap $c[0] $c[1]
     Start-Sleep 2
     $f = Shell "dumpsys window | grep mCurrentFocus"
-    if($f -notmatch "MainFrameActivity"){ Log "s1 直点 $($c[0]),$($c[1]) 已离开首页 成功"; Start-Sleep 1; return }
+    if($f -notmatch "MainFrameActivity"){ Log "s1 直点 $($c[0]),$($c[1]) 已离开首页 成功，立即返回"; Start-Sleep 1; PressBack; Start-Sleep 1; Log "s1 已返回首页"; return }
     $dump = WindowDump
     if($dump -match "加入购物车|直接拼成|限时直降"){ Log "s1 误进商品页，back"; PressBack; Start-Sleep 1 }
   }
@@ -71,8 +74,12 @@ function S1_ShengQianYueKa{
 function S2_BaiYiBuTie{
   Log "=== s2 百亿补贴 640,1450 ==="
   GoHome
+  $dump = WindowDump
+  if($dump -notmatch "百亿补贴"){ Log "s2 预检 未见百亿补贴，仍尝试点击" }
   Tap 640 1450
   Start-Sleep 2
+  $f = Shell "dumpsys window | grep mCurrentFocus"
+  if($f -match "MainFrameActivity"){ Log "s2 仍在首页，可能未点中，重试 640,1450"; Tap 640 1450; Start-Sleep 2 }
   Log "s2 banner直点成功"
 }
 function S3_HuiYuan{
@@ -103,9 +110,13 @@ function S6_XiaoFeiQuan{
   Tap 640 2630
   Start-Sleep 2
   $dump = WindowDump
-  if($dump -match "百亿消费券|消费券|去抢购"){ Log "s6 底栏已进入消费券页" } else { Log "s6 底栏未命中，尝试红块 640,810"; Tap 640 810; Start-Sleep 2 }
-  Tap 640 810
-  Start-Sleep 2
+  if($dump -match "加入购物车|直接拼成|限时直降|退货包运费"){ Log "s6 误进商品页 back"; PressBack; Start-Sleep 1; $dump = WindowDump }
+  if($dump -match "百亿消费券|消费券|去抢购"){ Log "s6 底栏已进入消费券页" } else { Log "s6 底栏未命中，尝试红块 640,810"; Tap 640 810; Start-Sleep 2; $dump = WindowDump; if($dump -match "加入购物车|直接拼成"){ Log "s6 红块误进商品 back"; PressBack; Start-Sleep 1 } }
+  $dump2 = WindowDump
+  if($dump2 -notmatch "加入购物车|直接拼成"){
+    if($dump2 -match "百亿消费券|去抢购|立即领取"){ Tap 640 810; Start-Sleep 2 }
+    else { Log "s6 跳过红块补点，未在消费券页" }
+  }
   Log "s6 完成"
 }
 function S7_LingQu{
@@ -145,7 +156,7 @@ function S8_DianLiangAndSwipe{
   Swipe 600 700 600 1400 400
   Start-Sleep 500
 }
-Log "pdd v1.28 start Serial=$Serial"
+Log "pdd v1.29 start Serial=$Serial"
 EnsurePdd
 S1_ShengQianYueKa
 GoHome
@@ -156,6 +167,5 @@ S5_Back
 S6_XiaoFeiQuan
 S7_LingQu
 S8_DianLiangAndSwipe
-Log "=== all done v1.28 ==="
+Log "=== all done v1.29 ==="
 Write-Host "流程结束，若需追加 s9，在末尾加函数并在 flow.md 追加一行。"
-

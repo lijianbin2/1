@@ -2,7 +2,7 @@
 
 > 存档位置: H:\Codex\pdd-mcp\pdd_mcp_flow.md (真源) + mcp_pdd_runner.ps1 (本地直跑)
 > 设备: 25053RT47C onyx 1280x2772 | ADB C:\platform-tools\adb.exe | 包 com.xunmeng.pinduoduo
-> 版本: v1.28 (2026-09-03) 继承 v1.27 验证 109s
+> 版本: v1.29 (2026-09-03) 继承 v1.29 验证 109s
 
 ## 触发词
 用户说以下任意一句，立即按本文执行，无需再问：
@@ -34,10 +34,10 @@ C:\platform-tools\adb.exe -s <SERIAL> shell dumpsys window | grep mCurrentFocus
 | s5 | 返回 | pressBack | 回补贴页 |
 | s6 | 消费券底栏+红块 | 640,2630*2 -> 640,810 | s6 底栏已进入消费券页 |
 | s7 | 立即领取6点兜底 | 227,1048 640,1048 ... | s7 领取坐标 |
-| s8 | 点亮+滑动10秒+回顶部 | 立即点亮->640,1360->swipe1150,1400->700*5 | all done v1.28 |
+| s8 | 点亮+滑动10秒+回顶部 | 立即点亮->640,1360->swipe1150,1400->700*5 | all done v1.29 |
 
 ### 3. 判定补丁 (必须遵守)
-- isHome = (含首页 && 含个人中心 && 不含共200元券) || MainFrameActivity fallback
+- isHome = 严格 MainFrameActivity (禁止用 首页+个人中心 文本，省钱月卡页底栏也会含首页导致误判)
 - isCommodityPage = 含 加入购物车/立即购买/收藏/直接拼成/限时直降/退货包运费
 - s6底栏 开学消费券 window_dump.xml text=""，必须用坐标 640,2630
 - s6红块 640,810 整体可点，不必拘泥 已抢购 文本
@@ -58,7 +58,7 @@ powershell -ExecutionPolicy Bypass -File H:\Codex\pdd-mcp\mcp_pdd_runner.ps1 -Se
 - 日志统一 Log "=== s9 xxx ===" 便于 grep
 
 ## 完成标志
-控制台最后打印 === all done v1.28 === 且 dumpsys 回到 MainFrameActivity 即成功。
+控制台最后打印 === all done v1.29 === 且 dumpsys 回到 MainFrameActivity 即成功。
 ---
 生成: 2026-09-03 | 真源 pdd_mcp_flow.md | 无 Hamibot | 坐标1280x2772不变
 
