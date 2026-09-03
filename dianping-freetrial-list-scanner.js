@@ -1,6 +1,6 @@
 // ============================================================
 // 大众点评「免费试」列表扫描筛选（Hamibot 版）
-// 版本：v1.45.42-fix-点击失败不回退+防首页误退
+// 版本：v1.45.43-fix-距离联合去重+底部阈值30+美食放行优化
 //
 // 运行环境：Hamibot 手机客户端
 // 目标 App：大众点评（com.dianping.v1）
@@ -88,7 +88,7 @@
 // ============================================================
 
 // 版本标记：手机端日志中会输出，用来确认运行的是新脚本
-var __SCRIPT_VERSION = "v1.45.42-fix-点击失败不回退+防首页误退";
+var __SCRIPT_VERSION = "v1.45.43-fix-距离联合去重+底部阈值30+美食放行优化";
 
 var CONFIG = {
     PACKAGE: "com.dianping.v1",
@@ -3696,7 +3696,7 @@ function scanCurrentScreen(seenKeys) {
         var screenCategory = screenParsed.category;
         var screenDistance = screenParsed.distance;
         var screenMerchant = screenParsed.merchant;
-        var screenKey = buildActivityKey(screenName, screenValue, screenMerchant, screenArea, screenItem.key);
+        var screenKey = buildActivityKey(screenName, screenValue, screenMerchant, screenArea, screenItem.key, screenDistance);
         // 免费抽节点的卡片容器偶尔会串入相邻卡片的「已报名」水印。
         // 已报名状态只接受独立收集到的当前标记节点，避免把免费活动误跳过。
         var screenRegistered = !!screenItem.isRegisteredMarker;
@@ -4266,7 +4266,7 @@ function scanFreeTrialList() {
                 // v1.45.6: 修复过早判定已报名区域——加载中/返回列表瞬间可能出现 0 按钮，需同时满足可见文本充足且已扫一定数量才计数
         var visibleCountForGate = 0;
         try { visibleCountForGate = getVisibleTextInfos().length; } catch(eVG) {}
-        if (result.freeDrawCount <= 0 && totalNew > 0 && totalNew >= 6 && visibleCountForGate >= 80) {
+        if (result.freeDrawCount <= 0 && totalNew > 0 && totalNew >= 3 && visibleCountForGate >= 30) {
             consecutiveNoFreeDraw++;
             log("[列表] 当前屏「免费抽」按钮数：0（连续第 " + consecutiveNoFreeDraw + " 屏，visible=" + visibleCountForGate + " totalNew=" + totalNew + "）");
             if (consecutiveNoFreeDraw >= 2) {
@@ -6435,6 +6435,10 @@ if (Date.now() - __scriptStartTime < 5000) {
     log("脚本在 5 秒内提前结束，请把上方所有日志发给开发者排查");
     toastMsg("脚本提前结束，请查看 Hamibot 日志");
 }
+
+
+
+
 
 
 
