@@ -1,6 +1,6 @@
 ﻿auto.waitFor();
 console.show();
-console.log("pdd v1.21 - robustBack单拍+activity检测边看边改 推荐tab强制+省钱月卡896,750+百亿banner640,1450");
+console.log("pdd v1.22 - robustBack单拍+activity检测边看边改 推荐tab强制+省钱月卡896,750+百亿banner640,1450");
 function tapShell(x,y){ try{ shell("input tap "+x+" "+y, true); }catch(e){} try{ click(x,y);}catch(e){} }
 function pressBack(){ try{ shell("input tap 71 177", true); }catch(e){} sleep(400); try{ shell("input keyevent 4", true); }catch(e){} sleep(200); try{ shell("input keyevent 4", true); }catch(e){} }
 function robustBack(){
@@ -378,7 +378,7 @@ function s8(){
     showConsoleSoon();
 }
 function main(){
-    console.log("=== main 开始 v1.21 ==="); sleep(800); try{ ensurePdd(); }catch(e){ console.log("ensurePdd err "+e); }
+    console.log("=== main 开始 v1.22 ==="); sleep(800); try{ ensurePdd(); }catch(e){ console.log("ensurePdd err "+e); }
     let inPdd=isInPdd(); console.log("ensure后 inPdd="+inPdd+" isHome="+isHome()+" isCommodity="+isCommodityPage());
     if(!inPdd){
         console.log("ensure后误判不在pdd，重试2次");
@@ -391,6 +391,7 @@ function main(){
     }
     goHome(); console.log("goHome后 isHome="+isHome());
     s1(); s2(); s3(); s4(); s5(); s6(); s7(); s8();
-    toast("v1.21 完成"); console.log("=== all done v1.21 ===");
+    toast("v1.22 完成"); console.log("=== all done v1.22 ===");
 }
 main();
+
