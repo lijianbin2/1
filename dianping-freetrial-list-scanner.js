@@ -1,6 +1,6 @@
 // ============================================================
 // 大众点评「免费试」列表扫描筛选（Hamibot 版）
-// 版本：v1.45.41-fix-ADB实测校准_分类点击与等待
+// 版本：v1.45.42-fix-点击失败不回退+防首页误退
 //
 // 运行环境：Hamibot 手机客户端
 // 目标 App：大众点评（com.dianping.v1）
@@ -88,7 +88,7 @@
 // ============================================================
 
 // 版本标记：手机端日志中会输出，用来确认运行的是新脚本
-var __SCRIPT_VERSION = "v1.45.41-fix-ADB实测校准_分类点击与等待";
+var __SCRIPT_VERSION = "v1.45.42-fix-点击失败不回退+防首页误退";
 
 var CONFIG = {
     PACKAGE: "com.dianping.v1",
@@ -4394,10 +4394,15 @@ function scanFreeTrialList() {
                     break;
                 }
 
-                // 返回列表，继续扫描
-                log("[边扫边报] 返回免费试列表");
-                try { returnToList(4); } catch (eRet) { logError("[边扫边报] 返回列表异常", eRet); }
-                sleepMs(1000);
+                // v1.45.42: 只有已离开列表才返回，避免点击未生效时回退到首页
+                if (!isListPage()) {
+                    log("[边扫边报] 返回免费试列表");
+                    try { returnToList(4); } catch (eRet) { logError("[边扫边报] 返回列表异常", eRet); }
+                    sleepMs(1000);
+                } else {
+                    log("[边扫边报] 仍在列表页，无需返回");
+                    sleepMs(300);
+                }
 
                 // v1.42.1：如果返回后不在大众点评前台（如被短信通知拉走），重新拉起
                 if (!isListPage()) {
@@ -6430,6 +6435,8 @@ if (Date.now() - __scriptStartTime < 5000) {
     log("脚本在 5 秒内提前结束，请把上方所有日志发给开发者排查");
     toastMsg("脚本提前结束，请查看 Hamibot 日志");
 }
+
+
 
 
 
