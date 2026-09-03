@@ -1,13 +1,19 @@
 ﻿auto.waitFor();
 console.show();
-console.log("pdd v1.19 - MCP边看边改 推荐tab强制+省钱月卡896,750+百亿banner640,1450");
+console.log("pdd v1.20 - robustBack单拍+activity检测边看边改 推荐tab强制+省钱月卡896,750+百亿banner640,1450");
 function tapShell(x,y){ try{ shell("input tap "+x+" "+y, true); }catch(e){} try{ click(x,y);}catch(e){} }
 function pressBack(){ try{ shell("input tap 71 177", true); }catch(e){} sleep(400); try{ shell("input keyevent 4", true); }catch(e){} sleep(200); try{ shell("input keyevent 4", true); }catch(e){} }
-function robustBack(){ try{ shell("input tap 71 177", true); }catch(e){} sleep(500); try{ shell("input tap 82 227", true); }catch(e){} sleep(300); try{ shell("input keyevent 4", true);}catch(e){} sleep(300); try{ shell("input keyevent 4", true);}catch(e){} }
+function robustBack(){
+    try{ shell("input tap 71 177", true); }catch(e){}
+    sleep(900);
+    try{ shell("input keyevent 4", true); }catch(e){}
+    sleep(700);
+}
+function pureShellBack(){ try{ shell("input keyevent 4", true); }catch(e){} sleep(900); }
 function hideConsoleSoon(){ try{ console.hide(); }catch(e){} sleep(800); }
 function showConsoleSoon(){ try{ console.show(); }catch(e){} sleep(300); }
 function swipeEdgeUp(t, interval) { t=t||5; interval=interval||2000; for(let n=0;n<t;n++){ swipe(1150,1400,1150,700,600); sleep(interval);} }
-function swipeToTop(){ for(let i=0;i<2;i++){ swipe(600,700,600,1400,600); sleep(900);} sleep(300); }
+function swipeToTop(){ try{ for(let i=0;i<2;i++){ swipe(600,700,600,1400,600); sleep(900);} sleep(300); }catch(e){ console.log("swipeToTop err "+e); try{ shell("input swipe 600 700 600 1400 600", true);}catch(e2){} sleep(800); } }
 function isInPdd(){ return currentPackage()==="com.xunmeng.pinduoduo"; }
 function isHome(){
     try{
@@ -123,7 +129,7 @@ function goHome(){
         if(isHome()){ console.log("已在首页"); try{ tapShell(30,380); sleep(900); }catch(e){} showConsoleSoon(); swipeToTop(); sleep(500); return true; } // v1.18
         if(isCommodityPage()){
             console.log("检测到商品页 优先back "+(i+1)+"/10");
-            robustBack(); sleep(1500);
+            robustBack(); sleep(1800);
             if(isHome()){ swipeToTop(); showConsoleSoon(); return true; }
             continue;
         }
@@ -134,7 +140,7 @@ function goHome(){
             if(isCommodityPage()){ console.log("点tab后进商品页 回退"); pressBack(); sleep(1300); continue; }
         }
         console.log("back "+(i+1)+"/10");
-        robustBack(); sleep(1300);
+        pureShellBack(); sleep(1300);
         if(isHome()){ swipeToTop(); showConsoleSoon(); return true; }
     }
     if(isHome()){ swipeToTop(); showConsoleSoon(); return true; }
@@ -159,7 +165,7 @@ function s1(){
         tapShell(pt[0],pt[1]);
         sleep(600);
         try{ shell("input tap "+pt[0]+" "+pt[1], true);}catch(e){}
-        sleep(1600);
+        sleep(1800);
         if(!isHome()){
             if(isCommodityPage()){
                 console.log("s1 误进商品页 回退继续 "+pt);
@@ -169,9 +175,16 @@ function s1(){
                 continue;
             }
             console.log("s1 直点 "+pt+" 已离开首页 成功");
-            sleep(1200);
-            robustBack(); sleep(2000);
-            if(!isHome()){ pressBack(); sleep(1500); if(!isHome()) goHome(); }
+            sleep(1500);
+            robustBack(); sleep(2500);
+            // v1.20: avoid over-back flip-flop, check via isHome safe + fallback to pureShellBack once
+            try{
+                if(!isHome()){
+                    console.log("s1后仍不在首页 补一次pureShellBack");
+                    pureShellBack(); sleep(1500);
+                    if(!isHome()) goHome();
+                }
+            }catch(e){ console.log("s1 check err "+e); pureShellBack(); sleep(1500); }
             swipeToTop(); sleep(500);
             console.log("s1直点成功结束 isHome="+isHome());
             showConsoleSoon();
@@ -361,11 +374,11 @@ function s8(){
     showConsoleSoon();
 }
 function main(){
-    console.log("=== main 开始 v1.19 ==="); sleep(800); try{ ensurePdd(); }catch(e){ console.log("ensurePdd err "+e); }
+    console.log("=== main 开始 v1.20 ==="); sleep(800); try{ ensurePdd(); }catch(e){ console.log("ensurePdd err "+e); }
     let inPdd=isInPdd(); console.log("ensure后 inPdd="+inPdd+" isHome="+isHome()+" isCommodity="+isCommodityPage());
     if(!inPdd){ console.log("不在pdd，终止"); toast("不在拼多多"); return; }
     goHome(); console.log("goHome后 isHome="+isHome());
     s1(); s2(); s3(); s4(); s5(); s6(); s7(); s8();
-    toast("v1.19 完成"); console.log("=== all done v1.19 ===");
+    toast("v1.20 完成"); console.log("=== all done v1.20 ===");
 }
 main();
