@@ -1,26 +1,35 @@
 ﻿auto.waitFor();
 console.show();
-console.log("pdd v1.18 - MCP边看边改 推荐tab强制+省钱月卡896,750+百亿banner640,1450");
+console.log("pdd v1.19 - MCP边看边改 推荐tab强制+省钱月卡896,750+百亿banner640,1450");
 function tapShell(x,y){ try{ shell("input tap "+x+" "+y, true); }catch(e){} try{ click(x,y);}catch(e){} }
-function pressBack(){ try{ shell("input keyevent 4", true); }catch(e){} }
+function pressBack(){ try{ shell("input tap 71 177", true); }catch(e){} sleep(400); try{ shell("input keyevent 4", true); }catch(e){} sleep(200); try{ shell("input keyevent 4", true); }catch(e){} }
+function robustBack(){ try{ shell("input tap 71 177", true); }catch(e){} sleep(500); try{ shell("input tap 82 227", true); }catch(e){} sleep(300); try{ shell("input keyevent 4", true);}catch(e){} sleep(300); try{ shell("input keyevent 4", true);}catch(e){} }
 function hideConsoleSoon(){ try{ console.hide(); }catch(e){} sleep(800); }
 function showConsoleSoon(){ try{ console.show(); }catch(e){} sleep(300); }
 function swipeEdgeUp(t, interval) { t=t||5; interval=interval||2000; for(let n=0;n<t;n++){ swipe(1150,1400,1150,700,600); sleep(interval);} }
 function swipeToTop(){ for(let i=0;i<2;i++){ swipe(600,700,600,1400,600); sleep(900);} sleep(300); }
 function isInPdd(){ return currentPackage()==="com.xunmeng.pinduoduo"; }
 function isHome(){
-    let hasHome = text("首页").exists()||desc("首页").exists();
-    let hasMe = text("个人中心").exists()||desc("个人中心").exists();
-    if(hasHome && hasMe && isInPdd()){
-        if(textContains("共200元券").exists()) return false;
-        return true;
-    }
-    return false;
+    try{
+        let hasHome=false,hasMe=false;
+        try{ hasHome=text("首页").exists()||desc("首页").exists(); }catch(e){ console.log("isHome hasHome err "+e); }
+        try{ hasMe=text("个人中心").exists()||desc("个人中心").exists(); }catch(e){ console.log("isHome hasMe err "+e); }
+        if(hasHome && hasMe && isInPdd()){
+            try{ if(textContains("共200元券").exists()) return false; }catch(e){}
+            return true;
+        }
+        return false;
+    }catch(e){ console.log("isHome outer err "+e); return false; }
 }
 function isCommodityPage(){
-    return text("加入购物车").exists() || textContains("立即购买").exists() || text("收藏").exists() || descContains("购物车").exists();
+    try{ if(text("加入购物车").exists()) return true; }catch(e){}
+    try{ if(textContains("立即购买").exists()) return true; }catch(e){}
+    try{ if(text("收藏").exists()) return true; }catch(e){}
+    try{ if(descContains("购物车").exists()) return true; }catch(e){}
+    return false;
 }
-function clickViaParent(selectorText){
+function clickViaParentSafe(selectorText){ try{ return clickViaParent(selectorText); }catch(e){ console.log("clickViaParentSafe err "+e); return false; } }
+function clickViaParent(selectorText){ try{
     let node=text(selectorText).findOne(800)||desc(selectorText).findOne(500)||textContains(selectorText).findOne(500)||descContains(selectorText).findOne(500);
     if(!node){ console.log("clickViaParent 未找到 "+selectorText); return false; }
     console.log("找到 "+selectorText+" text="+node.text()+" desc="+node.desc()+" bounds="+node.bounds()+" clickable="+node.clickable());
@@ -40,6 +49,7 @@ function clickViaParent(selectorText){
     try{ shell("input tap "+b.centerX()+" "+b.centerY(), true); }catch(e){ console.log("shell tap失败 "+e); }
     try{ let pb=cur.bounds(); shell("input tap "+pb.centerX()+" "+pb.centerY(), true);}catch(e){}
     return true;
+    }catch(e){ console.log("clickViaParent err "+e); return false; }
 }
 function clickRedBlockByConsumption(){
     let cands=textContains("消费券").find();
@@ -113,18 +123,18 @@ function goHome(){
         if(isHome()){ console.log("已在首页"); try{ tapShell(30,380); sleep(900); }catch(e){} showConsoleSoon(); swipeToTop(); sleep(500); return true; } // v1.18
         if(isCommodityPage()){
             console.log("检测到商品页 优先back "+(i+1)+"/10");
-            pressBack(); sleep(1500);
+            robustBack(); sleep(1500);
             if(isHome()){ swipeToTop(); showConsoleSoon(); return true; }
             continue;
         }
-        let tab=text("首页").findOne(500)||desc("首页").findOne(500);
+        let tab=null; try{ tab=text("首页").findOne(500)||desc("首页").findOne(500); }catch(e){ console.log("goHome tab err "+e); }
         if(tab){ console.log("点 首页tab "+tab.bounds()); try{tab.click();}catch(e){} 
             try{ let b=tab.bounds(); shell("input tap "+b.centerX()+" "+b.centerY(), true);}catch(e){}
             sleep(1800); if(isHome()){ swipeToTop(); showConsoleSoon(); return true; } 
             if(isCommodityPage()){ console.log("点tab后进商品页 回退"); pressBack(); sleep(1300); continue; }
         }
         console.log("back "+(i+1)+"/10");
-        pressBack(); sleep(1300);
+        robustBack(); sleep(1300);
         if(isHome()){ swipeToTop(); showConsoleSoon(); return true; }
     }
     if(isHome()){ swipeToTop(); showConsoleSoon(); return true; }
@@ -160,7 +170,7 @@ function s1(){
             }
             console.log("s1 直点 "+pt+" 已离开首页 成功");
             sleep(1200);
-            pressBack(); sleep(2000);
+            robustBack(); sleep(2000);
             if(!isHome()){ pressBack(); sleep(1500); if(!isHome()) goHome(); }
             swipeToTop(); sleep(500);
             console.log("s1直点成功结束 isHome="+isHome());
@@ -174,7 +184,7 @@ function s1(){
     }
     let ok=false;
     for(let k=0;k<4;k++){
-        let n=text("省钱月卡").findOne(700)||desc("省钱月卡").findOne(500);
+        let n=null; try{ n=text("省钱月卡").findOne(700)||desc("省钱月卡").findOne(500); }catch(e){ console.log("s1 find err "+e); }
         if(n){
             console.log("s1 精准找到省钱月卡 k="+k+" "+n.bounds()+" clickable="+n.clickable());
             let cur=n;
@@ -351,11 +361,11 @@ function s8(){
     showConsoleSoon();
 }
 function main(){
-    console.log("=== main 开始 v1.18 ==="); sleep(800); ensurePdd(); 
+    console.log("=== main 开始 v1.19 ==="); sleep(800); try{ ensurePdd(); }catch(e){ console.log("ensurePdd err "+e); }
     let inPdd=isInPdd(); console.log("ensure后 inPdd="+inPdd+" isHome="+isHome()+" isCommodity="+isCommodityPage());
     if(!inPdd){ console.log("不在pdd，终止"); toast("不在拼多多"); return; }
     goHome(); console.log("goHome后 isHome="+isHome());
     s1(); s2(); s3(); s4(); s5(); s6(); s7(); s8();
-    toast("v1.18 完成"); console.log("=== all done v1.18 ===");
+    toast("v1.19 完成"); console.log("=== all done v1.19 ===");
 }
 main();
