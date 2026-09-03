@@ -1,6 +1,6 @@
 ﻿auto.waitFor();
 console.show();
-console.log("pdd v1.15 - MCP边看边改 s1精准直点防误触+s6红块整体+goHome商品页增强");
+console.log("pdd v1.16 - MCP边看边改 推荐tab强制+省钱月卡896,750+百亿banner640,1450");
 function tapShell(x,y){ try{ shell("input tap "+x+" "+y, true); }catch(e){} try{ click(x,y);}catch(e){} }
 function hideConsoleSoon(){ try{ console.hide(); }catch(e){} sleep(800); }
 function showConsoleSoon(){ try{ console.show(); }catch(e){} sleep(300); }
@@ -96,7 +96,7 @@ function goHome(){
     try{ shell("svc power stayon true", true); shell("input keyevent 224", true); }catch(e){}
     hideConsoleSoon();
     for(let i=0;i<10;i++){
-        if(isHome()){ console.log("已在首页"); showConsoleSoon(); swipeToTop(); sleep(500); return true; }
+        if(isHome()){ console.log("已在首页"); try{ tapShell(30,380); sleep(900); }catch(e){} showConsoleSoon(); swipeToTop(); sleep(500); return true; } // v1.16
         if(isCommodityPage()){
             console.log("检测到商品页 优先back "+(i+1)+"/10");
             back(); sleep(1500);
@@ -119,7 +119,7 @@ function goHome(){
     try{ click(w*0.12,h*0.93); }catch(e){}
     try{ shell("input tap "+Math.round(w*0.12)+" "+Math.round(h*0.93), true);}catch(e){}
     sleep(1800);
-    if(!isHome()){ console.log("goHome后仍不在首页，再back"); back(); sleep(1300); }
+    try{ tapShell(128,2640); sleep(700); tapShell(30,380); sleep(1000);}catch(e){} if(!isHome()){ console.log("goHome后仍不在首页，再back"); back(); sleep(1300); }
     showConsoleSoon();
     return isHome();
 }
@@ -129,7 +129,7 @@ function s1(){
     if(!isHome()) goHome();
     hideConsoleSoon();
     swipeToTop(); sleep(600);
-    let ptsDirect=[[640,427],[896,784],[895,766],[640,520],[896,700],[1062,790]];
+    let ptsDirect=[[896,750],[896,784],[640,650],[895,766],[640,520],[1062,790]]; // v1.16
     for(let pt of ptsDirect){
         console.log("s1 直点 "+pt[0]+","+pt[1]);
         tapShell(pt[0],pt[1]);
@@ -209,6 +209,7 @@ function s2(){
     hideConsoleSoon();
     if(!isHome()) goHome();
     swipeToTop(); sleep(600);
+    try{ tapShell(640,1450); sleep(2500); if(!isHome() && !isCommodityPage()){ console.log("s2 banner直点成功"); showConsoleSoon(); return; } if(isCommodityPage()){ console.log("s2 banner误进商品回退"); back(); sleep(1500); if(!isHome()) goHome(); } else { if(!isHome()){ back(); sleep(1500); if(!isHome()) goHome(); swipeToTop(); sleep(600); } } }catch(e){}
     let ok=false;
     for(let k=0;k<6;k++){
         if(clickViaParent("百亿补贴")){ ok=true; console.log("百亿补贴点击 k="+k); sleep(3000); break; }
@@ -219,7 +220,7 @@ function s2(){
     }
     if(!ok){
         let w=device.width,h=device.height;
-        let x=Math.round(w*0.50),y=Math.round(h*0.35);
+        let x=640,y=1450; // v1.16
         console.log("百亿兜底 "+x+","+y); tapShell(x,y); sleep(3000);
     }
     showConsoleSoon();
@@ -328,11 +329,11 @@ function s8(){
     showConsoleSoon();
 }
 function main(){
-    console.log("=== main 开始 v1.15 ==="); sleep(800); ensurePdd(); 
+    console.log("=== main 开始 v1.16 ==="); sleep(800); ensurePdd(); 
     let inPdd=isInPdd(); console.log("ensure后 inPdd="+inPdd+" isHome="+isHome()+" isCommodity="+isCommodityPage());
     if(!inPdd){ console.log("不在pdd，终止"); toast("不在拼多多"); return; }
     goHome(); console.log("goHome后 isHome="+isHome());
     s1(); s2(); s3(); s4(); s5(); s6(); s7(); s8();
-    toast("v1.15 完成"); console.log("=== all done v1.15 ===");
+    toast("v1.16 完成"); console.log("=== all done v1.16 ===");
 }
 main();
