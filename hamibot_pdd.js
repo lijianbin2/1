@@ -1,6 +1,6 @@
 ﻿auto.waitFor();
 console.show();
-console.log("pdd v1.17 - MCP边看边改 推荐tab强制+省钱月卡896,750+百亿banner640,1450");
+console.log("pdd v1.18 - MCP边看边改 推荐tab强制+省钱月卡896,750+百亿banner640,1450");
 function tapShell(x,y){ try{ shell("input tap "+x+" "+y, true); }catch(e){} try{ click(x,y);}catch(e){} }
 function pressBack(){ try{ shell("input keyevent 4", true); }catch(e){} }
 function hideConsoleSoon(){ try{ console.hide(); }catch(e){} sleep(800); }
@@ -86,7 +86,20 @@ function ensurePdd(){
         if(pkg!=="com.xunmeng.pinduoduo"){
             console.log("再次尝试 monkey");
             try{ shell("monkey -p com.xunmeng.pinduoduo -c android.intent.category.LAUNCHER 1", true);}catch(e){}
+            sleep(4000);
+            pkg=currentPackage();
+            console.log("monkey后包: "+pkg);
+        }
+        if(pkg!=="com.xunmeng.pinduoduo"){
+            console.log("再次尝试 launch");
+            try{ launch("com.xunmeng.pinduoduo"); }catch(e){}
             sleep(3500);
+        }
+        for(let k=0;k<6;k++){
+            pkg=currentPackage();
+            console.log("轮询 "+k+" 包:"+pkg+" inPdd="+isInPdd());
+            if(pkg==="com.xunmeng.pinduoduo") break;
+            sleep(1500);
         }
     }
     try{ shell("svc power stayon true", true); shell("input keyevent 224", true); }catch(e){}
@@ -97,7 +110,7 @@ function goHome(){
     try{ shell("svc power stayon true", true); shell("input keyevent 224", true); }catch(e){}
     hideConsoleSoon();
     for(let i=0;i<10;i++){
-        if(isHome()){ console.log("已在首页"); try{ tapShell(30,380); sleep(900); }catch(e){} showConsoleSoon(); swipeToTop(); sleep(500); return true; } // v1.17
+        if(isHome()){ console.log("已在首页"); try{ tapShell(30,380); sleep(900); }catch(e){} showConsoleSoon(); swipeToTop(); sleep(500); return true; } // v1.18
         if(isCommodityPage()){
             console.log("检测到商品页 优先back "+(i+1)+"/10");
             pressBack(); sleep(1500);
@@ -130,7 +143,7 @@ function s1(){
     if(!isHome()) goHome();
     hideConsoleSoon();
     swipeToTop(); sleep(600);
-    let ptsDirect=[[896,750],[896,784],[640,650],[895,766],[640,520],[1062,790]]; // v1.17
+    let ptsDirect=[[896,750],[896,784],[640,650],[895,766],[640,520],[1062,790]]; // v1.18
     for(let pt of ptsDirect){
         console.log("s1 直点 "+pt[0]+","+pt[1]);
         tapShell(pt[0],pt[1]);
@@ -221,7 +234,7 @@ function s2(){
     }
     if(!ok){
         let w=device.width,h=device.height;
-        let x=640,y=1450; // v1.17
+        let x=640,y=1450; // v1.18
         console.log("百亿兜底 "+x+","+y); tapShell(x,y); sleep(3000);
     }
     showConsoleSoon();
@@ -338,11 +351,11 @@ function s8(){
     showConsoleSoon();
 }
 function main(){
-    console.log("=== main 开始 v1.17 ==="); sleep(800); ensurePdd(); 
+    console.log("=== main 开始 v1.18 ==="); sleep(800); ensurePdd(); 
     let inPdd=isInPdd(); console.log("ensure后 inPdd="+inPdd+" isHome="+isHome()+" isCommodity="+isCommodityPage());
     if(!inPdd){ console.log("不在pdd，终止"); toast("不在拼多多"); return; }
     goHome(); console.log("goHome后 isHome="+isHome());
     s1(); s2(); s3(); s4(); s5(); s6(); s7(); s8();
-    toast("v1.17 完成"); console.log("=== all done v1.17 ===");
+    toast("v1.18 完成"); console.log("=== all done v1.18 ===");
 }
 main();
