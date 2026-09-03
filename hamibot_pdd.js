@@ -1,6 +1,6 @@
 ﻿auto.waitFor();
 console.show();
-console.log("pdd v1.23 - robustBack单拍+activity检测边看边改 推荐tab强制+省钱月卡896,750+百亿banner640,1450");
+console.log("pdd v1.24 - robustBack单拍+activity检测边看边改 推荐tab强制+省钱月卡896,750+百亿banner640,1450");
 function tapShell(x,y){ try{ shell("input tap "+x+" "+y, true); }catch(e){} try{ click(x,y);}catch(e){} }
 function pressBack(){ try{ shell("input tap 71 177", true); }catch(e){} sleep(400); try{ shell("input keyevent 4", true); }catch(e){} sleep(200); try{ shell("input keyevent 4", true); }catch(e){} }
 function robustBack(){
@@ -16,7 +16,7 @@ function swipeEdgeUp(t, interval) { t=t||5; interval=interval||2000; for(let n=0
 function swipeToTop(){ try{ for(let i=0;i<2;i++){ swipe(600,700,600,1400,600); sleep(900);} sleep(300); }catch(e){ console.log("swipeToTop err "+e); try{ shell("input swipe 600 700 600 1400 600", true);}catch(e2){} sleep(800); } }
 function isInPdd(){
     try{ if(currentPackage()==="com.xunmeng.pinduoduo") return true; }catch(e){ console.log("isInPdd currentPackage err "+e); }
-    try{ let out=shell("dumpsys window | grep mCurrentFocus", true); if(out && out.indexOf("com.xunmeng.pinduoduo")>=0) return true; }catch(e){ console.log("isInPdd shell err "+e); }
+    try{ let out=shell("dumpsys window | grep mCurrentFocus"); if(out && out.indexOf("com.xunmeng.pinduoduo")>=0) return true; }catch(e){ console.log("isInPdd shell err "+e); }
     return false;
 }
 function isHome(){
@@ -26,16 +26,16 @@ function isHome(){
         try{ hasHome=text("首页").exists()||desc("首页").exists(); }catch(e){ console.log("isHome hasHome err "+e); accErr=true; }
         try{ hasMe=text("个人中心").exists()||desc("个人中心").exists(); }catch(e){ console.log("isHome hasMe err "+e); accErr=true; }
         if(accErr){
-            try{ let out=shell("dumpsys window | grep mCurrentFocus", true); if(out && out.indexOf("MainFrameActivity")>=0 && isInPdd()){ console.log("isHome shell fallback true "+out.trim()); return true; } }catch(e){ console.log("isHome fallback err "+e); }
+            try{ let out=shell("dumpsys window | grep mCurrentFocus"); if(out && out.indexOf("MainFrameActivity")>=0 && isInPdd()){ console.log("isHome shell fallback true "+out.trim()); return true; } }catch(e){ console.log("isHome fallback err "+e); }
             return false;
         }
         if(hasHome && hasMe && isInPdd()){
             try{ if(textContains("共200元券").exists()) return false; }catch(e){ accErr=true; }
-            if(accErr){ try{ let out=shell("dumpsys window | grep mCurrentFocus", true); if(out && out.indexOf("MainFrameActivity")>=0 && isInPdd()) return true; }catch(e2){} }
+            if(accErr){ try{ let out=shell("dumpsys window | grep mCurrentFocus"); if(out && out.indexOf("MainFrameActivity")>=0 && isInPdd()) return true; }catch(e2){} }
             return true;
         }
         return false;
-    }catch(e){ console.log("isHome outer err "+e); try{ let out=shell("dumpsys window | grep mCurrentFocus", true); if(out && out.indexOf("MainFrameActivity")>=0 && isInPdd()) return true; }catch(e2){} return false; }
+    }catch(e){ console.log("isHome outer err "+e); try{ let out=shell("dumpsys window | grep mCurrentFocus"); if(out && out.indexOf("MainFrameActivity")>=0 && isInPdd()) return true; }catch(e2){} return false; }
 }
 function isCommodityPage(){
     try{ if(text("加入购物车").exists()) return true; }catch(e){}
@@ -397,7 +397,7 @@ function main(){
     }
     goHome(); console.log("goHome后 isHome="+isHome());
     s1(); s2(); s3(); s4(); s5(); s6(); s7(); s8();
-    toast("v1.23 完成"); console.log("=== all done v1.23 ===");
+    toast("v1.24 完成"); console.log("=== all done v1.24 ===");
 }
 main();
 
