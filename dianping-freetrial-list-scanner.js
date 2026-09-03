@@ -1,6 +1,6 @@
-// ============================================================
+﻿// ============================================================
 // 大众点评「免费试」列表扫描筛选（Hamibot 版）
-// 版本：v1.45.43-fix-距离联合去重+底部阈值30+美食放行优化
+// 版本：v1.45.44-fix-距离去重真正生效
 //
 // 运行环境：Hamibot 手机客户端
 // 目标 App：大众点评（com.dianping.v1）
@@ -88,7 +88,7 @@
 // ============================================================
 
 // 版本标记：手机端日志中会输出，用来确认运行的是新脚本
-var __SCRIPT_VERSION = "v1.45.43-fix-距离联合去重+底部阈值30+美食放行优化";
+var __SCRIPT_VERSION = "v1.45.44-fix-距离去重真正生效";
 
 var CONFIG = {
     PACKAGE: "com.dianping.v1",
@@ -4610,10 +4610,13 @@ function scanFreeTrialList() {
 // ---------- v1.7：逐个处理符合条件活动 ----------
 
 // 与扫描阶段一致的活动唯一键：名称 + 价值 + 商户/区域
-function buildActivityKey(name, value, merchant, area, positionKey) {
+function buildActivityKey(name, value, merchant, area, positionKey, distance) {
     var base = (name || "未知活动") + "|" +
         (value === null ? "?" : value) + "|" +
         (merchant || area || "未知");
+    if (distance) {
+        base += "|" + String(distance).replace(/\|/g, '');
+    }
 
     // 解析失败时不能让同屏多张卡片都使用同一个
     // “未知活动|?|未知”键，否则后一张（可能正是100元卡）会被去重掉。
@@ -5467,7 +5470,7 @@ function normalizeNameForMatch(name) {
 
 function activityMatchesCard(target, parsed) {
     var targetKey = target && target.key ? target.key : String(target || "");
-    var cardKey = buildActivityKey(parsed.name, parsed.value, parsed.merchant, parsed.area);
+    var cardKey = buildActivityKey(parsed.name, parsed.value, parsed.merchant, parsed.area, null, parsed.distance);
 
     if (cardKey === targetKey) {
         return true;
