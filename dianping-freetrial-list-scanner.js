@@ -82,13 +82,13 @@
 //      attemptSignup 中点击确认弹窗后改为轮询等待（每500ms，最多5秒），
 //      持续检测「完成」按钮和报名成功标识；returnToList 在按返回键前
 //      优先检测并点击「完成」按钮，避免卡在成功页无法返回列表。
-//  28. v1.42.11：识别「你暂未满足报名要求」等级资格弹窗。
-//      v1.45.50 起改为单店跳过（此前一家 Lv6-Lv8+橙V 会断掉后面所有商户）；
-//      关闭弹窗后继续处理后面的活动。
+//  28. v1.42.11：识别「你暂未满足报名要求」等级资格弹窗。该弹窗说明
+//      当前账号无法报名当前批次后续商户；检测到后记录明确结果并立即安全停止，
+//      不点击「我知道了」、不返回列表、也不继续处理后面的活动。
 // ============================================================
 
 // 版本标记：手机端日志中会输出，用来确认运行的是新脚本
-var __SCRIPT_VERSION = "v1.45.50-50元+20km+等级跳过+新鲜节点+轮数120";
+var __SCRIPT_VERSION = "v1.45.51-50元+20km+等级停止+新鲜节点+轮数120";
 
 var CONFIG = {
     PACKAGE: "com.dianping.v1",
@@ -1598,7 +1598,10 @@ function goBack() {
 }
 
 function returnToList(maxBacks) {
-    // v1.45.50：等级不足已改为单店跳过，此处不再全局拦截。
+    if (gStopAfterLevelRequirement) {
+        log("[返回] 已触发等级资格不足安全停止，保留当前提示页，不返回列表");
+        return false;
+    }
     var maxAttempts = maxBacks || 4;
     for (var i = 0; i < maxAttempts; i++) {
         if (isListPage()) {
@@ -4440,6 +4443,12 @@ function scanFreeTrialList() {
                 logAutoSignupResult(it, inlineStatus, results.length - 1, qualifiedList.length);
                                 // 等级资格弹窗表示当前账号无法报名后续同批次活动；停在详情页结束，
                 // 避免关闭弹窗后继续点下一家。
+                if (gStopAfterLevelRequirement) {
+                    endReason = gStopAfterLevelRequirementReason || "等级资格不足，停止后续报名";
+                    inlineProcessedThisScreen = true;
+                    log("[边扫边报] " + endReason);
+                    break;
+                }
 
                 // v1.45.42: 只有已离开列表才返回，避免点击未生效时回退到首页
                 if (!isListPage()) {
@@ -4496,6 +4505,10 @@ function scanFreeTrialList() {
             }
         }
 
+        if (gStopAfterLevelRequirement) {
+            endReason = gStopAfterLevelRequirementReason || "等级资格不足，停止后续报名";
+            break;
+        }
 
         // 同屏重扫是为了继续处理剩余卡片；此时不能让同屏已报名卡片
         // 提前触发列表尾部判断，否则它下面的活动会被漏掉。
@@ -4614,6 +4627,10 @@ function scanFreeTrialList() {
     log("[筛选] 扫描完成");
     log("[筛选] 共扫描到 " + totalNew + " 个不同活动");
     log("[筛选] 符合条件活动：" + qualifiedList.length + " 个");
+    if (gStopAfterLevelRequirement) {
+        log("[安全停止] 检测到等级资格不足，已停止后续商户报名");
+        toastMsg("等级不足，脚本已停止");
+    }
 
     if (qualifiedList.length === 0) {
         log("[边扫边报] 没有需要报名的活动");
@@ -6085,12 +6102,15 @@ function hasLevelRequirementPrompt() {
 }
 
 function requestLevelRequirementStop() {
-    // v1.45.50：等级不足改为单店跳过，不再整场停止。
-    // 此前一家 Lv6-Lv8+橙V（如俄士厨房343）会断掉后面所有商户。
-    log("[等级门槛] 检测到「你暂未满足报名要求」弹窗，本店跳过、继续后排");
-    try { toastMsg("等级不足，本店跳过"); } catch(eT2){}
-    try { back(); sleepMs(500); } catch(eBkLv){}
-    return "等级不足，跳过此活动";
+    if (!gStopAfterLevelRequirement) {
+        gStopAfterLevelRequirement = true;
+        gStopAfterLevelRequirementReason = "等级资格不足，停止后续报名";
+        log("[安全停止] 检测到「你暂未满足报名要求」弹窗");
+        log("[安全停止] 当前账号等级不满足该批次报名条件，立即停止脚本（用户要求等级不足即停止）");
+        try { setScriptState("SAFE_STOP"); } catch(eSt){}
+        try { toastMsg("等级不足，脚本已停止"); } catch(eT2){}
+    }
+    return "等级不足，停止脚本";
 }
 
 function hasSignupConfirmationPrompt() {
