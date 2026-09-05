@@ -1,6 +1,6 @@
 ﻿// ============================================================
 // 大众点评「免费试」列表扫描筛选（Hamibot 版）
-// 版本：v1.45.47-50元+20km+防漏4屏
+// 版本：v1.45.48-50元+20km+防漏4屏+失败沉降
 //
 // 运行环境：Hamibot 手机客户端
 // 目标 App：大众点评（com.dianping.v1）
@@ -88,7 +88,7 @@
 // ============================================================
 
 // 版本标记：手机端日志中会输出，用来确认运行的是新脚本
-var __SCRIPT_VERSION = "v1.45.47-50元+20km+防漏4屏";
+var __SCRIPT_VERSION = "v1.45.48-50元+20km+防漏4屏+失败沉降";
 
 var CONFIG = {
     PACKAGE: "com.dianping.v1",
@@ -4168,6 +4168,25 @@ function verifyAndRecoverListPage() {
     log("[安全停止] 无法恢复到免费试列表，停止列表操作");
     return false;
 }
+// v1.45.48：点击失败后列表可能处于瞬态（点击曾导致页面内容变化、免费抽短暂消失），
+// 此时立即重扫会抓到垃圾节点（如名字里混入“活动流程|活动内容”的错解析卡片），
+// 甚至把垃圾节点误判成“已报名”而提前收工。失败后先等列表沉降：轮询等免费抽按钮
+// 重新出现，最多等 8 秒，超时也不阻塞（后续还有误判兜底）。
+function waitForListSettleAfterFail() {
+    try {
+        for (var wi = 0; wi < 16; wi++) {
+            var btnCount = 0;
+            try { btnCount = getFreeDrawSnapshot().length; } catch (eSnap) { btnCount = 0; }
+            if (btnCount > 0) {
+                if (wi > 0) { log("[边扫边报] 列表已沉降，免费抽按钮重新出现（" + btnCount + "个）"); }
+                return true;
+            }
+            sleepMs(500);
+        }
+        log("[边扫边报] 沉降等待超时（8秒仍无免费抽按钮），继续重扫");
+    } catch (eSettle) {}
+    return false;
+}
 function scanFreeTrialList() {
     if (!enterScanningState()) {
         return {
@@ -4438,7 +4457,14 @@ function scanFreeTrialList() {
                     sleepMs(1000);
                 } else {
                     log("[边扫边报] 仍在列表页，无需返回");
-                    sleepMs(300);
+                    // v1.45.48：点击失败后列表可能处于瞬态，短睡300ms不够，
+                    // 重扫会抓到垃圾节点。失败后先等列表沉降再重扫。
+                    if (!(clickOkResult && clickOkResult.ok)) {
+                        sleepMs(800);
+                        waitForListSettleAfterFail();
+                    } else {
+                        sleepMs(300);
+                    }
                 }
 
                 // v1.42.1：如果返回后不在大众点评前台（如被短信通知拉走），重新拉起
@@ -4491,6 +4517,16 @@ function scanFreeTrialList() {
 
         // 已报名活动可能已经没有「免费抽」按钮。它只保留在全量诊断
         // 结果中，绝不补入自动报名队列。
+        // v1.45.48：点击失败后的瞬态屏可能抓到垃圾节点并误判成“已报名”
+        // （如名字混入“活动流程|活动内容”的错解析卡片），此时绝不能收工：
+        // 消耗一次宽限并重扫当前屏，避免漏掉下面的合格活动。
+        if (result.registeredFound && postFailGrace > 0 && result.freeDrawCount <= 0) {
+            var __susName = (result.registeredActivity && result.registeredActivity.name) || "未知";
+            postFailGrace--;
+            rescanCurrentScreen = true;
+            log("[边扫边报] 失败后宽限期内0按钮疑似已报名（" + __susName + "），疑为瞬态误判，继续重扫当前屏");
+            continue;
+        }
         if (result.registeredFound) {
             for (var rsi = 0; rsi < result.registeredActivities.length; rsi++) {
                 var registered = result.registeredActivities[rsi];
