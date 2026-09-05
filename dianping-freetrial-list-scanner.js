@@ -1,6 +1,6 @@
 ﻿// ============================================================
 // 大众点评「免费试」列表扫描筛选（Hamibot 版）
-// 版本：v1.45.49-50元+20km+防漏4屏+失败沉降+轮数120
+// 版本：v1.45.53-50元+20km+防漏4屏+失败沉降+轮数120
 //
 // 运行环境：Hamibot 手机客户端
 // 目标 App：大众点评（com.dianping.v1）
@@ -88,7 +88,7 @@
 // ============================================================
 
 // 版本标记：手机端日志中会输出，用来确认运行的是新脚本
-var __SCRIPT_VERSION = "v1.45.52-50元+20km+等级停止+橙V弹窗为准+轮数120";
+var __SCRIPT_VERSION = "v1.45.53-50元+20km+无按钮雷达+回顶不丢位";
 
 var CONFIG = {
     PACKAGE: "com.dianping.v1",
@@ -3671,6 +3671,40 @@ function classifyActivity(activity) {
     return activity;
 }
 
+// v1.45.53 radar
+function logNoButtonHighValueCards(snapshot) {
+    try {
+        var infos = getVisibleTextInfos();
+        var btnYs = [];
+        var si = 0;
+        for (si = 0; si < snapshot.length; si++) {
+            try { btnYs.push((snapshot[si].top + snapshot[si].bottom) / 2); } catch (e1) {}
+        }
+        var i = 0;
+        for (i = 0; i < infos.length; i++) {
+            var t = String(infos[i].text || "");
+            if (t.indexOf("价值") < 0) { continue; }
+            var cy = infos[i].cy;
+            var hasBtn = false;
+            var k = 0;
+            for (k = 0; k < btnYs.length; k++) {
+                var d = btnYs[k] - cy;
+                if (d < 0) { d = -d; }
+                if (d < 120) { hasBtn = true; break; }
+            }
+            if (hasBtn) { continue; }
+            var near = [];
+            var j = 0;
+            for (j = 0; j < infos.length; j++) {
+                var dd = infos[j].cy - cy;
+                if (dd < 0) { dd = -dd; }
+                if (dd < 250) { near.push(String(infos[j].text || "")); }
+            }
+            log("[radar] nobtn | " + t + " | " + near.join("/").slice(0, 160));
+        }
+    } catch (e2) { log("[radar] err " + e2); }
+}
+
 function scanCurrentScreen(seenKeys) {
     var snapshot = [];
 
@@ -3712,6 +3746,7 @@ function scanCurrentScreen(seenKeys) {
 
     log("[列表] 当前屏可见文本数：" + getVisibleTextInfos().length);
     log("[列表] 本屏发现「免费抽」按钮：" + snapshot.length);
+    try { logNoButtonHighValueCards(snapshot); } catch (eRadar) {}
 
     var newItems = [];
     var visibleItems = [];
@@ -4252,9 +4287,9 @@ function scanFreeTrialList() {
                     rebuiltSeen.push(pk);
                 }
             }
-            seenKeys.length = 0;
+            // v1.45.53 keep seenKeys union no pos loss
             for (var rs = 0; rs < rebuiltSeen.length; rs++) {
-                seenKeys.push(rebuiltSeen[rs]);
+                if (seenKeys.indexOf(rebuiltSeen[rs]) < 0) { seenKeys.push(rebuiltSeen[rs]); }
             }
             log("[边扫边报] seenKeys 已重建，保留 " + seenKeys.length + " 条已处理记录");
         }
@@ -5054,7 +5089,7 @@ function diffPageSignature(before, after) {
 }
 
 function normalizePlainText(s) {
-    return String(s || "").replace(/[\s\uFFFC]/g, "");
+    return String(s || "").replace(/[\s\u00A0\uFFFC\u2000-\u200F\u202F\u2060]/g, "");
 }
 
 function signatureContains(sig, keyword) {
@@ -5182,7 +5217,7 @@ function dumpPostClickState(before, after, diff, activity) {
     }
 
     if (activity.name) {
-        var fp = String(activity.name).split(/[|｜·•]/)[0].replace(/[\s\uFFFC]/g, "");
+        var fp = String(activity.name).split(/[|｜·•]/)[0].replace(/[\s\u00A0\uFFFC\u2000-\u200F\u202F\u2060]/g, "");
 
         if (fp.length >= 3 && probes.indexOf(fp) < 0) {
             probes.push(fp);
@@ -5950,7 +5985,7 @@ function detailMatchesTarget(activity) {
     }
 
     if (activity.name) {
-        var fp = String(activity.name).split(/[|｜·•]/)[0].replace(/[\s\uFFFC]/g, "");
+        var fp = String(activity.name).split(/[|｜·•]/)[0].replace(/[\s\u00A0\uFFFC\u2000-\u200F\u202F\u2060]/g, "");
 
         if (fp.length >= 3 && probes.indexOf(fp) < 0) {
             probes.push(fp);
