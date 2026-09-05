@@ -1,6 +1,6 @@
 ﻿// ============================================================
 // 大众点评「免费试」列表扫描筛选（Hamibot 版）
-// 版本：v1.45.48-50元+20km+防漏4屏+失败沉降
+// 版本：v1.45.49-50元+20km+防漏4屏+失败沉降+轮数120
 //
 // 运行环境：Hamibot 手机客户端
 // 目标 App：大众点评（com.dianping.v1）
@@ -88,7 +88,7 @@
 // ============================================================
 
 // 版本标记：手机端日志中会输出，用来确认运行的是新脚本
-var __SCRIPT_VERSION = "v1.45.48-50元+20km+防漏4屏+失败沉降";
+var __SCRIPT_VERSION = "v1.45.49-50元+20km+防漏4屏+失败沉降+轮数120";
 
 var CONFIG = {
     PACKAGE: "com.dianping.v1",
@@ -191,7 +191,7 @@ var CONFIG = {
     SKIP_REGISTERED: true,
 
     // 列表扫描上限与区域识别参数
-    MAX_SCAN_SCROLLS: 40,
+    MAX_SCAN_SCROLLS: 120,
     MAX_CONSECUTIVE_EMPTY_SCROLLS: 8,
     // v1.9.0：扫描到底综合检测与硬安全阀
     MAX_NO_NEW_ROUNDS: 6,
@@ -4615,7 +4615,7 @@ function scanFreeTrialList() {
     // 如果误点进入详情页（如橙V专享价等），立即返回避免在错误页面翻页
     // （此检查在 scrollListOnce 之后、下一轮 snapshot 之前执行）
 
-    markScanFinished(endReason || "列表已扫描到底");
+    markScanFinished(endReason || ("达到最大扫描轮数 " + CONFIG.MAX_SCAN_SCROLLS + "（预算耗尽，可能仍有未处理）"));
 
     log("[扫描] ========================================");
     log("[扫描] 扫描阶段完成");
