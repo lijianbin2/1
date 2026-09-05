@@ -1,6 +1,6 @@
 ﻿// ============================================================
 // 大众点评「免费试」列表扫描筛选（Hamibot 版）
-// 版本：v1.45.44-fix-距离去重真正生效
+// 版本：v1.45.47-50元+20km+防漏4屏
 //
 // 运行环境：Hamibot 手机客户端
 // 目标 App：大众点评（com.dianping.v1）
@@ -88,13 +88,17 @@
 // ============================================================
 
 // 版本标记：手机端日志中会输出，用来确认运行的是新脚本
-var __SCRIPT_VERSION = "v1.45.44-fix-距离去重真正生效";
+var __SCRIPT_VERSION = "v1.45.47-50元+20km+防漏4屏";
 
 var CONFIG = {
     PACKAGE: "com.dianping.v1",
 
     // 最低活动价值
-    MIN_VALUE: 100,
+    MIN_VALUE: 50,
+
+    // 最大报名距离（km）：超过该距离的活动只记录、不报名
+    // v1.45.45新增：距离未知时不过滤，避免误杀<1km显示为m的卡片解析失败情况
+    MAX_DISTANCE_KM: 20,
 
     // 地区固定使用「全部地区」，不限制行政区；
     // 地区字段仍然解析并展示，但不参与筛选
@@ -3107,15 +3111,41 @@ function lookupDistrictByLandmark(str) {
     return null;
 }
 
-// 按文本内容识别距离（如 19.7km、距离5.8km），只作展示，不参与筛选
+// 按文本内容识别距离（如 19.7km、距离5.8km、850m），v1.45.45起参与筛选
 function extractDistanceFromText(str) {
     if (!str) {
         return null;
     }
 
     var m = str.match(/(\d+(?:\.\d+)?)\s*km/i);
+    if (m) {
+        return m[1] + "km";
+    }
+    // 兼容1km内显示为“xxm”的卡片，如“850m / 距离850m”
+    var m2 = str.match(/(\d+(?:\.\d+)?)\s*m/i);
+    if (m2) {
+        return m2[1] + "m";
+    }
 
-    return m ? m[1] + "km" : null;
+    return null;
+}
+
+// v1.45.45新增：把距离字符串换算成km数字，便于和MAX_DISTANCE_KM比较
+// 支持 "19.7km" / "850m" / "距离5.8km"，解析失败返回null（未知不过滤）
+function parseDistanceKm(distanceStr) {
+    if (!distanceStr) {
+        return null;
+    }
+    var t = String(distanceStr).replace(/\s/g, "");
+    var mk = t.match(/(\d+(?:\.\d+)?)km/i);
+    if (mk) {
+        return parseFloat(mk[1]);
+    }
+    var mm = t.match(/(\d+(?:\.\d+)?)m/i);
+    if (mm) {
+        return parseFloat(mm[1]) / 1000;
+    }
+    return null;
 }
 
 // 判断文本是否就是行政区域标签本身（如「越秀」「天河区」），
@@ -3626,6 +3656,12 @@ function classifyActivity(activity) {
         activity.qualified = reasons.length === 0;
         activity.reason = activity.qualified ? "已报名" : reasons.join("，");
         return activity;
+    }
+
+    // v1.45.45新增：距离超过MAX_DISTANCE_KM只记录、不报名（已报名不受影响，距离未知不过滤）
+    var __distKm = parseDistanceKm(activity.distance);
+    if (__distKm !== null && __distKm > CONFIG.MAX_DISTANCE_KM) {
+        reasons.push("距离" + activity.distance + "超过" + CONFIG.MAX_DISTANCE_KM + "km");
     }
 
     // 地区固定为「全部地区」，区域字段只展示，不参与筛选
@@ -4147,6 +4183,7 @@ function scanFreeTrialList() {
     log("[筛选] 地区：全部地区");
     log("[筛选] 类目：美食");
     log("[筛选] 最低价值：" + CONFIG.MIN_VALUE + "元");
+    log("[筛选] 最大距离：" + CONFIG.MAX_DISTANCE_KM + "km（超过只记录、不报名）");
     log("[处理] 模式：边扫描边报名，每个活动只进入一次");
     toastMsg("正在扫描免费试列表");
 
@@ -4168,7 +4205,7 @@ function scanFreeTrialList() {
     var qualifiedList = [];
     var totalNew = 0;
     var consecutiveEmpty = 0;
-    var consecutiveNoFreeDraw = 0;
+    var consecutiveNoFreeDraw = 0; var postFailGrace = 0;
     var endReason = "";
     // v1.42.0：边扫边报——立即处理，不再等全部扫描完
     var processedKeys = {};
@@ -4266,15 +4303,15 @@ function scanFreeTrialList() {
                 // v1.45.6: 修复过早判定已报名区域——加载中/返回列表瞬间可能出现 0 按钮，需同时满足可见文本充足且已扫一定数量才计数
         var visibleCountForGate = 0;
         try { visibleCountForGate = getVisibleTextInfos().length; } catch(eVG) {}
-        if (result.freeDrawCount <= 0 && totalNew > 0 && totalNew >= 3 && visibleCountForGate >= 30) {
+        if (result.freeDrawCount <= 0 && totalNew > 0 && totalNew >= 3 && visibleCountForGate >= 30) { if (postFailGrace > 0) { postFailGrace--; consecutiveNoFreeDraw = 0; } else {
             consecutiveNoFreeDraw++;
             log("[列表] 当前屏「免费抽」按钮数：0（连续第 " + consecutiveNoFreeDraw + " 屏，visible=" + visibleCountForGate + " totalNew=" + totalNew + "）");
-            if (consecutiveNoFreeDraw >= 2) {
-                endReason = "连续2屏无免费抽按钮，判定已进入已报名区域";
+            if (consecutiveNoFreeDraw >= 4) {
+                endReason = "连续4屏无免费抽按钮，判定已进入已报名区域";
                 log("[扫描] " + endReason + "，提前停止扫描");
                 break;
             }
-        } else if (result.freeDrawCount <= 0 && totalNew > 0) {
+        } } else if (result.freeDrawCount <= 0 && totalNew > 0) {
             log("[列表] 当前屏「免费抽」按钮数：0（visible=" + visibleCountForGate + " totalNew=" + totalNew + " 未达阈值，暂不计入连续计数）");
         } else {
             consecutiveNoFreeDraw = 0;
@@ -4370,7 +4407,7 @@ function scanFreeTrialList() {
                     processedKeys[it.key] = true;
                     processedKeys[processKey] = true;
                 } else {
-                    failedProcessAttempts[processKey] = failedAttempts + 1;
+                    failedProcessAttempts[processKey] = failedAttempts + 1; postFailGrace = 2;
                     if (failedProcessAttempts[processKey] < MAX_FAILED_PROCESS_ATTEMPTS) {
                         log("[边扫边报] 点击失败，第" + failedProcessAttempts[processKey] +
                             "次失败，当前屏重扫后重试");
@@ -6249,6 +6286,7 @@ function main() {
     log("脚本：大众点评免费试-扫描自动报名");
     log("版本：" + __SCRIPT_VERSION);
     log("最低价值：" + CONFIG.MIN_VALUE + " 元");
+    log("最大距离：" + CONFIG.MAX_DISTANCE_KM + "km（超过只记录、不报名）");
     log("地区：全部地区（区域仅展示，不参与筛选）");
     log(__SCRIPT_VERSION + "：手动入口模式，边扫描边处理符合条件活动并汇总");
     log("========================================");
