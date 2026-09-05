@@ -88,7 +88,7 @@
 // ============================================================
 
 // 版本标记：手机端日志中会输出，用来确认运行的是新脚本
-var __SCRIPT_VERSION = "v1.45.51-50元+20km+等级停止+新鲜节点+轮数120";
+var __SCRIPT_VERSION = "v1.45.52-50元+20km+等级停止+橙V弹窗为准+轮数120";
 
 var CONFIG = {
     PACKAGE: "com.dianping.v1",
@@ -5198,9 +5198,11 @@ function dumpPostClickState(before, after, diff, activity) {
         }
     }
 
+    // v1.45.52：橙V/零售价只记嫌疑，不再硬拒绝；用户规则：以进去报名后是否弹等级不足为准。
+    var suspectedWrongPage = false;
     if (matched) {
         // v1.28.0: 橙V专享/零售价特征检测——页面进入错误页面（橙V专享推荐区）时
-        // 商户名会出现在推荐区域，必须拒绝匹配
+        // 商户名会出现在推荐区域，v1.45.52起只记嫌疑，转严格校验
         var wrongPageHits = 0;
         // v1.31.0: only detect 橙V专享价 tab page, not 橙V专享 badge on detail page
         if (anyTextContains("橙V专享价")) wrongPageHits++;
@@ -5208,17 +5210,20 @@ function dumpPostClickState(before, after, diff, activity) {
         if (anyTextContains("橙V立减")) wrongPageHits++;
 
         if (wrongPageHits >= 2) {
-            log("[v1.28.0] 名称匹配「" + matched + "」，但页面含" + wrongPageHits + "个橙V特征，判定为错误页面（橙V专享推荐区），拒绝匹配");
-            matched = null;
+            log("[v1.45.52] 名称匹配「" + matched + "」，页面含" + wrongPageHits + "个橙V特征，疑似推荐区，转严格校验，以报名弹窗为准");
+            suspectedWrongPage = true;
         } else if (anyTextContains("零售价") && anyTextContains("免费抽")) {
-            log("[v1.28.0] 名称匹配「" + matched + "」，但页面同时有「零售价」和「免费抽」，判定为橙V专享推荐区，拒绝匹配");
-            matched = null;
+            log("[v1.45.52] 名称匹配「" + matched + "」，页面同时有「零售价」和「免费抽」，疑似推荐区，转严格校验，以报名弹窗为准");
+            suspectedWrongPage = true;
         }
     }
 
-    if (matched) {
+    if (matched && !suspectedWrongPage) {
         log("[v1.6.1] 详情内容与目标活动匹配：" + matched);
         return matched;
+    }
+    if (suspectedWrongPage) {
+        log("[v1.45.52] 橙V嫌疑页：不预判等级，以报名弹窗为准，继续严格校验");
     }
 
     // v1.32.0: 精确名称未匹配 → 视为失败（TARGET_DETAIL_UNCONFIRMED）
@@ -5261,8 +5266,10 @@ function dumpPostClickState(before, after, diff, activity) {
         if (activity.value !== null && typeof activity.value !== "undefined") {
             var valStr = String(activity.value);
             valueProbeOk = false;
+            // v1.45.52：价值文本可能被硬空格拆开，归一化后再比，避免格式问题拦单，等级以报名弹窗为准。
             for (var _v in after.texts) if (after.texts.hasOwnProperty(_v)) {
-                if (String(_v).indexOf(valStr) >= 0 || String(_v).indexOf("¥" + valStr) >= 0) { valueProbeOk = true; break; }
+                var _vn = normalizePlainText(_v);
+                if (String(_v).indexOf(valStr) >= 0 || String(_v).indexOf("¥" + valStr) >= 0 || _vn.indexOf(valStr) >= 0) { valueProbeOk = true; break; }
             }
             if (!valueProbeOk && !anyTextContains(valStr)) valueProbeOk = false;
         }
