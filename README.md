@@ -129,3 +129,12 @@ Temp下codex-clipboard截图删光 34个约6.6MB已清
 - 原 `闲鱼图文发布.md` 已合并至本 `README.md`，现单文件真源为 `README.md`（10282 bytes，十四节完整版）
 - 仓库路径 `H:\Codex\闲鱼图文发布` 独立于 `H:\Codex\1`（lijianbin2/1 已瘦身为 substore），后续所有闲鱼图文在此 README 沉淀
 
+## 十五 新增 Codex职场高效办公实战55集 2026-09-12
+10 Codex职场高效办公实战，AI自动化赋能日常办公 55集 图01-04已验证(白底蓝框 BORDER38 BLUE#2F5DFF)
+- 来源：M:/WebDAV/夸克/教程/Codex职场高效办公实战，AI自动化赋能日常办公 55个mp4 (1-55已校验，含课程介绍/软件安装/CCSwitch切模型/gpt-image2/Seedream/Seedance/edge语音/办公提效/行业报表/视频电商/飞书知识库)
+- 图：01封面 55集全 多场景实战+3卖点(多模型一站式/音视频全覆盖/飞书+知识库) /02目录 6模块3x2卡(基础1-5/模型6-10/办公11-16/报表17-26/视频27-41/飞书42-55) /03收获6点+适合4人群 /04指南4步+提醒，均1080x1080 PNG 86/148/113/90KB，无价钱，文字无出框
+- 文案：标题 Codex职场高效办公实战55集 AI自动化赋能日常办公 只发夸克，正文6模块简介(基础5/模型5/办公6/报表10/视频15/飞书14)+适合人群，已投desc.txt+闲鱼发布文案_直接复制.txt（纯商品简单介绍+【说明】只发夸克网盘，不含链接与价钱，Select-String 1元 0命中）
+- 落盘：D:/闲鱼/Codex职场高效办公实战，AI自动化赋能日常办公/ 扁平 01-04.png+desc.txt+闲鱼发布文案_直接复制.txt，无重复
+- 夸克：M:/WebDAV/夸克/教程/Codex职场高效办公实战，AI自动化赋能日常办公 fid ~1WlqzV3VYPeMOZ1KzyPO4SmLYCBAso9oXkyWOly5gHX22CqWwyCVJouEMCHQFsxo1amKuIy-RjJ0VZ3fN7_gIeE 分享 https://pan.quark.cn/s/98d130a1f067 提取码 UkmA 不限时需码带文件名 已验证(url_type2/expired1)
+- 闲鱼：标题不写价，价格字段填1元，图文不写价钱，手动发布 https://www.goofish.com/publish
+
