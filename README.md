@@ -126,5 +126,6 @@ Temp下codex-clipboard截图删光 34个约6.6MB已清
 
 ---
 ## 迁移说明 2026-09-12
-- 原 \闲鱼图文发布.md\ 已合并至本 \README.md\，现单文件真源为 \README.md\（10282 bytes，十四节完整版）
-- 仓库路径 \H:\Codex\闲鱼图文发布\ 独立于 \H:\Codex\1\（lijianbin2/1 已瘦身为 substore），后续所有闲鱼图文在此 README 沉淀
+- 原 `闲鱼图文发布.md` 已合并至本 `README.md`，现单文件真源为 `README.md`（10282 bytes，十四节完整版）
+- 仓库路径 `H:\Codex\闲鱼图文发布` 独立于 `H:\Codex\1`（lijianbin2/1 已瘦身为 substore），后续所有闲鱼图文在此 README 沉淀
+
