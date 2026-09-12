@@ -209,8 +209,8 @@ for i,(ptitle, pdesc) in enumerate(points):
     draw.text((x+14+8, yy+16), str(i+1), fill="white", font=num_font)
     draw.text((x+14+40, yy+16), ptitle, fill=DARK, font=get_font(22, bold=True))
     # desc wrap
-    df=get_font(18)
-    lines=wrap_text(pdesc, df, (W-2*BORDER-80)//2 -28, draw)
+    df=get_font(16)
+    lines=wrap_text(pdesc, df, (W-2*BORDER-80)//2 -32, draw)
     dy=yy+52
     for l in lines[:2]:
         draw.text((x+14, dy), l, fill=GRAY, font=df)
@@ -265,7 +265,10 @@ for num, ttitle, tdesc in steps:
 warn_y=yy+10
 draw.rounded_rectangle([BORDER+40, warn_y, W-BORDER-40, warn_y+70], radius=14, fill=(255,251,235), outline=(253,230,138), width=1)
 draw.text((BORDER+60, warn_y+16), "提醒", fill=(146,64,14), font=get_font(22, bold=True))
-draw.text((BORDER+60, warn_y+38), "虚拟资料一经发货不退不换，请确认是 Codex 职场办公需要再拍", fill=(120,113,108), font=get_font(18))
+wf=get_font(16)
+warn_text="虚拟资料一经发货不退不换，请确认是 Codex 职场办公需要再拍"
+for idx, wl in enumerate(wrap_text(warn_text, wf, W-2*BORDER-120, draw)[:2]):
+    draw.text((BORDER+60, warn_y+38+ idx*18), wl, fill=(120,113,108), font=wf)
 
 draw.rounded_rectangle([BORDER, H-BORDER-86, W-BORDER, H-BORDER], radius=22, fill=(30,41,59))
 draw.text((BORDER+40, H-BORDER-68), "只发夸克网盘", fill="white", font=get_font(24, bold=True))
