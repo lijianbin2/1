@@ -1,152 +1,219 @@
-# 闲鱼图文发布工作流程
-
-单文件真源 适用闲鱼手动发布 沉淀自8项目 已验证
-
-## 一 标准流水线
-1 收料 用户给教程名加集数加截图 存对应项目目录
-2 写文案 按第二节规范写标题A加desc 删图注和私聊试看
-3 做图 按第三节规范做1080x1080共4张 顺序01到04
-4 校验 逐张看图查文字出框错字 顺序正确
-5 落盘 按第四节写入D:/闲鱼对应项目目录
-6 手动发布 按第五节打开闲鱼发闲置页 用户自己操作 聊天贴文案复制
-7 归档 清理推送见第七节
-
-## 二 文案规范
-标题A加价格1元加只发夸克 标题参考用户原话
-只发夸克网盘 不发百度和其他盘 无需快递无需发货
-删除图1图2见图试看片段私聊这类描述
-desc直接聊天贴文案复制 不用打开文件也行 desc.txt可省
-
-## 三 图片规范
-尺寸1080x1080 每项目4张 顺序01到02到03到04
-图片不用实拍目录 PLC已删00实拍仅01到04 即梦01到04无实拍
-校验文字无出框 乱版重做
-
-## 四 落盘规范
-根目录D:/闲鱼 按项目文件夹分类 同一项目文件放同一目录扁平单目录
-每目录放图文4张加发布文案 不套娃
-
-## 五 手动发布
-自动发布用不了就手动 图文完成后帮用户打开闲鱼发闲置页
-发布页 https://www.goofish.com/publish
-用户自己传图填价1元贴文案 不代点提交
-
-## 六 发布检查
-标题A加1元加只发夸克 图片4张齐全顺序正确
-desc无图注无私聊试看 聊天已贴可复制文案
-
-## 七 清理与推送
-Temp下codex-clipboard截图删光 34个约6.6MB已清
-仓库H:/Codex/1跑gc 清掉loose count32到0
-远端https://github.com/lijianbin2/1.git 分支main
-只走代理推送 127.0.0.1:7890 配http.proxy和https.proxy后add commit pull rebase push 推完unset
-
-## 七补 排版修复 2026-09-04
-中英文混排换行孤字 已修 根因 professional 居中加长英文 Internet Download Manager (IDM) 占宽导致第二行孤字载。
-补丁1 assets/themes/professional.css 末尾加 card-content p,li {overflow-wrap:anywhere; word-break:break-word; line-break:anywhere; text-align:justify}
-补丁2 scripts/render_xhs.py {theme_css} 后插入同规则 对全部8主题生效 两端对齐 无孤字 无出框
-验证句 Internet Download Manager (IDM) 是一款下载加速器，可将下载速度提高至 8 倍，并支持恢复、组织和安排下载。
-
-## 八 exec坑位
-1 workdir填真实存在目录 如C:/Users/1 否则目录名称无效
-2 命令文本不出现美元符开头词 powershell变量不用
-3 超10秒转后台 发布类加日志重定向再分段看日志
-4 中文路径用正斜杠 写中文文件用python open指定utf8 换行用chr10拼接 不用heredoc
-
-## 九 用户偏好
-只发夸克 价格1元 手动发布 聊天直接复制
-文件按项目分类放D:/闲鱼同一目录
-
-## 十 8项目清单（1-8）
-1 AI写作全链路教程 一站式掌握AI辅助内容创作 20集 图01到04
-2 AI入门大白话教程 零基础玩转人工智能 19集 图01到04
-3 AI自媒体工业化实战课 终结低效创作模式 21集 图01到04
-4 PLC编程入门精通73节全套教程 已删00实拍仅01到04
-5 即梦Seedance2.0动漫短剧视频教程大合集 01到04无实拍
-6 AI漫剧制作全流程60集 剧本分镜+AI生成+剪辑发布+模板化量产 60集 图01到04 Pillow渲染已验证
-7 WorkBuddy多场景AI办公实战，系统提升职场效率 36集 图01-04
-8 AI智能体提效实战课，零基础打造自动化工作助手 61集 图01-04
-
-## 环境备注
-旧主机D:/闲鱼本机缺失 本机outputs和work为空
-仓库H:/Codex/1 main 已推0b51bdc 上游为render_xhs补丁验证句IDM
-# 新增 2026-09-07 AI漫剧60集 Pillow兜底渲染 01-04已验证 文案已对齐即梦范本
-
-## 十一 7项目 WorkBuddy 2026-09-07
-7 WorkBuddy多场景AI办公实战，系统提升职场效率 36集 图01-04已验证（wb_helper渐变+白卡）
-- 目录11阶段：认识2/上手2/Claw2/提示词2/文件5/文档5/数据5/自动化3/技巧3/Skill5/专营2
-- 图：01封面（深蓝渐变36集打包）/02目录3列11卡/03收获6点/04指南6项，均1080x1080 125/109/112/115KB
-- 文案：标题A WorkBuddy多场景AI办公实战36集 文件/文档/数据/自动化 只发夸克1元，已投desc+直接复制（聊天一键复制，去图注/试看）
-- 落盘：D:/闲鱼/WorkBuddy多场景AI办公实战/ 扁平 01-04.jpg+desc.txt+闲鱼发布文案_直接复制.txt，无重复
-- 夸克：fid ~1G87XffcaTXotxtWpPApYdMYg3dEgMRmWnY1tAnq542lS23NVzYZ0yCWWZwBkKbDdLxXj9s5N4cr5rO9feam5hU 37文件，分享 https://pan.quark.cn/s/a21e9f52bcf5 提取码 jrvt (永久/需码/带文件名 url_type2/expired1 已验)
-- 闲鱼文案：一键复制已交付（标题+1元+只发夸克+链接+提取码），手动发布 https://www.goofish.com/publish
-## 十二 8项目 AI智能体提效实战课 2026-09-08
-8 AI智能体提效实战课，零基础打造自动化工作助手 61集 图01-04已验证（文件夹名+文件名文案）
-- 源：M:/WebDAV/夸克/教程/AI智能体提效实战课，零基础打造自动化工作助手 61个mp4排序（总63含2个同名演示，文案取61课时）
-- 文案：按文件夹名+文件名，一键复制标题+61行文件名+尾部固定
-- 图：01封面02目录03收获04指南 均1080x1080 Pillow
-- 落盘：D:/闲鱼/AI智能体提效实战课，零基础打造自动化工作助手/ 扁平 01-04.jpg+desc.txt+闲鱼发布文案_直接复制.txt
-- 夸克：fid ~1m48xlMnGlIAwa16XkOprS7WUom3dMwWWMQg5O3Adu1YIq_SO6RlWKj7J3-2uqSDbSOkI5-vYvDLCbhuULL2pd8 分享 https://pan.quark.cn/s/52b6844951e4 提取码 dtuv 不限时需码带文件名
-- 闲鱼：标题 AI智能体提效实战课61集 零基础打造自动化助手 只发夸克1元 已交付 手动发布 https://www.goofish.com/publish
-
-## 十二补 内容完整性重渲 2026-09-08晚
-01标题“零基础打造自动化工作助手”原单行截断，已改双行66/58pt自适应不截；02/03原61文件名单行截断（单节…/单节新闻…），已改14模块卡片化（3列网格）每卡标题+描述均wrap+auto_wrap，无出框无…截；箭头与底部栏右文案溢出已wrap+右对齐修正；验证01-04均为1080x1080，逐张view_image完整。
-
-## 十二补2 纯商品文案 2026-09-08
-文案已精简为纯商品：标题+61行文件名+夸克3行（文件夹名/链接/提取码），已删【你将获得】【适合谁】【发货形式】【说明与售后】及辅助描述，聊天一键复制即为闲鱼可贴版本（desc.txt与直接复制.txt同内容，无BOM，已验68行）。
-## 十二补3 图文去价格 2026-09-08
-图文4张已去价格：01徽章改61\集全/60\集全/36\集全（蓝/粉），02/03/04底栏与副标题均移除1元，统一为 02/04 只发夸克 / 虚拟资料·拍后发网盘链接·不用物流 / 发货指南·只发夸克 / 虚拟资料不发百度/不发实物·不包变现承诺，校验1080x1080无价格、无截断。底栏深色AI(30,41,59)/WB(15,23,42)正确。一键复制文案为纯商品简单介绍+【说明】只发夸克网盘，不含链接与文件名列表；夸克链接单独3行（文件夹名、链接、提取码）交付。
-
-## 十二补4 文案去价格 2026-09-08
-图文+文案标题均不写1元（用户截图确认）：
-- AI智能体 desc首行 61集 只发夸克1元 → 61集 只发夸克，两文件已同步
-- AI漫剧/WorkBuddy 标题A/B中 只发夸克1元/1元入 → 只发夸克，正文 1元拍即得 → 拍即得，1元收齐 → 收齐，已去除所有1元残留
-- 现一键复制为纯商品简单介绍+【说明】只发夸克网盘，不含链接与文件名列表；校验 Select-String 1元 0命中
-- 夸克链接单独3行交付：文件夹名 / 链接 / 提取码（AI智能体 52b6844951e4/dtuv，AI漫剧 21e9f52bcf5/jrvt，WorkBuddy 21e9f52bcf5/jrvt需核实，实际按落盘为准）
-- 价格字段仍填1元，但图文与文案标题不写价钱，已符合 这里也不要写价钱 要求
-
-
-
-## 十三 收尾推送与打开 2026-09-08
-- 复核：D:/闲鱼 3项目各4张1080x1080，Select-String 1元 0命中，文案标题/正文/图文均不含价，符合 这里也不要写价钱
-- 推送：代理127.0.0.1:7890 http.proxy/https.proxy -> add/commit 6fcde84 -> pull --rebase up to date -> push main -> unset proxy 已完成
-- 清理：python 23440 taskkill，D:/test*.txt已删，C:/Temp已清
-- 打开：python webbrowser.open 已打开 https://www.goofish.com/publish 与 https://44.81938193.xyz/ 供手动发布
-
-
-## 十四 新增 Adobe+达芬奇音效库 2026-09-10
-9 Adobe+达芬奇官方音效库合集，影视级音效素材包 27大类 图01-04已验证(蓝框白底)
-- 来源：用户截图27文件夹（动物类/多媒体/工业/环境音1/2/火与爆炸/家庭宠物/交通/紧急效果/卡通/科幻/科技/恐怖/拟音/拟真脚步声/魔法/人体元素/水下/体育/天气/嘲鸣/武器/液体-水/影像元素/噪声 言语 DTMF 测试/制作元素/撞击）
-- 图：01封面 官方音效库·影视级·27大类全覆盖 WAV高品质 / 02目录 3列27类 bullet / 03收获+适用场景 各4点 / 04指南 只发夸克 无需快递 虚拟资料·拍后发网盘链接，均1080x1080 PNG 66/66/92/44KB，无价钱
-- 文案：标题 Adobe+达芬奇官方音效库合集 影视级音效素材包 27大类 只发夸克，正文27类清单+WAV兼容说明，已投desc.txt+闲鱼发布文案_直接复制.txt（纯商品+【说明】只发夸克网盘，不含价格）
-- 落盘：D:/闲鱼/Adobe+达芬奇官方音效库合集，影视级音效素材包/ 扁平 01-04.png+desc.txt+闲鱼发布文案_直接复制.txt
-- 存量去价：D:/闲鱼/IDM下载加速器 DaVinci 少儿编程 04.png已重渲去1元，desc.txt同步去价，Select-String 1元 0命中
-- 夸克：M:/WebDAV/夸克/软件/Adobe+达芬奇官方音效库合集，影视级音效素材包 fid ~1SYrpYTvr3t0vxwZO3IVQqQ_tAgJhnQx_uBsamBENeYPn_-bc2fGYk1QMDGc_wHnwG_aVNYxpzdR58tajKG-ENU 分享 https://pan.quark.cn/s/f696934d9eb0 提取码 j4Fb 不限时需码带文件名 已验证
-- 闲鱼：标题不写价，价格字段填1元，手动发布 https://www.goofish.com/publish
-
----
-## 迁移说明 2026-09-12
-- 原 `闲鱼图文发布.md` 已合并至本 `README.md`，现单文件真源为 `README.md`（10282 bytes，十四节完整版）
-- 仓库路径 `H:\Codex\闲鱼图文发布` 独立于 `H:\Codex\1`（lijianbin2/1 已瘦身为 substore），后续所有闲鱼图文在此 README 沉淀
-
-## 十五 新增 Codex职场高效办公实战55集 2026-09-12
-10 Codex职场高效办公实战，AI自动化赋能日常办公 55集 图01-04已验证(白底蓝框 BORDER38 BLUE#2F5DFF)
-- 来源：M:/WebDAV/夸克/教程/Codex职场高效办公实战，AI自动化赋能日常办公 55个mp4 (1-55已校验，含课程介绍/软件安装/CCSwitch切模型/gpt-image2/Seedream/Seedance/edge语音/办公提效/行业报表/视频电商/飞书知识库)
-- 图：01封面 55集全 多场景实战+3卖点(多模型一站式/音视频全覆盖/飞书+知识库) /02目录 6模块3x2卡(基础1-5/模型6-10/办公11-16/报表17-26/视频27-41/飞书42-55) /03收获6点+适合4人群 /04指南4步+提醒，均1080x1080 PNG 122/148/107/88KB（01:125767 02:148214 03:107652 04:88574）（01:125767 02:148214 03:107652 04:88574），无价钱，文字无出框
-- 文案：标题 Codex职场高效办公实战55集 AI自动化赋能日常办公 只发夸克，正文6模块简介(基础5/模型5/办公6/报表10/视频15/飞书14)+适合人群，已投desc.txt+闲鱼发布文案_直接复制.txt（纯商品简单介绍+【说明】只发夸克网盘，不含链接与价钱，Select-String 1元 0命中）
-- 落盘：D:/闲鱼/Codex职场高效办公实战，AI自动化赋能日常办公/ 扁平 01-04.png+desc.txt+闲鱼发布文案_直接复制.txt，无重复
-- 夸克：M:/WebDAV/夸克/教程/Codex职场高效办公实战，AI自动化赋能日常办公 fid ~1WlqzV3VYPeMOZ1KzyPO4SmLYCBAso9oXkyWOly5gHX22CqWwyCVJouEMCHQFsxo1amKuIy-RjJ0VZ3fN7_gIeE 分享 https://pan.quark.cn/s/98d130a1f067 提取码 UkmA 不限时需码带文件名 已验证(url_type2/expired1)
-- 闲鱼：标题不写价，价格字段填1元，图文不写价钱，手动发布 https://www.goofish.com/publish
-
----
-## 十一 Canva封面重做 2026-09-12 (112KB)
-- 需求：用Canva制作封面图片 (Canva MCP unsupported call -> fallback PIL Canva-grade)
-- 产出：D:/闲鱼/Codex职场高效办公实战，AI自动化赋能日常办公/01.png 86K->122K (125767B) 同时备份 01_old.png / 01_canva.png
-- 设计：1080x1080 BORDER38 BLUE#2F5DFF 白底蓝框 顶徽章55集全·多场景实战 / 标题Codex职场高效办公实战 + 副标题AI自动化赋能日常办公 + 蓝分隔线 / 3卖点图标 多模型一站式/音视频全覆盖/飞书+知识库 / 中部灰卡#F1F5F9 左420x240笔记本Mock( Codex·自动化工作流 + 5代码行 + 5柱状图) 右6模块3x2白卡 01-05基础入门/06-10模型实战/11-16办公提效/17-26行业报表/27-41视频电商/42-55飞书知识库 / 底Pill 55集完整版·即学即用·零基础友好 / 底栏#1E293B 只发夸克·虚拟资料
-- 修复：v1文字与灰卡重叠( card_y 120->150 )、01-0徽章截断( badge_w 32->动态textlength+20 )，view_image验无出框无截断
-- 渲染脚本：H:/Codex/闲鱼图文发布/render_canva_cover.py (PIL Msyh 66/36/28pt) + render_codex55.py (259行 c357aa7恢复) 02-04未动
-- 文案：desc.txt 6模块+【说明】只发夸克 1元零命中；夸克 98d130a1f067 UkmA 不限时需码带文件名
-- 44.81938193.xyz 只发链接不自动打开；手动发布 https://www.goofish.com/publish
-- 待：import HTML data-document-role/page 可导入Canva可编辑
-
-
+# Sub-Store 三合一合并脚本 · substore-combined.js
+
+[![Sub-Store](https://img.shields.io/badge/Sub--Store-覆写脚本-1f6feb)](https://github.com/sub-store-org/Sub-Store)
+[![Mihomo](https://img.shields.io/badge/Mihomo-Clash-ff6b35)](https://github.com/MetaCubeX/mihomo)
+[![Snapshot](https://img.shields.io/badge/快照-2026--08--26-4caf50)](./substore-combined.js)
+[![License](https://img.shields.io/badge/license-MIT-informational)](#-许可)
+
+> 由 `build-substore-combined.js` 生成的 **自动更新版** 三合一覆写脚本，执行流程等价于 `0.js → convert.min.js#grouptype=1 → 1.js`，开箱即用、零维护。
+
+---
+
+## 📌 简介
+
+`substore-combined.js` 是为 [Sub-Store](https://github.com/sub-store-org/Sub-Store) 定制的 Clash / Mihomo 配置覆写脚本，整合三段逻辑于一体：
+
+1. **0.js** — 备份原始 `dns` / `hosts`
+2. **convert.min.js**（[powerfullz/override-rules](https://github.com/powerfullz/override-rules)）— 全量重写：节点分组、规则集、DNS、嗅探等
+3. **1.js** — 还原 DNS / Hosts + 追加自定义后处理与分流规则
+
+与传统三段式引用不同，本脚本 **运行时自动拉取最新版 `convert.min.js`**，失败时无缝回退到文件尾部的内联快照 `CONVERT_SNAPSHOT`，兼顾「始终最新」与「离线可用」。
+
+> ⚠️ **请勿直接编辑生成物** `substore-combined.js`，应修改源码 `src/*.ts` 后重新执行构建脚本生成。
+
+---
+
+## ✨ 特性
+
+| 特性 | 说明 |
+|------|------|
+| 🔄 自动更新 | 运行时从 `cdn.jsdelivr.net/gh/powerfullz/override-rules/convert.min.js` 拉取最新版，6 h 本地内存缓存 `globalThis.__CONVERT_CACHE__`，避免每次生成配置都触发网络请求 |
+| 🛡️ 兜底快照 | 远程拉取失败自动回退到文件尾部的 `CONVERT_SNAPSHOT` 内联快照（快照日期：2026-08-26） |
+| 🔒 作用域隔离 | 通过 `new Function` 在隔离的 `globalThis` 中执行中间脚本，防止覆盖本脚本的 `main` |
+| 💾 DNS / Hosts 保护 | 执行前后完整备份 / 还原用户原始 `dns` 与 `hosts`，中间脚本的重写不会污染自定义 DNS |
+| 🎯 精细后处理 | 自动剔除「选择代理」中的「自动选择」、新增「非香港节点」故障转移组、「javdb手动选择」地区手动选择组并注入服务链 |
+| 📏 幂等规则插入 | 自定义分流规则去重插入，重复生成不堆积（`customRules + oldRules.filter`） |
+
+---
+
+## 📂 文件结构
+
+```
+H:/Codex/1/
+├── substore-combined.js   # 生成物 — Sub-Store 中直接引用（29066 B，Snapshot 2026-08-26）
+└── README.md              # 本文档
+
+# 源码仓库侧（未包含在本目录）：
+# ├── build-substore-combined.js  # 构建脚本：拉取最新 convert.min.js 并拼接 0/1.js
+# └── src/*.ts                    # 逻辑源码（已迁移至 TypeScript）
+```
+
+---
+
+## ⚙️ 工作原理
+
+```mermaid
+flowchart LR
+  A[Sub-Store 调用 main(config)] --> B[备份 dns/hosts]
+  B --> C{缓存命中? < 6h}
+  C -->|是| D[复用缓存 main]
+  C -->|否| E[fetch CONVERT_URL]
+  E -->|成功| F[隔离执行取出 main + 更新缓存]
+  E -->|失败| G[回退 CONVERT_SNAPSHOT]
+  D & F & G --> H[convertMain(config) 全量重写]
+  H --> I[还原 dns/hosts]
+  I --> J[后处理 proxy-groups]
+  J --> K[追加 customRules]
+  K --> L[return config]
+```
+
+### 关键实现
+
+- **缓存键**：`globalThis.__CONVERT_CACHE__ = { main, time }` ，TTL = `6 * 60 * 60 * 1000`
+- **下载**：优先 `fetch`（Node 18+ Sub-Store 后端自带），降级 `$substore.http.get`（15 s 超时）
+- **隔离执行**：`new Function("globalThis","$arguments", code + ";return globalThis.main;")({}, args)`
+- **参数透传**：Sub-Store URL 上的 `#` 参数优先于默认值，见下表
+
+---
+
+## 🎛️ 支持参数（URL Hash）
+
+在 Sub-Store 脚本引用 URL 后追加 `#key=value&...` 即可覆盖默认值。例：
+
+```
+https://cdn.jsdelivr.net/gh/<user>/<repo>/main/substore-combined.js#grouptype=2&threshold=5&regex=true
+```
+
+| 参数 | 类型 | 默认 | 说明 |
+|------|------|------|------|
+| `grouptype` | `0 / 1 / 2` | `1` | 地区分组类型：`0` = select 手动选择、`1` = url-test 自动测速、`2` = load-balance 负载均衡。兼容旧参 `loadbalance=true→2 / false→1` |
+| `ipv6` | boolean | `false` | 启用 IPv6 |
+| `tun` | boolean | `false` | 启用 TUN（gVisor + route-exclude + dns-hijack） |
+| `full` | boolean | `false` | 输出完整 Mihomo 配置（含 mixed-port、external-controller 等，适合纯内核启动） |
+| `keepalive` | boolean | `false` | 启用 `tcp-keep-alive` |
+| `fakeip` | boolean | `true` | DNS 使用 FakeIP；`false` 时为 RedirHost |
+| `quic` | boolean | `false` | 放行 QUIC（UDP 443） |
+| `threshold` | number | `0` | 地区节点数 < 阈值时不显示该分组 |
+| `regex` | boolean | `false` | 正则过滤模式：用 `include-all + filter` 而非枚举节点名写入地区组 |
+| `landing` | — | 自动 | 根据节点 `dialer-proxy` 字段自动识别落地节点，无需传参 |
+
+> 源码已迁移至 `src/*.ts`，参数解析见 `G(ce())`。
+
+---
+
+## 🔧 后处理逻辑（1.js 部分）
+
+### 1. 清理「选择代理」
+
+```js
+// 从「选择代理」中排除「自动选择」，避免与 url-test 组重复调度
+g.proxies = g.proxies.filter(p => p !== "自动选择");
+```
+
+### 2. 收集地区节点组（动态，不硬编码）
+
+地区组统一命名为 `<国家/地区>节点`（如 `香港节点`、`台湾节点`、`美国节点`），以 `节点` 结尾。
+后处理先排除功能组（`自动选择 / 手动选择 / 落地节点 / 低倍率节点 / 前置代理 / 非香港节点 / javdb手动选择`），
+剩下的即为**每一个地区的节点组**，天然兼容 `grouptype=0/1/2` 与 `threshold` 过滤：
+
+```js
+const __excludedNodeGroups = ["自动选择", "手动选择", "落地节点", "低倍率节点", "前置代理", "非香港节点", "javdb手动选择"];
+const __regionGroups = (config["proxy-groups"] || [])
+  .map(g => g.name)
+  .filter(name => /节点$/.test(name) && !__excludedNodeGroups.includes(name));
+```
+
+### 3. 新增「非香港节点」故障转移组
+
+`__nonHkRegionGroups = __regionGroups` 按非港正则二次过滤
+（澳门/台湾/新加坡/日本/韩国/美国/加拿大/英国/澳大利亚/德国/法国/俄罗斯/泰国/印度/马来西亚/阿根廷/芬兰/埃及/菲律宾/土耳其/乌克兰），
+幂等写入分组列表末尾（已存在则只更新 `proxies`，不重复 push）：
+
+```js
+{ name: "非香港节点", type: "fallback", url: "https://www.gstatic.com/generate_204", interval: 300, tolerance: 50, proxies: __nonHkRegionGroups }
+```
+
+### 4. 新增「javdb手动选择」手动选择组（包含每一个地区的节点组）
+
+javdb 专用 `select` 组，`proxies = __regionGroups`（**含香港节点在内的全量地区组**，动态取值）：
+
+```js
+{ name: "javdb手动选择", type: "select", proxies: __regionGroups }
+```
+
+同样幂等：已存在则只更新 `proxies`，重复生成不堆积。切换节点时在客户端手动点选即可，无需改规则。
+
+### 5. 注入服务链
+
+- `AI服务` 组最前插入 `非香港节点`
+- `谷歌服务` 组最前插入 `AI服务` → 实现 `非香港 → AI → 谷歌` 的级联容灾
+
+### 6. 自定义分流规则（幂等，SUFFIX 必须在 KEYWORD 之前）
+
+```js
+const customRules = [
+  "DOMAIN,cpa.wisdamsatan.de,DIRECT",
+  "DOMAIN-SUFFIX,bingosoft.net,DIRECT",
+  "DOMAIN-SUFFIX,opencode.ai,AI服务",               // opencode.ai 走 AI 服务
+  "DOMAIN-SUFFIX,javdb.com,javdb手动选择",        // javdb 主站走 javdb手动选择组（必须在 KEYWORD 前）
+  "DOMAIN-KEYWORD,javdb,javdb手动选择",            // 其余含 javdb 的域名同样走 javdb手动选择组
+];
+config.rules = customRules.concat(oldRules.filter(r => !customRules.includes(r)));
+```
+
+> 顺序敏感：`DOMAIN-SUFFIX,javdb.com` 精确匹配主站，若放在 `DOMAIN-KEYWORD,javdb` 之后将被后者截获。
+> 新逻辑下两条 javdb 规则都指向 `javdb手动选择`，组内再手动选择具体地区（香港/台湾/美国/日本…）。
+
+---
+
+## 🚀 在 Sub-Store 中使用
+
+1. Sub-Store → `脚本操作` → 新建脚本，粘贴本文件内容或引用远程 URL
+2. 订阅 → `脚本` 列选择本脚本，参数示例：`#grouptype=1&regex=false`
+3. 保存并生成订阅，客户端（Clash Verge / Mihomo Party / Stash 等）导入即可
+
+#### 本地引用示例
+
+```
+脚本路径: H:/Codex/1/substore-combined.js
+参数: grouptype=1
+```
+
+#### 远程引用示例
+
+```
+https://raw.githubusercontent.com/lijianbin2/1/main/substore-combined.js#grouptype=1
+https://cdn.jsdelivr.net/gh/lijianbin2/1@main/substore-combined.js#grouptype=1
+```
+
+---
+
+## 🛠️ 刷新内联快照
+
+当上游 `convert.min.js` 有重大更新且希望离线快照也同步时：
+
+```bash
+node build-substore-combined.js
+# 输出: 已拉取最新 convert.min.js，快照日期: YYYY-MM-DD
+# 生成: substore-combined.js
+```
+
+构建脚本会自动下载最新 `convert.min.js` 并重新拼接 `0.js + 快照 + 1.js`。
+
+---
+
+## 📝 来源与致谢
+
+- 覆写核心：[powerfullz/override-rules](https://github.com/powerfullz/override-rules) — `convert.min.js`
+- 图标 CDN：`cdn.jsdelivr.net/gh/Koolson/Qure`
+- 规则数据：`MetaCubeX/meta-rules-dat` (geoip/geosite/mmdb/asn)
+
+---
+
+## 📄 许可
+
+遵循上游 `powerfullz/override-rules` 的开源许可。自定义后处理部分可按需自由使用。
+
+---
+
+*README 重写于 2026-09-12 · 2026-09-13 新增 javdb手动选择组（全量地区组） · 生成物版本快照 2026-08-26 23:30:44 · 代理推送 `lijianbin2/1@main` · 维护方式：修改 `src/*.ts` 后重新执行 `build-substore-combined.js`*
