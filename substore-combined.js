@@ -106,7 +106,7 @@ async function main(config) {
 
   // ================= 后处理：收集地区节点组（动态，兼容 grouptype=0/1/2 + threshold 过滤） =================
   // 地区组命名为 `<国家/地区>节点`，统一以 `节点` 结尾；排除功能组后剩下的即为每一个地区的节点组
-  const __excludedNodeGroups = ["自动选择", "手动选择", "落地节点", "低倍率节点", "前置代理", "非香港节点", "javdb手动选择"];
+  const __excludedNodeGroups = ["自动选择", "手动选择", "落地节点", "低倍率节点", "前置代理", "非香港节点", "javdb", "javdb手动选择"];
   const __regionGroups = (config["proxy-groups"] || [])
     .map(g => g.name)
     .filter(name => /节点$/.test(name) && !__excludedNodeGroups.includes(name));
@@ -131,12 +131,13 @@ async function main(config) {
     }
   }
 
-  // ================= 后处理：新增「javdb手动选择」select 组（包含每一个地区的节点组） =================
+  // ================= 后处理：新增「javdb」select 组（包含每一个地区的节点组） =================
   // javdb 专用手动选择组，proxies = 全部地区组（含香港节点），动态取值不硬编码
   if (__regionGroups.length > 0) {
-    const __javdbIdx = config["proxy-groups"].findIndex(g => g.name === "javdb手动选择");
+    config["proxy-groups"] = config["proxy-groups"].filter(g => g.name !== "javdb手动选择"); // 升级清理：移除旧名孤儿组（幂等）
+    const __javdbIdx = config["proxy-groups"].findIndex(g => g.name === "javdb");
     const __javdbCfg = {
-      name: "javdb手动选择",
+      name: "javdb",
       type: "select",
       proxies: __regionGroups
     };
@@ -161,8 +162,8 @@ async function main(config) {
     "DOMAIN,cpa.wisdamsatan.de,DIRECT",
     "DOMAIN-SUFFIX,bingosoft.net,DIRECT",
     "DOMAIN-SUFFIX,opencode.ai,AI服务",               // opencode.ai 走 AI服务组
-    "DOMAIN-SUFFIX,javdb.com,javdb手动选择",        // javdb 主站走 javdb手动选择组（须排在 KEYWORD 之前）
-    "DOMAIN-KEYWORD,javdb,javdb手动选择"            // 其余含 javdb 的域名同样走 javdb手动选择组
+    "DOMAIN-SUFFIX,javdb.com,javdb",        // javdb 主站走 javdb组（须排在 KEYWORD 之前）
+    "DOMAIN-KEYWORD,javdb,javdb"            // 其余含 javdb 的域名同样走 javdb组
   ];
 
   const oldRules = config["rules"] || [];

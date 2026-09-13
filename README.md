@@ -31,7 +31,7 @@
 | 🛡️ 兜底快照 | 远程拉取失败自动回退到文件尾部的 `CONVERT_SNAPSHOT` 内联快照（快照日期：2026-08-26） |
 | 🔒 作用域隔离 | 通过 `new Function` 在隔离的 `globalThis` 中执行中间脚本，防止覆盖本脚本的 `main` |
 | 💾 DNS / Hosts 保护 | 执行前后完整备份 / 还原用户原始 `dns` 与 `hosts`，中间脚本的重写不会污染自定义 DNS |
-| 🎯 精细后处理 | 自动剔除「选择代理」中的「自动选择」、新增「非香港节点」故障转移组、「javdb手动选择」地区手动选择组并注入服务链 |
+| 🎯 精细后处理 | 自动剔除「选择代理」中的「自动选择」、新增「非香港节点」故障转移组、「javdb」地区手动选择组并注入服务链 |
 | 📏 幂等规则插入 | 自定义分流规则去重插入，重复生成不堆积（`customRules + oldRules.filter`） |
 
 ---
@@ -113,11 +113,11 @@ g.proxies = g.proxies.filter(p => p !== "自动选择");
 ### 2. 收集地区节点组（动态，不硬编码）
 
 地区组统一命名为 `<国家/地区>节点`（如 `香港节点`、`台湾节点`、`美国节点`），以 `节点` 结尾。
-后处理先排除功能组（`自动选择 / 手动选择 / 落地节点 / 低倍率节点 / 前置代理 / 非香港节点 / javdb手动选择`），
+后处理先排除功能组（`自动选择 / 手动选择 / 落地节点 / 低倍率节点 / 前置代理 / 非香港节点 / javdb`），
 剩下的即为**每一个地区的节点组**，天然兼容 `grouptype=0/1/2` 与 `threshold` 过滤：
 
 ```js
-const __excludedNodeGroups = ["自动选择", "手动选择", "落地节点", "低倍率节点", "前置代理", "非香港节点", "javdb手动选择"];
+const __excludedNodeGroups = ["自动选择", "手动选择", "落地节点", "低倍率节点", "前置代理", "非香港节点", "javdb", "javdb手动选择"]; // 旧名仅升级兼容
 const __regionGroups = (config["proxy-groups"] || [])
   .map(g => g.name)
   .filter(name => /节点$/.test(name) && !__excludedNodeGroups.includes(name));
@@ -133,12 +133,12 @@ const __regionGroups = (config["proxy-groups"] || [])
 { name: "非香港节点", type: "fallback", url: "https://www.gstatic.com/generate_204", interval: 300, tolerance: 50, proxies: __nonHkRegionGroups }
 ```
 
-### 4. 新增「javdb手动选择」手动选择组（包含每一个地区的节点组）
+### 4. 新增「javdb」手动选择组（包含每一个地区的节点组）
 
 javdb 专用 `select` 组，`proxies = __regionGroups`（**含香港节点在内的全量地区组**，动态取值）：
 
 ```js
-{ name: "javdb手动选择", type: "select", proxies: __regionGroups }
+{ name: "javdb", type: "select", proxies: __regionGroups }
 ```
 
 同样幂等：已存在则只更新 `proxies`，重复生成不堆积。切换节点时在客户端手动点选即可，无需改规则。
@@ -155,14 +155,14 @@ const customRules = [
   "DOMAIN,cpa.wisdamsatan.de,DIRECT",
   "DOMAIN-SUFFIX,bingosoft.net,DIRECT",
   "DOMAIN-SUFFIX,opencode.ai,AI服务",               // opencode.ai 走 AI 服务
-  "DOMAIN-SUFFIX,javdb.com,javdb手动选择",        // javdb 主站走 javdb手动选择组（必须在 KEYWORD 前）
-  "DOMAIN-KEYWORD,javdb,javdb手动选择",            // 其余含 javdb 的域名同样走 javdb手动选择组
+  "DOMAIN-SUFFIX,javdb.com,javdb",        // javdb 主站走 javdb组（必须在 KEYWORD 前）
+  "DOMAIN-KEYWORD,javdb,javdb",            // 其余含 javdb 的域名同样走 javdb组
 ];
 config.rules = customRules.concat(oldRules.filter(r => !customRules.includes(r)));
 ```
 
 > 顺序敏感：`DOMAIN-SUFFIX,javdb.com` 精确匹配主站，若放在 `DOMAIN-KEYWORD,javdb` 之后将被后者截获。
-> 新逻辑下两条 javdb 规则都指向 `javdb手动选择`，组内再手动选择具体地区（香港/台湾/美国/日本…）。
+> 新逻辑下两条 javdb 规则都指向 `javdb`，组内再手动选择具体地区（香港/台湾/美国/日本…）。
 
 ---
 
@@ -216,4 +216,4 @@ node build-substore-combined.js
 
 ---
 
-*README 重写于 2026-09-12 · 2026-09-13 新增 javdb手动选择组（全量地区组） · 生成物版本快照 2026-08-26 23:30:44 · 代理推送 `lijianbin2/1@main` · 维护方式：修改 `src/*.ts` 后重新执行 `build-substore-combined.js`*
+*README 重写于 2026-09-13 · 组改名：javdb手动选择 → javdb（旧名已改名并自动清理） · 生成物 29140 B / 快照 2026-08-26 · 代理推送 `lijianbin2/1@main` · 维护：改 `src/*.ts` 后重跑 `build-substore-combined.js`*
