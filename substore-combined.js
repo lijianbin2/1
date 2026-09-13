@@ -162,8 +162,7 @@ async function main(config) {
     "DOMAIN,cpa.wisdamsatan.de,DIRECT",
     "DOMAIN-SUFFIX,bingosoft.net,DIRECT",
     "DOMAIN-SUFFIX,opencode.ai,AI服务",               // opencode.ai 走 AI服务组
-    "DOMAIN-SUFFIX,javdb.com,javdb",        // javdb 主站走 javdb组（须排在 KEYWORD 之前）
-    "DOMAIN-KEYWORD,javdb,javdb"            // 其余含 javdb 的域名同样走 javdb组
+    "DOMAIN-KEYWORD,javdb,javdb"            // 含 javdb 的域名走 javdb 组（含主站 javdb.com）
   ];
 
   const oldRules = config["rules"] || [];

@@ -148,21 +148,20 @@ javdb 专用 `select` 组，`proxies = __regionGroups`（**含香港节点在内
 - `AI服务` 组最前插入 `非香港节点`
 - `谷歌服务` 组最前插入 `AI服务` → 实现 `非香港 → AI → 谷歌` 的级联容灾
 
-### 6. 自定义分流规则（幂等，SUFFIX 必须在 KEYWORD 之前）
+### 6. 自定义分流规则（幂等）
 
 ```js
 const customRules = [
   "DOMAIN,cpa.wisdamsatan.de,DIRECT",
   "DOMAIN-SUFFIX,bingosoft.net,DIRECT",
   "DOMAIN-SUFFIX,opencode.ai,AI服务",               // opencode.ai 走 AI 服务
-  "DOMAIN-SUFFIX,javdb.com,javdb",        // javdb 主站走 javdb组（必须在 KEYWORD 前）
-  "DOMAIN-KEYWORD,javdb,javdb",            // 其余含 javdb 的域名同样走 javdb组
+  "DOMAIN-KEYWORD,javdb,javdb",         // 含 javdb 的域名走 javdb 组（含主站，已覆盖 SUFFIX 场景）
 ];
 config.rules = customRules.concat(oldRules.filter(r => !customRules.includes(r)));
 ```
 
-> 顺序敏感：`DOMAIN-SUFFIX,javdb.com` 精确匹配主站，若放在 `DOMAIN-KEYWORD,javdb` 之后将被后者截获。
-> 新逻辑下两条 javdb 规则都指向 `javdb`，组内再手动选择具体地区（香港/台湾/美国/日本…）。
+> javdb 仅保留 `DOMAIN-KEYWORD,javdb` 一条：KEYWORD 已覆盖主站 `javdb.com`，无需再写 SUFFIX。
+> javdb 规则指向 `javdb` 组，组内再手动选择具体地区（香港/台湾/美国/日本…）。
 
 ---
 
@@ -216,4 +215,4 @@ node build-substore-combined.js
 
 ---
 
-*README 重写于 2026-09-13 · 组改名：javdb手动选择 → javdb（旧名已改名并自动清理） · 生成物 29140 B / 快照 2026-08-26 · 代理推送 `lijianbin2/1@main` · 维护：改 `src/*.ts` 后重跑 `build-substore-combined.js`*
+*README 重写于 2026-09-13 · 组改名：javdb手动选择 → javdb（旧名已改名并自动清理） · 生成物 29051 B / 快照 2026-08-26 · 代理推送 `lijianbin2/1@main` · 维护：改 `src/*.ts` 后重跑 `build-substore-combined.js`*
