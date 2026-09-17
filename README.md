@@ -31,7 +31,7 @@
 | 🛡️ 兜底快照 | 远程拉取失败自动回退到文件尾部的 `CONVERT_SNAPSHOT` 内联快照（快照日期：2026-08-26） |
 | 🔒 作用域隔离 | 通过 `new Function` 在隔离的 `globalThis` 中执行中间脚本，防止覆盖本脚本的 `main` |
 | 💾 DNS / Hosts 保护 | 执行前后完整备份 / 还原用户原始 `dns` 与 `hosts`，中间脚本的重写不会污染自定义 DNS |
-| 🎯 精细后处理 | 剔除「选择代理」中的「自动选择」、删除「非香港节点」组、「AI服务」摘除「选择代理/香港节点」并转故障转移、「javdb」地区手动选择组 |
+| 🎯 精细后处理 | 剔除「选择代理」中的「自动选择」、删除「非香港节点」组、「AI服务」摘除「选择代理/香港节点」并转故障转移、「谷歌服务」仅保留「AI服务」、「javdb」地区手动选择组 |
 | 📏 幂等规则插入 | 自定义分流规则去重插入，重复生成不堆积（`customRules + oldRules.filter`） |
 
 ---
@@ -40,7 +40,7 @@
 
 ```
 H:/Codex/1/
-├── substore-combined.js   # 生成物 — Sub-Store 中直接引用（30031 B，Snapshot 2026-08-26）
+├── substore-combined.js   # 生成物 — Sub-Store 中直接引用（29796 B，Snapshot 2026-08-26）
 └── README.md              # 本文档
 
 # 源码仓库侧（未包含在本目录）：
@@ -147,7 +147,7 @@ javdb 专用 `select` 组，`proxies = __regionGroups`（**含香港节点在内
 ### 5. 注入服务链
 
 - `AI服务`：摘除 `选择代理` / `香港节点` / `非香港节点` 引用，类型由 `select` 改为 `fallback`（`url / interval / tolerance` 缺失时自动补齐）
-- `谷歌服务` 组最前插入 `AI服务`（去重幂等）
+- `谷歌服务` 组仅保留 `AI服务`（AI服务组放进谷歌服务组里面，幂等覆盖：`proxies = ["AI服务"]`）
 
 ### 6. 自定义分流规则（幂等）
 
@@ -217,4 +217,4 @@ node build-substore-combined.js
 
 ---
 
-*README 重写于 2026-09-13，代码优化于 2026-09-17（后处理单次遍历 + Set 查找，行为零变化） · 组改名：javdb手动选择 → javdb（旧名已改名并自动清理） · 生成物 30031 B / 快照 2026-08-26 · 代理推送 `lijianbin2/1@main` · 维护：改 `src/*.ts` 后重跑 `build-substore-combined.js`*
+*README 重写于 2026-09-13，代码优化于 2026-09-17（后处理单次遍历 + Set 查找，行为零变化） · 组改名：javdb手动选择 → javdb（旧名已改名并自动清理） · 生成物 29796 B / 快照 2026-08-26 · 2026-09-17 谷歌服务组仅保留AI服务 · 代理推送 `lijianbin2/1@main` · 维护：改 `src/*.ts` 后重跑 `build-substore-combined.js`*

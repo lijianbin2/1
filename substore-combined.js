@@ -151,7 +151,7 @@ async function main(config) {
     }
   }
 
-  // ================= 后处理：AI服务摘除引用并转 fallback；AI服务插入谷歌服务 =================
+  // ================= 后处理：AI服务摘除引用并转 fallback；谷歌服务只保留AI服务 =================
   if (aiGroup) {
     const proxies = aiGroup.proxies;
     if (Array.isArray(proxies) && (proxies.indexOf("选择代理") !== -1 || proxies.indexOf("香港节点") !== -1 || proxies.indexOf("非香港节点") !== -1)) {
@@ -162,17 +162,9 @@ async function main(config) {
     if (!aiGroup.interval) aiGroup.interval = 300;
     if (aiGroup.tolerance == null) aiGroup.tolerance = 50;
   }
+  // 谷歌服务只走 AI 链：AI服务组放进谷歌服务组里面，谷歌组仅保留 AI服务（幂等覆盖）
   if (googleGroup) {
-    const proxies = googleGroup.proxies;
-    if (Array.isArray(proxies)) {
-      if (proxies.indexOf("AI服务") !== -1) {
-        googleGroup.proxies = ["AI服务"].concat(proxies.filter(p => p !== "AI服务"));
-      } else {
-        proxies.unshift("AI服务"); // 原地前插，结果与重建数组一致，少一次拷贝
-      }
-    } else {
-      googleGroup.proxies = ["AI服务"];
-    }
+    googleGroup.proxies = ["AI服务"];
   }
 
   // ================= 原 1.js：自定义分流规则（幂等，Set 去重） =================
