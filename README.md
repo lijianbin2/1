@@ -40,7 +40,7 @@
 
 ```
 H:/Codex/1/
-├── substore-combined.js   # 生成物 — Sub-Store 中直接引用（30002 B，Snapshot 2026-08-26）
+├── substore-combined.js   # 生成物 — Sub-Store 中直接引用（30066 B，Snapshot 2026-08-26）
 └── README.md              # 本文档
 
 # 源码仓库侧（未包含在本目录）：
@@ -217,4 +217,4 @@ node build-substore-combined.js
 
 ---
 
-*README 重写于 2026-09-13，代码优化于 2026-09-17（后处理单次遍历 + Set 查找，行为零变化） · 组改名：javdb手动选择 → javdb（旧名已改名并自动清理） · 生成物 30002 B / 快照 2026-08-26 · 代理推送 `lijianbin2/1@main` · 维护：改 `src/*.ts` 后重跑 `build-substore-combined.js`*
+*README 重写于 2026-09-13，代码优化于 2026-09-17（后处理单次遍历 + Set 查找 +AI剥离短路/谷歌前插快路，行为零变化） · 组改名：javdb手动选择 → javdb（旧名已改名并自动清理） · 生成物 30066 B / 快照 2026-08-26 · 代理推送 `lijianbin2/1@main` · 维护：改 `src/*.ts` 后重跑 `build-substore-combined.js`*

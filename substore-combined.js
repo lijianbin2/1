@@ -154,8 +154,10 @@ async function main(config) {
   // ================= 后处理：AI服务摘除引用并转 fallback；谷歌服务前插AI服务 =================
   if (aiGroup) {
     const proxies = aiGroup.proxies;
-    if (Array.isArray(proxies) && (proxies.indexOf("选择代理") !== -1 || proxies.indexOf("香港节点") !== -1 || proxies.indexOf("非香港节点") !== -1)) {
-      aiGroup.proxies = proxies.filter(p => !__AI_STRIP.has(p));
+    if (Array.isArray(proxies)) {
+      let needStrip = false;
+      for (const q of proxies) if (__AI_STRIP.has(q)) { needStrip = true; break; }
+      if (needStrip) aiGroup.proxies = proxies.filter(p => !__AI_STRIP.has(p));
     }
     aiGroup.type = "fallback";
     if (!aiGroup.url) aiGroup.url = __FALLBACK_URL;
@@ -166,7 +168,7 @@ async function main(config) {
   if (googleGroup) {
     const proxies = googleGroup.proxies;
     if (Array.isArray(proxies)) {
-      googleGroup.proxies = ["AI服务"].concat(proxies.filter(p => p !== "AI服务"));
+      googleGroup.proxies = proxies.indexOf("AI服务") === -1 ? ["AI服务"].concat(proxies) : ["AI服务"].concat(proxies.filter(p => p !== "AI服务"));
     } else {
       googleGroup.proxies = ["AI服务"];
     }
