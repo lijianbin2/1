@@ -40,7 +40,7 @@
 
 ```
 H:/Codex/1/
-├── substore-combined.js   # 生成物 — Sub-Store 中直接引用（28694 B，Snapshot 2026-08-26）
+├── substore-combined.js   # 生成物 — Sub-Store 中直接引用（30031 B，Snapshot 2026-08-26）
 └── README.md              # 本文档
 
 # 源码仓库侧（未包含在本目录）：
@@ -117,10 +117,13 @@ g.proxies = g.proxies.filter(p => p !== "自动选择");
 剩下的即为**每一个地区的节点组**，天然兼容 `grouptype=0/1/2` 与 `threshold` 过滤：
 
 ```js
-const __excludedNodeGroups = ["自动选择", "手动选择", "落地节点", "低倍率节点", "前置代理", "非香港节点", "javdb", "javdb手动选择"]; // 旧名仅升级兼容
-const __regionGroups = (config["proxy-groups"] || [])
-  .map(g => g.name)
-  .filter(name => /节点$/.test(name) && !__excludedNodeGroups.includes(name));
+// 模块级常量 + 单次遍历：一次循环同时收集地区组并定位 选择代理/AI服务/谷歌服务
+const __EXCLUDED_NODE_GROUPS = new Set(["自动选择", "手动选择", "落地节点", "低倍率节点", "前置代理", "非香港节点", "javdb", "javdb手动选择"]); // 旧名仅升级兼容
+const __NODE_SUFFIX = /节点$/;
+const regionGroups = [];
+for (const g of groups) {
+  if (__NODE_SUFFIX.test(g.name) && !__EXCLUDED_NODE_GROUPS.has(g.name)) regionGroups.push(g.name);
+}
 ```
 
 ### 3. 已删除「非香港节点」组
@@ -155,7 +158,8 @@ const customRules = [
   "DOMAIN-SUFFIX,opencode.ai,AI服务",               // opencode.ai 走 AI 服务
   "DOMAIN-KEYWORD,javdb,javdb",         // 含 javdb 的域名走 javdb 组（含主站，已覆盖 SUFFIX 场景）
 ];
-config.rules = customRules.concat(oldRules.filter(r => !customRules.includes(r)));
+const customRuleSet = new Set(customRules); // O(1) 去重，原 includes 版为 O(n*m)
+config.rules = customRules.concat(oldRules.filter(r => !customRuleSet.has(r)));
 ```
 
 > javdb 仅保留 `DOMAIN-KEYWORD,javdb` 一条：KEYWORD 已覆盖主站 `javdb.com`，无需再写 SUFFIX。
@@ -213,4 +217,4 @@ node build-substore-combined.js
 
 ---
 
-*README 重写于 2026-09-13 · 组改名：javdb手动选择 → javdb（旧名已改名并自动清理） · 生成物 28694 B / 快照 2026-08-26 · 代理推送 `lijianbin2/1@main` · 维护：改 `src/*.ts` 后重跑 `build-substore-combined.js`*
+*README 重写于 2026-09-13，代码优化于 2026-09-17（后处理单次遍历 + Set 查找，行为零变化） · 组改名：javdb手动选择 → javdb（旧名已改名并自动清理） · 生成物 30031 B / 快照 2026-08-26 · 代理推送 `lijianbin2/1@main` · 维护：改 `src/*.ts` 后重跑 `build-substore-combined.js`*

@@ -12,6 +12,33 @@
 const CONVERT_URL = "https://cdn.jsdelivr.net/gh/powerfullz/override-rules/convert.min.js";
 const CONVERT_CACHE_TTL = 6 * 60 * 60 * 1000; // 6 小时
 
+// ---------- 模块级常量：main() 多次调用时不重复分配 ----------
+// 地区组统一以「节点」结尾；排除功能组后剩下的即为每一个地区的节点组
+const __EXCLUDED_NODE_GROUPS = new Set(["自动选择", "手动选择", "落地节点", "低倍率节点", "前置代理", "非香港节点", "javdb", "javdb手动选择"]); // 旧名仅升级兼容
+const __NODE_SUFFIX = /节点$/;
+const __AI_STRIP = new Set(["选择代理", "香港节点", "非香港节点"]);
+const __FALLBACK_URL = "https://www.gstatic.com/generate_204";
+const __CUSTOM_RULES = [
+  "DOMAIN,cpa.wisdamsatan.de,DIRECT",
+  "DOMAIN-SUFFIX,bingosoft.net,DIRECT",
+  "DOMAIN-SUFFIX,opencode.ai,AI服务", // opencode.ai 走 AI服务组
+  "DOMAIN-KEYWORD,javdb,javdb" // 含 javdb 的域名走 javdb 组（含主站 javdb.com，已覆盖 SUFFIX 场景）
+];
+const __CUSTOM_RULE_SET = new Set(__CUSTOM_RULES);
+
+// 深拷贝（备份/还原时隔离引用；falsy 直接返回，避免无意义的 JSON 往返）
+function __clone(v) {
+  return v ? JSON.parse(JSON.stringify(v)) : v;
+}
+
+function __log(msg) {
+  if (typeof console !== "undefined") console.log(msg);
+}
+
+function __logErr(msg) {
+  if (typeof console !== "undefined") console.error(msg);
+}
+
 // 中间脚本的参数：默认 grouptype=1；Sub-Store 里 URL 上的 # 参数优先
 function __convertArgs() {
   const userArgs = (typeof $arguments !== "undefined" && $arguments) || {};
@@ -60,101 +87,97 @@ async function __loadConvertMain(args) {
     const fn = __buildConvert(code, args);
     cache.main = fn;
     cache.time = now;
-    if (typeof console !== "undefined") {
-      console.log("[substore-combined] 已加载最新版 convert.min.js");
-    }
+    __log("[substore-combined] 已加载最新版 convert.min.js");
     return fn;
   } catch (e) {
-    if (typeof console !== "undefined") {
-      console.error("[substore-combined] 拉取最新 convert.min.js 失败，使用内联快照: " + (e && e.message));
-    }
+    __logErr("[substore-combined] 拉取最新 convert.min.js 失败，使用内联快照: " + (e && e.message));
     return __buildConvert(CONVERT_SNAPSHOT, args);
   }
 }
 
 async function main(config) {
   // ================= 原 0.js：备份 DNS / Hosts =================
-  const backup = {
-    dns: config && config["dns"] ? JSON.parse(JSON.stringify(config["dns"])) : null,
-    hosts: config && config["hosts"] ? JSON.parse(JSON.stringify(config["hosts"])) : null
-  };
+  const backupDns = __clone(config && config["dns"]) || null;
+  const backupHosts = __clone(config && config["hosts"]) || null;
 
   // ================= 中间脚本：全量重写（自动获取最新版） =================
-  const convertMain = await __loadConvertMain(__convertArgs());
-  config = convertMain(config);
+  config = (await __loadConvertMain(__convertArgs()))(config);
 
   // ================= 原 1.js：还原 DNS / Hosts =================
-  if (backup["dns"]) {
-    config["dns"] = JSON.parse(JSON.stringify(backup["dns"]));
-  } else {
-    delete config["dns"];
-  }
+  if (backupDns) config["dns"] = __clone(backupDns);
+  else delete config["dns"];
+  if (backupHosts) config["hosts"] = __clone(backupHosts);
+  else delete config["hosts"];
 
-  if (backup["hosts"]) {
-    config["hosts"] = JSON.parse(JSON.stringify(backup["hosts"]));
-  } else {
-    delete config["hosts"];
-  }
+  // ================= 后处理：proxy-groups（单次遍历收集 + 单次过滤清理） =================
+  // 地区组命名为 `<国家/地区>节点`；排除功能组后剩下的即为每一个地区的节点组
+  // （动态取值，兼容 grouptype=0/1/2 + threshold 过滤；javdb 组取含香港节点在内的全量地区组）
+  let groups = config["proxy-groups"];
+  if (!Array.isArray(groups)) groups = config["proxy-groups"] = [];
 
-
-  // ================= 后处理：从选择代理中排除「自动选择」 =================
-  for (const g of config["proxy-groups"]) {
-    if (g.name === "选择代理") {
-      g.proxies = (g.proxies || []).filter(p => p !== "自动选择");
+  const regionGroups = [];
+  let aiGroup = null;
+  let googleGroup = null;
+  for (const g of groups) {
+    const name = g.name;
+    if (name === "选择代理") {
+      // 从「选择代理」中排除「自动选择」，避免与 url-test 组重复调度（无命中时零分配）
+      const proxies = g.proxies;
+      if (Array.isArray(proxies) && proxies.indexOf("自动选择") !== -1) {
+        g.proxies = proxies.filter(p => p !== "自动选择");
+      }
+    } else if (name === "AI服务") {
+      aiGroup = g;
+    } else if (name === "谷歌服务") {
+      googleGroup = g;
     }
+    if (__NODE_SUFFIX.test(name) && !__EXCLUDED_NODE_GROUPS.has(name)) regionGroups.push(name);
   }
 
-  // ================= 后处理：收集地区节点组（动态，兼容 grouptype=0/1/2 + threshold 过滤） =================
-  // 地区组命名为 `<国家/地区>节点`，统一以 `节点` 结尾；排除功能组后剩下的即为每一个地区的节点组
-  const __excludedNodeGroups = ["自动选择", "手动选择", "落地节点", "低倍率节点", "前置代理", "非香港节点", "javdb", "javdb手动选择"];
-  const __regionGroups = (config["proxy-groups"] || [])
-    .map(g => g.name)
-    .filter(name => /节点$/.test(name) && !__excludedNodeGroups.includes(name));
-
-  // 已删除「非香港节点」组：清理旧配置残留（幂等）
-  config["proxy-groups"] = config["proxy-groups"].filter(g => g.name !== "非香港节点");
-
+  // 已删除「非香港节点」组：清理旧配置残留（幂等）；旧名「javdb手动选择」仅在 javdb 能重建时一并清理
+  // （与旧逻辑一致：regionGroups 为空时保留旧名孤儿组；原来要两趟 filter，现在一趟）
+  config["proxy-groups"] = groups = regionGroups.length > 0
+    ? groups.filter(g => g.name !== "非香港节点" && g.name !== "javdb手动选择")
+    : groups.filter(g => g.name !== "非香港节点");
 
   // ================= 后处理：新增「javdb」select 组（包含每一个地区的节点组） =================
-  // javdb 专用手动选择组，proxies = 全部地区组（含香港节点），动态取值不硬编码
-  if (__regionGroups.length > 0) {
-    config["proxy-groups"] = config["proxy-groups"].filter(g => g.name !== "javdb手动选择"); // 升级清理：移除旧名孤儿组（幂等）
-    const __javdbIdx = config["proxy-groups"].findIndex(g => g.name === "javdb");
-    const __javdbCfg = {
-      name: "javdb",
-      type: "select",
-      proxies: __regionGroups
-    };
-    if (__javdbIdx >= 0) {
-      config["proxy-groups"][__javdbIdx].proxies = __regionGroups;
+  // javdb 专用手动选择组，proxies = 全部地区组（含香港节点）；幂等：已存在只更新 proxies
+  if (regionGroups.length > 0) {
+    const javdbIdx = groups.findIndex(g => g.name === "javdb");
+    if (javdbIdx >= 0) {
+      groups[javdbIdx].proxies = regionGroups;
     } else {
-      config["proxy-groups"].push(__javdbCfg);
+      groups.push({ name: "javdb", type: "select", proxies: regionGroups });
     }
   }
 
-  // ================= 后处理：AI服务摘除「选择代理/香港节点/非香港节点」并转 fallback；AI服务插入谷歌服务 =================
-  for (const g of config["proxy-groups"]) {
-    if (g.name === "AI服务") {
-      g.proxies = (g.proxies || []).filter(p => p !== "选择代理" && p !== "香港节点" && p !== "非香港节点");
-      g.type = "fallback";
-      if (!g.url) g.url = "https://www.gstatic.com/generate_204";
-      if (!g.interval) g.interval = 300;
-      if (g.tolerance == null) g.tolerance = 50;
-    } else if (g.name === "谷歌服务") {
-      g.proxies = ["AI服务", ...(g.proxies || []).filter(p => p !== "AI服务")];
+  // ================= 后处理：AI服务摘除引用并转 fallback；AI服务插入谷歌服务 =================
+  if (aiGroup) {
+    const proxies = aiGroup.proxies;
+    if (Array.isArray(proxies) && (proxies.indexOf("选择代理") !== -1 || proxies.indexOf("香港节点") !== -1 || proxies.indexOf("非香港节点") !== -1)) {
+      aiGroup.proxies = proxies.filter(p => !__AI_STRIP.has(p));
+    }
+    aiGroup.type = "fallback";
+    if (!aiGroup.url) aiGroup.url = __FALLBACK_URL;
+    if (!aiGroup.interval) aiGroup.interval = 300;
+    if (aiGroup.tolerance == null) aiGroup.tolerance = 50;
+  }
+  if (googleGroup) {
+    const proxies = googleGroup.proxies;
+    if (Array.isArray(proxies)) {
+      if (proxies.indexOf("AI服务") !== -1) {
+        googleGroup.proxies = ["AI服务"].concat(proxies.filter(p => p !== "AI服务"));
+      } else {
+        proxies.unshift("AI服务"); // 原地前插，结果与重建数组一致，少一次拷贝
+      }
+    } else {
+      googleGroup.proxies = ["AI服务"];
     }
   }
 
-  // ================= 原 1.js：自定义分流规则（幂等） =================
-  const customRules = [
-    "DOMAIN,cpa.wisdamsatan.de,DIRECT",
-    "DOMAIN-SUFFIX,bingosoft.net,DIRECT",
-    "DOMAIN-SUFFIX,opencode.ai,AI服务",               // opencode.ai 走 AI服务组
-    "DOMAIN-KEYWORD,javdb,javdb"            // 含 javdb 的域名走 javdb 组（含主站 javdb.com）
-  ];
-
+  // ================= 原 1.js：自定义分流规则（幂等，Set 去重） =================
   const oldRules = config["rules"] || [];
-  config["rules"] = customRules.concat(oldRules.filter(r => !customRules.includes(r)));
+  config["rules"] = __CUSTOM_RULES.concat(oldRules.filter(r => !__CUSTOM_RULE_SET.has(r)));
 
   return config;
 }
