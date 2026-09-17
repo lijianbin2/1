@@ -82,7 +82,7 @@ for i,(a,b) in enumerate(features):
     cy=y0+30
     draw.ellipse([cx-32, cy-32, cx+32, cy+32], fill=(239,246,255), outline=BLUE, width=2)
     icon_font=get_font(28, bold=True)
-    icons=["◉","◆","▣"]
+    icons=["1","2","3"]
     iw=draw.textlength(icons[i], font=icon_font)
     draw.text((cx-iw//2, cy-16), icons[i], fill=BLUE, font=icon_font)
     # text
