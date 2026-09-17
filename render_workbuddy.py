@@ -1,4 +1,4 @@
-from PIL import Image, ImageDraw, ImageFont
+﻿from PIL import Image, ImageDraw, ImageFont
 import pathlib, textwrap
 
 W=H=1080
@@ -201,7 +201,7 @@ for i,(ptitle, pdesc) in enumerate(points):
     col=i%2
     row=i//2
     x=BORDER+40+col*( (W-2*BORDER-80)//2 +20)
-    yy=BORDER+110+row*145
+    yy=BORDER+130+row*145
     draw.rounded_rectangle([x, yy, x+(W-2*BORDER-80)//2, yy+125], radius=18, fill=(248,250,252), outline=(226,232,240), width=1)
     # number
     num_font=get_font(20, bold=True)
@@ -263,12 +263,12 @@ for num, ttitle, tdesc in steps:
 
 # warning box
 warn_y=yy+10
-draw.rounded_rectangle([BORDER+40, warn_y, W-BORDER-40, warn_y+70], radius=14, fill=(255,251,235), outline=(253,230,138), width=1)
-draw.text((BORDER+60, warn_y+16), "提醒", fill=(146,64,14), font=get_font(22, bold=True))
+draw.rounded_rectangle([BORDER+40, warn_y, W-BORDER-40, warn_y+86], radius=14, fill=(255,251,235), outline=(253,230,138), width=1)
+draw.text((BORDER+60, warn_y+12), "提醒", fill=(146,64,14), font=get_font(22, bold=True))
 wf=get_font(16)
 warn_text='虚拟资料一经发货不退不换，请确认是WorkBuddy智能体需要再拍'
 for idx, wl in enumerate(wrap_text(warn_text, wf, W-2*BORDER-120, draw)[:2]):
-    draw.text((BORDER+60, warn_y+38+ idx*18), wl, fill=(120,113,108), font=wf)
+    draw.text((BORDER+60, warn_y+44+ idx*20), wl, fill=(120,113,108), font=wf)
 
 draw.rounded_rectangle([BORDER, H-BORDER-86, W-BORDER, H-BORDER], radius=22, fill=(30,41,59))
 draw.text((BORDER+40, H-BORDER-68), "只发夸克网盘", fill="white", font=get_font(24, bold=True))
