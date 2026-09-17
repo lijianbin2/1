@@ -111,25 +111,9 @@ async function main(config) {
     .map(g => g.name)
     .filter(name => /节点$/.test(name) && !__excludedNodeGroups.includes(name));
 
-  const __nonHkRegionGroups = __regionGroups
-    .filter(name => /^(?:澳门|台湾|新加坡|日本|韩国|美国|加拿大|英国|澳大利亚|德国|法国|俄罗斯|泰国|印度|马来西亚|阿根廷|芬兰|埃及|菲律宾|土耳其|乌克兰)节点$/.test(name));
+  // 已删除「非香港节点」组：清理旧配置残留（幂等）
+  config["proxy-groups"] = config["proxy-groups"].filter(g => g.name !== "非香港节点");
 
-  if (__nonHkRegionGroups.length > 0) {
-    const __nonHkIdx = config["proxy-groups"].findIndex(g => g.name === "非香港节点");
-    const __nonHkCfg = {
-      name: "非香港节点",
-      type: "fallback",
-      url: "https://www.gstatic.com/generate_204",
-      interval: 300,
-      tolerance: 50,
-      proxies: __nonHkRegionGroups
-    };
-    if (__nonHkIdx >= 0) {
-      config["proxy-groups"][__nonHkIdx].proxies = __nonHkRegionGroups;
-    } else {
-      config["proxy-groups"].push(__nonHkCfg);
-    }
-  }
 
   // ================= 后处理：新增「javdb」select 组（包含每一个地区的节点组） =================
   // javdb 专用手动选择组，proxies = 全部地区组（含香港节点），动态取值不硬编码
@@ -148,16 +132,20 @@ async function main(config) {
     }
   }
 
-  // ================= 后处理：把「非香港节点」插入 AI服务 最前面，AI服务 插入谷歌服务 =================
+  // ================= 后处理：AI服务摘除「选择代理/香港节点/非香港节点」并转 fallback；AI服务插入谷歌服务 =================
   for (const g of config["proxy-groups"]) {
     if (g.name === "AI服务") {
-      g.proxies = ["非香港节点", ...(g.proxies || [])];
+      g.proxies = (g.proxies || []).filter(p => p !== "选择代理" && p !== "香港节点" && p !== "非香港节点");
+      g.type = "fallback";
+      if (!g.url) g.url = "https://www.gstatic.com/generate_204";
+      if (!g.interval) g.interval = 300;
+      if (g.tolerance == null) g.tolerance = 50;
     } else if (g.name === "谷歌服务") {
-      g.proxies = ["AI服务", ...(g.proxies || [])];
+      g.proxies = ["AI服务", ...(g.proxies || []).filter(p => p !== "AI服务")];
     }
   }
 
-  // ================= 原 1.js：自定义分流规则（幂等，SUFFIX 必须排在 KEYWORD 之前） =================
+  // ================= 原 1.js：自定义分流规则（幂等） =================
   const customRules = [
     "DOMAIN,cpa.wisdamsatan.de,DIRECT",
     "DOMAIN-SUFFIX,bingosoft.net,DIRECT",

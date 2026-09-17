@@ -31,7 +31,7 @@
 | 🛡️ 兜底快照 | 远程拉取失败自动回退到文件尾部的 `CONVERT_SNAPSHOT` 内联快照（快照日期：2026-08-26） |
 | 🔒 作用域隔离 | 通过 `new Function` 在隔离的 `globalThis` 中执行中间脚本，防止覆盖本脚本的 `main` |
 | 💾 DNS / Hosts 保护 | 执行前后完整备份 / 还原用户原始 `dns` 与 `hosts`，中间脚本的重写不会污染自定义 DNS |
-| 🎯 精细后处理 | 自动剔除「选择代理」中的「自动选择」、新增「非香港节点」故障转移组、「javdb」地区手动选择组并注入服务链 |
+| 🎯 精细后处理 | 剔除「选择代理」中的「自动选择」、删除「非香港节点」组、「AI服务」摘除「选择代理/香港节点」并转故障转移、「javdb」地区手动选择组 |
 | 📏 幂等规则插入 | 自定义分流规则去重插入，重复生成不堆积（`customRules + oldRules.filter`） |
 
 ---
@@ -40,7 +40,7 @@
 
 ```
 H:/Codex/1/
-├── substore-combined.js   # 生成物 — Sub-Store 中直接引用（29066 B，Snapshot 2026-08-26）
+├── substore-combined.js   # 生成物 — Sub-Store 中直接引用（28694 B，Snapshot 2026-08-26）
 └── README.md              # 本文档
 
 # 源码仓库侧（未包含在本目录）：
@@ -123,14 +123,12 @@ const __regionGroups = (config["proxy-groups"] || [])
   .filter(name => /节点$/.test(name) && !__excludedNodeGroups.includes(name));
 ```
 
-### 3. 新增「非香港节点」故障转移组
+### 3. 已删除「非香港节点」组
 
-`__nonHkRegionGroups = __regionGroups` 按非港正则二次过滤
-（澳门/台湾/新加坡/日本/韩国/美国/加拿大/英国/澳大利亚/德国/法国/俄罗斯/泰国/印度/马来西亚/阿根廷/芬兰/埃及/菲律宾/土耳其/乌克兰），
-幂等写入分组列表末尾（已存在则只更新 `proxies`，不重复 push）：
+不再创建该组；同时清理旧配置中的残留（幂等），并从 `AI服务` 的引用中摘除：
 
 ```js
-{ name: "非香港节点", type: "fallback", url: "https://www.gstatic.com/generate_204", interval: 300, tolerance: 50, proxies: __nonHkRegionGroups }
+config["proxy-groups"] = config["proxy-groups"].filter(g => g.name !== "非香港节点");
 ```
 
 ### 4. 新增「javdb」手动选择组（包含每一个地区的节点组）
@@ -145,8 +143,8 @@ javdb 专用 `select` 组，`proxies = __regionGroups`（**含香港节点在内
 
 ### 5. 注入服务链
 
-- `AI服务` 组最前插入 `非香港节点`
-- `谷歌服务` 组最前插入 `AI服务` → 实现 `非香港 → AI → 谷歌` 的级联容灾
+- `AI服务`：摘除 `选择代理` / `香港节点` / `非香港节点` 引用，类型由 `select` 改为 `fallback`（`url / interval / tolerance` 缺失时自动补齐）
+- `谷歌服务` 组最前插入 `AI服务`（去重幂等）
 
 ### 6. 自定义分流规则（幂等）
 
@@ -215,4 +213,4 @@ node build-substore-combined.js
 
 ---
 
-*README 重写于 2026-09-13 · 组改名：javdb手动选择 → javdb（旧名已改名并自动清理） · 生成物 29051 B / 快照 2026-08-26 · 代理推送 `lijianbin2/1@main` · 维护：改 `src/*.ts` 后重跑 `build-substore-combined.js`*
+*README 重写于 2026-09-13 · 组改名：javdb手动选择 → javdb（旧名已改名并自动清理） · 生成物 28694 B / 快照 2026-08-26 · 代理推送 `lijianbin2/1@main` · 维护：改 `src/*.ts` 后重跑 `build-substore-combined.js`*
