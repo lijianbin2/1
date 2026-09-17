@@ -162,19 +162,16 @@ async function main(config) {
     if (!aiGroup.interval) aiGroup.interval = 300;
     if (aiGroup.tolerance == null) aiGroup.tolerance = 50;
   }
-  // 谷歌服务保留原有成员，AI服务组放进谷歌服务组最前面（幂等去重）
+  // 谷歌服务保留原有成员，AI服务组放进谷歌服务组最前面（幂等去重；重建数组，不污染上游共享引用）
   if (googleGroup) {
     const proxies = googleGroup.proxies;
     if (Array.isArray(proxies)) {
-      if (proxies.indexOf("AI服务") !== -1) {
-        googleGroup.proxies = ["AI服务"].concat(proxies.filter(p => p !== "AI服务"));
-      } else {
-        proxies.unshift("AI服务");
-      }
+      googleGroup.proxies = ["AI服务"].concat(proxies.filter(p => p !== "AI服务"));
     } else {
       googleGroup.proxies = ["AI服务"];
     }
   }
+
 
 
   // ================= 原 1.js：自定义分流规则（幂等，Set 去重） =================
