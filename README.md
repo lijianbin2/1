@@ -115,6 +115,9 @@ D:\闲鱼\<项目>\
 |------|------|----------|
 | `render_codex55.py` | Codex55 项目 02-04 目录/收获/指南 + 01 初版 | `W=H=1080, BORDER=38`，`wrap_text(textlength)` 防孤字，03 行宽 18→16 修复 |
 | `render_workbuddy.py` | WorkBuddy37集 01-04封面/目录/收获/指南 | W=H=1080, BORDER=38, 6模块29-37办公实战 |
+| `render_winrar_unified.py` | WinRAR 01-04 unified, one file covers version and noversion | W=H=1080 BORDER=38, --version v7.23, empty hides version
+| `xianyu_common.py` | shared board font wrap save check, new projects import | draw_board get_font wrap_text save_png check_copy
+| `make_desc.py` | desc plus copy generator with self check | title body quark block, forbidden-required check
 
 ## 10. 项目台账
 
@@ -131,6 +134,8 @@ D:\闲鱼\<项目>\
 | 9 | Adobe+达芬奇官方音效库合集 | 27大类 | 软件/Adobe+达芬奇官方音效库合集，影视级音效素材包 | `f696934d9eb0 / j4Fb` | 分享已验，存量已去价 |
 | 10 | Codex职场高效办公实战 | 55集 | 教程/Codex职场高效办公实战，AI自动化赋能日常办公 | `98d130a1f067 / UkmA` | 01定稿122K，02-04已验 |
 | 11 | WorkBuddy智能体实战，打造个人AI效率系统 | 37集 | 教程/同名，37mp4已验 | 待补 | 图文已验，D盘已落盘 |
+| 12 | WinRAR v7.23 64位单文件版 | 软件单文件约4.1MB | 软件/WinRAR v7.23解压缩工具 | 暂无 | 统一版已验，双文件已删 |
+| 13 | AI视频制作全攻略（豆包+即梦+剪映）从入门到精通实战课程 | 79视频+1PDF共80文件约8.7GB | 教程/同名 | 10378614ce30 / 8Fsq | 分享已验，图文已验，D盘已落盘 |
 | — | IDM / DaVinci / 少儿编程 | 存量 | — | — | 04图与desc已去价，1元零命中 |
 
 ## 11. 修订记录
@@ -141,3 +146,4 @@ D:\闲鱼\<项目>\
 - 2026-09-07：WorkBuddy 36集交付（分享 `a21e9f52bcf5 / jrvt`）；AI漫剧 60集 Pillow 兜底渲染
 - 2026-09-04：中英文混排孤字修复（`overflow-wrap:anywhere + break-word + 两端对齐`），验证句 IDM
 - 2026-09-17：WorkBuddy智能体37集交付，01-04已验，D盘已落盘，夸克分享待补
+- 2026-09-23：合入统一版WinRAR与公共库及文案生成器，清理5个未跟踪文件，台账补WinRAR与AI视频两行
