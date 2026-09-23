@@ -108,6 +108,24 @@ test("fetch 悬挂时触发硬超时并使用内联快照", async () => {
   assert.ok(runtime.logs.some(({ message }) => message.includes("fetch 超时")));
 });
 
+test("fetch 失败时尝试 Sub-Store HTTP 客户端", async () => {
+  const runtime = createRuntime({
+    fetch: async () => {
+      throw new Error("fetch boom");
+    },
+    $substore: {
+      http: {
+        get: async () => ({ body: runtime.__test.snapshot })
+      }
+    }
+  });
+  runtime.$arguments = { threshold: 0 };
+
+  const config = await runtime.__test.main(makeConfig());
+
+  assert.ok(findGroup(config, "香港节点"));
+});
+
 test("fetch 响应正文悬挂时也触发硬超时", async () => {
   const runtime = createRuntime({
     fetch: async () => ({ ok: true, text: () => new Promise(() => {}) }),

@@ -1,7 +1,7 @@
 // ============================================================================
-// Sub-Store 三合一合并脚本（自动更新版）
+// Sub-Store 合并覆写脚本（远程优先、快照兜底）
 //
-// 执行流程等价于 0.js -> convert.min.js#grouptype=1 -> 1.js：
+// 执行流程：
 //   1) 备份原始 DNS / Hosts
 //   2) 拉取并执行【最新版】convert.min.js（失败时回退到文件尾部的内联快照）
 //   3) 还原 DNS / Hosts + 追加自定义分流规则
@@ -72,8 +72,9 @@ function __withTimeout(request, message) {
 }
 
 // 下载文本：优先全局 fetch（Node 18+ 的 Sub-Store 后端自带），
-// 其次使用 Sub-Store 注入的 $substore.http。两条路径都使用硬超时，避免 CDN 挂起。
+// 失败后使用 Sub-Store 注入的 $substore.http。两条路径都使用硬超时，避免 CDN 挂起。
 async function __fetchText(url) {
+  let fetchError;
   if (typeof fetch === "function") {
     const controller = typeof AbortController === "function" ? new AbortController() : null;
     try {
@@ -83,17 +84,27 @@ async function __fetchText(url) {
         throw new Error("fetch 失败: HTTP " + (res && res.status));
       })();
       return await __withTimeout(request, "fetch 超时（15000 ms）");
+    } catch (e) {
+      fetchError = e;
     } finally {
       if (controller) controller.abort();
     }
   }
   if (typeof $substore !== "undefined" && $substore && $substore.http && typeof $substore.http.get === "function") {
-    const request = $substore.http.get({ url: url, timeout: CONVERT_FETCH_TIMEOUT });
-    const resp = await __withTimeout(request, "$substore.http 超时（15000 ms）");
-    const body = resp && (resp.body !== undefined ? resp.body : resp.rawBody);
-    if (typeof body === "string" && body.length > 0) return body;
-    throw new Error("$substore.http 返回为空");
+    try {
+      const request = $substore.http.get({ url: url, timeout: CONVERT_FETCH_TIMEOUT });
+      const resp = await __withTimeout(request, "$substore.http 超时（15000 ms）");
+      const body = resp && (resp.body !== undefined ? resp.body : resp.rawBody);
+      if (typeof body === "string" && body.length > 0) return body;
+      throw new Error("$substore.http 返回为空");
+    } catch (e) {
+      if (fetchError) {
+        throw new Error("fetch 失败: " + (fetchError.message || fetchError) + "; $substore.http 失败: " + (e.message || e));
+      }
+      throw e;
+    }
   }
+  if (fetchError) throw fetchError;
   throw new Error("当前环境没有可用的 HTTP 客户端");
 }
 
@@ -121,7 +132,7 @@ async function __loadConvertMain(args) {
 }
 
 async function main(config) {
-  // ================= 原 0.js：备份 DNS / Hosts =================
+  // ================= 配置保护：备份 DNS / Hosts =================
   const source = config && typeof config === "object" ? config : {};
   const hasDns = Object.prototype.hasOwnProperty.call(source, "dns");
   const hasHosts = Object.prototype.hasOwnProperty.call(source, "hosts");
@@ -150,7 +161,7 @@ async function main(config) {
     }
   }
 
-  // ================= 原 1.js：还原 DNS / Hosts =================
+  // ================= 配置收尾：还原 DNS / Hosts =================
   if (hasDns) config["dns"] = __clone(backupDns);
   else delete config["dns"];
   if (hasHosts) config["hosts"] = __clone(backupHosts);
@@ -223,7 +234,7 @@ async function main(config) {
 
 
 
-  // ================= 原 1.js：自定义分流规则（幂等，Set 去重） =================
+  // ================= 自定义后处理：分流规则（幂等，Set 去重） =================
   const oldRules = config["rules"] || [];
   config["rules"] = __CUSTOM_RULES.concat(oldRules.filter(r => !__CUSTOM_RULE_SET.has(r)));
 

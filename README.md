@@ -34,7 +34,7 @@
 
 | 特性 | 说明 |
 |------|------|
-| 🔄 远程优先 | 运行时从 `cdn.jsdelivr.net/gh/powerfullz/override-rules/convert.min.js` 获取当前可用源码，运行期间缓存 6 h，避免每次生成配置都触发网络请求；缓存不会绑定首次调用参数 |
+| 🔄 远程优先 | 运行时从 `cdn.jsdelivr.net/gh/powerfullz/override-rules/convert.min.js` 获取当前可用源码，运行期间缓存 6 h，避免每次生成配置都触发网络请求；缓存不会绑定首次调用参数；`fetch` 失败后继续尝试 `$substore.http.get` |
 | 🛡️ 兜底快照 | 远程拉取、编译或运行失败时回退到文件尾部的 `CONVERT_SNAPSHOT` 历史快照（快照日期：2026-08-26）；HTTP 两条路径均有 15 s 硬超时 |
 | 🔒 入口隔离 | 通过 `new Function` 和独立 `globalThis` 取出上游 `main`，防止其覆盖本脚本入口；这不是安全沙箱 |
 | 💾 DNS / Hosts 保护 | 按字段是否存在完整备份并还原 `dns` / `hosts`，保留原始值、空值和缺失状态，中间脚本的重写不会污染用户配置 |
@@ -79,7 +79,7 @@ flowchart LR
 ### 关键实现
 
 - **缓存键**：`globalThis.__SUBSTORE_COMBINED_CONVERT_V2__ = { code, time }`，TTL = `6 * 60 * 60 * 1000`；缓存源码而非已绑定 `$arguments` 的函数
-- **下载**：优先 `fetch`（Node 18+ Sub-Store 后端自带），降级 `$substore.http.get`；两条路径均有 15 s 硬超时，脚本大小上限 2 MiB
+- **下载**：优先 `fetch`（Node 18+ Sub-Store 后端自带），失败后降级 `$substore.http.get`；两条路径均有 15 s 硬超时，脚本大小上限 2 MiB
 - **隔离执行**：`new Function("globalThis","$arguments", code + ";return globalThis.main;")({}, args)`
 - **参数透传**：Sub-Store URL 上的 `#` 参数优先于默认值，见下表
 
