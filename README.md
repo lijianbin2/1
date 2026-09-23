@@ -1,4 +1,4 @@
-# Sub-Store 三合一合并脚本 · substore-combined.js
+# Sub-Store 合并覆写脚本 · substore-combined.js
 
 [![Sub-Store](https://img.shields.io/badge/Sub--Store-覆写脚本-1f6feb)](https://github.com/sub-store-org/Sub-Store)
 [![Mihomo](https://img.shields.io/badge/Mihomo-Clash-ff6b35)](https://github.com/MetaCubeX/mihomo)
