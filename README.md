@@ -5,7 +5,7 @@
 [![Snapshot](https://img.shields.io/badge/快照-2026--08--26-4caf50)](./substore-combined.js)
 [![License](https://img.shields.io/badge/license-MIT-informational)](#-许可)
 
-> **自动更新版**三合一覆写脚本，执行流程等价于 `0.js → convert.min.js#grouptype=1 → 1.js`，开箱即用。
+> **远程优先、快照兜底版**三合一覆写脚本，执行流程等价于 `0.js → convert.min.js#grouptype=1 → 1.js`，开箱即用。
 
 ---
 
@@ -17,9 +17,16 @@
 2. **convert.min.js**（[powerfullz/override-rules](https://github.com/powerfullz/override-rules)）— 全量重写：节点分组、规则集、DNS、嗅探等
 3. **1.js** — 还原 DNS / Hosts + 追加自定义后处理与分流规则
 
-与传统三段式引用不同，本脚本 **运行时自动拉取最新版 `convert.min.js`**，失败时无缝回退到文件尾部的内联快照 `CONVERT_SNAPSHOT`，兼顾「始终最新」与「离线可用」。
+与传统三段式引用不同，本脚本会优先在运行时获取 CDN 上的 `convert.min.js`；下载、编译或运行失败时，回退到文件尾部的内联快照 `CONVERT_SNAPSHOT`。
 
 > 当前仓库包含可直接部署的 `substore-combined.js` 以及零依赖回归测试；部署脚本的修改直接落在该文件中。
+
+### 版本与回退
+
+- **远程来源**：`cdn.jsdelivr.net/gh/powerfullz/override-rules/convert.min.js`，源码缓存有效期为 6 小时。
+- **内联回退**：`CONVERT_SNAPSHOT` 是仓库内置的历史快照，标记日期为 `2026-08-26`；它用于远程不可用时保持脚本可运行，不保证与当前 CDN 内容一致。
+- **审查时对比**：远程源码约 `21,595` 字节，内联快照约 `19,261` 字节，内容并不相同。因此本项目是“运行时优先使用远程版本”，而不是“仓库内嵌始终是最新版”。
+- **快照维护**：当前仓库没有自动构建快照的脚本；需要更新内联快照时，需要从指定远程版本重新生成并复核。
 
 ---
 
@@ -27,8 +34,8 @@
 
 | 特性 | 说明 |
 |------|------|
-| 🔄 自动更新 | 运行时从 `cdn.jsdelivr.net/gh/powerfullz/override-rules/convert.min.js` 拉取最新版，6 h 本地内存缓存源码，避免每次生成配置都触发网络请求；缓存不会绑定首次调用参数 |
-| 🛡️ 兜底快照 | 远程拉取、编译或运行失败时自动回退到文件尾部的 `CONVERT_SNAPSHOT` 内联快照（快照日期：2026-08-26）；HTTP 两条路径均有 15 s 硬超时 |
+| 🔄 远程优先 | 运行时从 `cdn.jsdelivr.net/gh/powerfullz/override-rules/convert.min.js` 获取当前可用源码，6 h 本地内存缓存源码，避免每次生成配置都触发网络请求；缓存不会绑定首次调用参数 |
+| 🛡️ 兜底快照 | 远程拉取、编译或运行失败时回退到文件尾部的 `CONVERT_SNAPSHOT` 历史快照（快照日期：2026-08-26）；HTTP 两条路径均有 15 s 硬超时 |
 | 🔒 入口隔离 | 通过 `new Function` 和独立 `globalThis` 取出上游 `main`，防止其覆盖本脚本入口；这不是安全沙箱 |
 | 💾 DNS / Hosts 保护 | 执行前后完整备份 / 还原用户原始 `dns` 与 `hosts`，中间脚本的重写不会污染自定义 DNS |
 | 🎯 精细后处理 | 剔除「选择代理」中的「自动选择」、删除「非香港节点」组、「AI服务」摘除「选择代理/香港节点」并转故障转移、「谷歌服务」前插「AI服务」、「javdb」地区手动选择组 |
@@ -197,7 +204,7 @@ https://cdn.jsdelivr.net/gh/lijianbin2/1@main/substore-combined.js#grouptype=1
 npm test
 ```
 
-测试直接加载部署脚本，覆盖不同 `grouptype` 的缓存隔离、远程运行/返回值异常回退、HTTP 硬超时、DNS/Hosts 空值保留、后处理幂等以及 `threshold` 默认值。
+测试直接加载部署脚本，覆盖不同 `grouptype` 的缓存隔离、远程运行/返回值异常回退、`fetch` 硬超时、DNS/Hosts 空值保留、后处理幂等以及 `threshold` 默认值。
 
 > 安全提示：自动更新会在 Sub-Store 运行时执行上游远程 JavaScript。这里只解决入口覆盖与失败恢复，不等同于安全沙箱；是否信任 `powerfullz/override-rules` 由使用者决定。
 
@@ -217,4 +224,4 @@ npm test
 
 ---
 
-*README 重写于 2026-09-13；2026-09-24 完成缓存、超时、异常回退、DNS/Hosts 与测试体系审查优化 · 快照 2026-08-26 · 仓库推送 `lijianbin2/1@main`*
+*README 重写于 2026-09-13；2026-09-24 完成缓存、超时、异常回退、DNS/Hosts、测试体系与版本说明审查优化 · 内置回退快照 2026-08-26 · 仓库推送 `lijianbin2/1@main`*
