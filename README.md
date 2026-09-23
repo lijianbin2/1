@@ -5,7 +5,7 @@
 [![Snapshot](https://img.shields.io/badge/快照-2026--08--26-4caf50)](./substore-combined.js)
 [![License](https://img.shields.io/badge/license-MIT-informational)](#-许可)
 
-> 由 `build-substore-combined.js` 生成的 **自动更新版** 三合一覆写脚本，执行流程等价于 `0.js → convert.min.js#grouptype=1 → 1.js`，开箱即用、零维护。
+> **自动更新版**三合一覆写脚本，执行流程等价于 `0.js → convert.min.js#grouptype=1 → 1.js`，开箱即用。
 
 ---
 
@@ -19,7 +19,7 @@
 
 与传统三段式引用不同，本脚本 **运行时自动拉取最新版 `convert.min.js`**，失败时无缝回退到文件尾部的内联快照 `CONVERT_SNAPSHOT`，兼顾「始终最新」与「离线可用」。
 
-> ⚠️ **请勿直接编辑生成物** `substore-combined.js`，应修改源码 `src/*.ts` 后重新执行构建脚本生成。
+> 当前仓库包含可直接部署的 `substore-combined.js` 以及零依赖回归测试；部署脚本的修改直接落在该文件中。
 
 ---
 
@@ -27,9 +27,9 @@
 
 | 特性 | 说明 |
 |------|------|
-| 🔄 自动更新 | 运行时从 `cdn.jsdelivr.net/gh/powerfullz/override-rules/convert.min.js` 拉取最新版，6 h 本地内存缓存 `globalThis.__CONVERT_CACHE__`，避免每次生成配置都触发网络请求 |
-| 🛡️ 兜底快照 | 远程拉取失败自动回退到文件尾部的 `CONVERT_SNAPSHOT` 内联快照（快照日期：2026-08-26） |
-| 🔒 作用域隔离 | 通过 `new Function` 在隔离的 `globalThis` 中执行中间脚本，防止覆盖本脚本的 `main` |
+| 🔄 自动更新 | 运行时从 `cdn.jsdelivr.net/gh/powerfullz/override-rules/convert.min.js` 拉取最新版，6 h 本地内存缓存源码，避免每次生成配置都触发网络请求；缓存不会绑定首次调用参数 |
+| 🛡️ 兜底快照 | 远程拉取、编译或运行失败时自动回退到文件尾部的 `CONVERT_SNAPSHOT` 内联快照（快照日期：2026-08-26）；HTTP 两条路径均有 15 s 硬超时 |
+| 🔒 入口隔离 | 通过 `new Function` 和独立 `globalThis` 取出上游 `main`，防止其覆盖本脚本入口；这不是安全沙箱 |
 | 💾 DNS / Hosts 保护 | 执行前后完整备份 / 还原用户原始 `dns` 与 `hosts`，中间脚本的重写不会污染自定义 DNS |
 | 🎯 精细后处理 | 剔除「选择代理」中的「自动选择」、删除「非香港节点」组、「AI服务」摘除「选择代理/香港节点」并转故障转移、「谷歌服务」前插「AI服务」、「javdb」地区手动选择组 |
 | 📏 幂等规则插入 | 自定义分流规则去重插入，重复生成不堆积（`customRules + oldRules.filter`） |
@@ -39,13 +39,13 @@
 ## 📂 文件结构
 
 ```
-H:/Codex/1/
-├── substore-combined.js   # 生成物 — Sub-Store 中直接引用（30066 B，Snapshot 2026-08-26）
-└── README.md              # 本文档
-
-# 源码仓库侧（未包含在本目录）：
-# ├── build-substore-combined.js  # 构建脚本：拉取最新 convert.min.js 并拼接 0/1.js
-# └── src/*.ts                    # 逻辑源码（已迁移至 TypeScript）
+.
+├── .gitignore                   # 忽略依赖、日志和临时文件
+├── README.md                    # 本文档
+├── package.json                 # 零依赖测试入口
+├── substore-combined.js         # Sub-Store 中直接引用（Snapshot 2026-08-26）
+└── test/
+    └── substore-combined.test.js # 缓存、超时、回退、DNS/Hosts 与幂等回归测试
 ```
 
 ---
@@ -55,10 +55,10 @@ H:/Codex/1/
 ```mermaid
 flowchart LR
   A[Sub-Store 调用 main(config)] --> B[备份 dns/hosts]
-  B --> C{缓存命中? < 6h}
-  C -->|是| D[复用缓存 main]
+  B --> C{源码缓存命中? < 6h}
+  C -->|是| D[按当前参数构建缓存源码入口]
   C -->|否| E[fetch CONVERT_URL]
-  E -->|成功| F[隔离执行取出 main + 更新缓存]
+  E -->|成功| F[隔离执行取出 main + 缓存源码]
   E -->|失败| G[回退 CONVERT_SNAPSHOT]
   D & F & G --> H[convertMain(config) 全量重写]
   H --> I[还原 dns/hosts]
@@ -69,8 +69,8 @@ flowchart LR
 
 ### 关键实现
 
-- **缓存键**：`globalThis.__CONVERT_CACHE__ = { main, time }` ，TTL = `6 * 60 * 60 * 1000`
-- **下载**：优先 `fetch`（Node 18+ Sub-Store 后端自带），降级 `$substore.http.get`（15 s 超时）
+- **缓存键**：`globalThis.__SUBSTORE_COMBINED_CONVERT_V2__ = { code, time }`，TTL = `6 * 60 * 60 * 1000`；缓存源码而非已绑定 `$arguments` 的函数
+- **下载**：优先 `fetch`（Node 18+ Sub-Store 后端自带），降级 `$substore.http.get`；两条路径均有 15 s 硬超时，脚本大小上限 2 MiB
 - **隔离执行**：`new Function("globalThis","$arguments", code + ";return globalThis.main;")({}, args)`
 - **参数透传**：Sub-Store URL 上的 `#` 参数优先于默认值，见下表
 
@@ -97,7 +97,7 @@ https://cdn.jsdelivr.net/gh/<user>/<repo>/main/substore-combined.js#grouptype=2&
 | `regex` | boolean | `false` | 正则过滤模式：用 `include-all + filter` 而非枚举节点名写入地区组 |
 | `landing` | — | 自动 | 根据节点 `dialer-proxy` 字段自动识别落地节点，无需传参 |
 
-> 源码已迁移至 `src/*.ts`，参数解析见 `G(ce())`。
+> 上游参数解析入口为 `G(ce())`。
 
 ---
 
@@ -176,7 +176,7 @@ config.rules = customRules.concat(oldRules.filter(r => !customRuleSet.has(r)));
 #### 本地引用示例
 
 ```
-脚本路径: H:/Codex/1/substore-combined.js
+脚本路径: ./substore-combined.js
 参数: grouptype=1
 ```
 
@@ -189,17 +189,15 @@ https://cdn.jsdelivr.net/gh/lijianbin2/1@main/substore-combined.js#grouptype=1
 
 ---
 
-## 🛠️ 刷新内联快照
-
-当上游 `convert.min.js` 有重大更新且希望离线快照也同步时：
+## 🧪 本地验证
 
 ```bash
-node build-substore-combined.js
-# 输出: 已拉取最新 convert.min.js，快照日期: YYYY-MM-DD
-# 生成: substore-combined.js
+npm test
 ```
 
-构建脚本会自动下载最新 `convert.min.js` 并重新拼接 `0.js + 快照 + 1.js`。
+测试直接加载部署脚本，覆盖不同 `grouptype` 的缓存隔离、远程运行/返回值异常回退、HTTP 硬超时、DNS/Hosts 空值保留、后处理幂等以及 `threshold` 默认值。
+
+> 安全提示：自动更新会在 Sub-Store 运行时执行上游远程 JavaScript。这里只解决入口覆盖与失败恢复，不等同于安全沙箱；是否信任 `powerfullz/override-rules` 由使用者决定。
 
 ---
 
@@ -217,4 +215,4 @@ node build-substore-combined.js
 
 ---
 
-*README 重写于 2026-09-13，代码优化于 2026-09-17（后处理单次遍历 + Set 查找 +AI剥离短路/谷歌前插快路，行为零变化） · 组改名：javdb手动选择 → javdb（旧名已改名并自动清理） · 生成物 30066 B / 快照 2026-08-26 · 代理推送 `lijianbin2/1@main` · 维护：改 `src/*.ts` 后重跑 `build-substore-combined.js`*
+*README 重写于 2026-09-13；2026-09-24 完成缓存、超时、异常回退、DNS/Hosts 与测试体系审查优化 · 快照 2026-08-26 · 仓库推送 `lijianbin2/1@main`*
