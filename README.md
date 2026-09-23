@@ -5,19 +5,19 @@
 [![Snapshot](https://img.shields.io/badge/快照-2026--08--26-4caf50)](./substore-combined.js)
 [![License](https://img.shields.io/badge/license-MIT-informational)](#-许可)
 
-> **远程优先、快照兜底版**三合一覆写脚本，执行流程等价于 `0.js → convert.min.js#grouptype=1 → 1.js`，开箱即用。
+> **远程优先、快照兜底版**三阶段覆写脚本，执行流程为：备份 `dns` / `hosts` → 加载转换源码 → 还原配置并应用自定义后处理，开箱即用。
 
 ---
 
 ## 📌 简介
 
-`substore-combined.js` 是为 [Sub-Store](https://github.com/sub-store-org/Sub-Store) 定制的 Clash / Mihomo 配置覆写脚本，整合三段逻辑于一体：
+`substore-combined.js` 是为 [Sub-Store](https://github.com/sub-store-org/Sub-Store) 定制的 Clash / Mihomo 配置覆写脚本，将三个处理阶段合并到一个部署文件中：
 
-1. **0.js** — 备份原始 `dns` / `hosts`
-2. **convert.min.js**（[powerfullz/override-rules](https://github.com/powerfullz/override-rules)）— 全量重写：节点分组、规则集、DNS、嗅探等
-3. **1.js** — 还原 DNS / Hosts + 追加自定义后处理与分流规则
+1. **配置保护** — 备份原始 `dns` / `hosts`
+2. **配置转换** — 加载 [powerfullz/override-rules](https://github.com/powerfullz/override-rules) 的 `convert.min.js`，生成节点分组、规则集、DNS、嗅探等配置
+3. **配置收尾** — 还原 `dns` / `hosts`，并追加自定义后处理与分流规则
 
-与传统三段式引用不同，本脚本会优先在运行时获取 CDN 上的 `convert.min.js`；下载、编译或运行失败时，回退到文件尾部的内联快照 `CONVERT_SNAPSHOT`。
+与分别维护或引用多个脚本不同，本脚本会优先在运行时获取 CDN 上的 `convert.min.js`；下载、编译或运行失败时，回退到文件尾部的内联快照 `CONVERT_SNAPSHOT`。
 
 > 当前仓库包含可直接部署的 `substore-combined.js` 以及零依赖回归测试；部署脚本的修改直接落在该文件中。
 
@@ -111,7 +111,7 @@ https://cdn.jsdelivr.net/gh/<user>/<repo>/main/substore-combined.js#grouptype=2&
 
 ---
 
-## 🔧 后处理逻辑（1.js 部分）
+## 🔧 自定义后处理逻辑
 
 ### 1. 清理「选择代理」
 
