@@ -25,7 +25,7 @@
 
 - **远程来源**：`cdn.jsdelivr.net/gh/powerfullz/override-rules/convert.min.js`，源码缓存有效期为 6 小时。
 - **内联回退**：`CONVERT_SNAPSHOT` 是仓库内置的历史快照，标记日期为 `2026-08-26`；它用于远程不可用时保持脚本可运行，不保证与当前 CDN 内容一致。
-- **审查时对比**：远程源码约 `21,595` 字节，内联快照约 `19,261` 字节，内容并不相同。因此本项目是“运行时优先使用远程版本”，而不是“仓库内嵌始终是最新版”。
+- **版本差异**：审查时已通过内容哈希确认远程源码与内联快照不是同一份源码；具体大小会随上游更新变化，因此不在 README 中固化。本项目是“运行时优先使用远程版本”，而不是“仓库内嵌始终是最新版”。
 - **快照维护**：当前仓库没有自动构建快照的脚本；需要更新内联快照时，需要从指定远程版本重新生成并复核。
 
 ---
@@ -34,11 +34,11 @@
 
 | 特性 | 说明 |
 |------|------|
-| 🔄 远程优先 | 运行时从 `cdn.jsdelivr.net/gh/powerfullz/override-rules/convert.min.js` 获取当前可用源码，6 h 本地内存缓存源码，避免每次生成配置都触发网络请求；缓存不会绑定首次调用参数 |
+| 🔄 远程优先 | 运行时从 `cdn.jsdelivr.net/gh/powerfullz/override-rules/convert.min.js` 获取当前可用源码，运行期间缓存 6 h，避免每次生成配置都触发网络请求；缓存不会绑定首次调用参数 |
 | 🛡️ 兜底快照 | 远程拉取、编译或运行失败时回退到文件尾部的 `CONVERT_SNAPSHOT` 历史快照（快照日期：2026-08-26）；HTTP 两条路径均有 15 s 硬超时 |
 | 🔒 入口隔离 | 通过 `new Function` 和独立 `globalThis` 取出上游 `main`，防止其覆盖本脚本入口；这不是安全沙箱 |
-| 💾 DNS / Hosts 保护 | 执行前后完整备份 / 还原用户原始 `dns` 与 `hosts`，中间脚本的重写不会污染自定义 DNS |
-| 🎯 精细后处理 | 剔除「选择代理」中的「自动选择」、删除「非香港节点」组、「AI服务」摘除「选择代理/香港节点」并转故障转移、「谷歌服务」前插「AI服务」、「javdb」地区手动选择组 |
+| 💾 DNS / Hosts 保护 | 按字段是否存在完整备份并还原 `dns` / `hosts`，保留原始值、空值和缺失状态，中间脚本的重写不会污染用户配置 |
+| 🎯 精细后处理 | 剔除「选择代理」中的「自动选择」、删除旧的「非香港节点」组；将「AI服务」改为故障转移并摘除指定引用；将「AI服务」幂等插入「谷歌服务」；创建地区「javdb」手动选择组 |
 | 📏 幂等规则插入 | 自定义分流规则去重插入，重复生成不堆积（`customRules + oldRules.filter`） |
 
 ---
@@ -96,6 +96,7 @@ https://cdn.jsdelivr.net/gh/<user>/<repo>/main/substore-combined.js#grouptype=2&
 | 参数 | 类型 | 默认 | 说明 |
 |------|------|------|------|
 | `grouptype` | `0 / 1 / 2` | `1` | 地区分组类型：`0` = select 手动选择、`1` = url-test 自动测速、`2` = load-balance 负载均衡。兼容旧参 `loadbalance=true→2 / false→1` |
+| `loadbalance` | boolean | — | 兼容参数：`true` 会映射为 `grouptype=2`，`false` 允许继续使用 `grouptype`；建议新配置只传 `grouptype` |
 | `ipv6` | boolean | `false` | 启用 IPv6 |
 | `tun` | boolean | `false` | 启用 TUN（gVisor + route-exclude + dns-hijack） |
 | `full` | boolean | `false` | 输出完整 Mihomo 配置（含 mixed-port、external-controller 等，适合纯内核启动） |
@@ -116,7 +117,9 @@ https://cdn.jsdelivr.net/gh/<user>/<repo>/main/substore-combined.js#grouptype=2&
 
 ```js
 // 从「选择代理」中排除「自动选择」，避免与 url-test 组重复调度
-g.proxies = g.proxies.filter(p => p !== "自动选择");
+if (Array.isArray(g.proxies) && g.proxies.includes("自动选择")) {
+  g.proxies = g.proxies.filter(p => p !== "自动选择");
+}
 ```
 
 ### 2. 收集地区节点组（动态，不硬编码）
@@ -200,13 +203,15 @@ https://cdn.jsdelivr.net/gh/lijianbin2/1@main/substore-combined.js#grouptype=1
 
 ## 🧪 本地验证
 
+需要 Node.js 18 或更高版本。测试不依赖第三方包。
+
 ```bash
 npm test
 ```
 
 测试直接加载部署脚本，覆盖不同 `grouptype` 的缓存隔离、远程运行/返回值异常回退、`fetch` 硬超时、DNS/Hosts 空值保留、后处理幂等以及 `threshold` 默认值。
 
-> 安全提示：自动更新会在 Sub-Store 运行时执行上游远程 JavaScript。这里只解决入口覆盖与失败恢复，不等同于安全沙箱；是否信任 `powerfullz/override-rules` 由使用者决定。
+> 安全提示：远程优先策略会在 Sub-Store 运行时执行上游 JavaScript。这里的入口隔离不是安全沙箱；是否信任 `powerfullz/override-rules` 由使用者决定。
 
 ---
 
