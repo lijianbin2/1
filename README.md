@@ -54,17 +54,19 @@
 
 ```mermaid
 flowchart LR
-  A[Sub-Store 调用 main(config)] --> B[备份 dns/hosts]
-  B --> C{源码缓存命中? < 6h}
-  C -->|是| D[按当前参数构建缓存源码入口]
-  C -->|否| E[fetch CONVERT_URL]
-  E -->|成功| F[隔离执行取出 main + 缓存源码]
-  E -->|失败| G[回退 CONVERT_SNAPSHOT]
-  D & F & G --> H[convertMain(config) 全量重写]
-  H --> I[还原 dns/hosts]
-  I --> J[后处理 proxy-groups]
-  J --> K[追加 customRules]
-  K --> L[return config]
+  A["Sub-Store 调用 main(config)"] --> B["备份 dns/hosts"]
+  B --> C{"源码缓存命中且未超过 6 小时"}
+  C -->|是| D["按当前参数构建缓存源码入口"]
+  C -->|否| E["拉取 CONVERT_URL"]
+  E -->|成功| F["隔离执行并缓存源码"]
+  E -->|失败| G["回退到 CONVERT_SNAPSHOT"]
+  D --> H["执行 convertMain(config) 全量重写"]
+  F --> H
+  G --> H
+  H --> I["还原 dns/hosts"]
+  I --> J["后处理 proxy-groups"]
+  J --> K["追加 customRules"]
+  K --> L["返回 config"]
 ```
 
 ### 关键实现
