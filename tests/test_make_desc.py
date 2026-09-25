@@ -2,7 +2,13 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from make_desc import build_quark, check_copy, write_project
+from make_desc import (
+    build_quark,
+    build_title,
+    check_copy,
+    check_public_copy,
+    write_project,
+)
 
 
 class MakeDescTests(unittest.TestCase):
@@ -12,16 +18,34 @@ class MakeDescTests(unittest.TestCase):
         self.assertEqual(check_copy("示例项目 10集 只发夸克", body), [])
         self.assertIn("currency-in-title", check_copy("示例项目 10元", body))
 
-    def test_write_project_writes_matching_utf8_files(self):
+    def test_write_project_keeps_public_copy_separate_from_delivery_details(self):
         quark = build_quark("示例项目", "https://pan.quark.cn/s/abc123", "abcd")
-        body = "只发夸克网盘\n" + quark
+        body = "只发夸克网盘"
         with tempfile.TemporaryDirectory() as directory:
             result = write_project(directory, "示例项目 10集 只发夸克", body, quark)
             self.assertEqual(result, [])
-            first = (Path(directory) / "desc.txt").read_bytes()
-            second = (Path(directory) / "闲鱼发布文案_直接复制.txt").read_bytes()
-            self.assertEqual(first, second)
-            self.assertIn("提取码：abcd", first.decode("utf-8"))
+            full = (Path(directory) / "desc.txt").read_text(encoding="utf-8")
+            public = (Path(directory) / "闲鱼发布文案_直接复制.txt").read_text(encoding="utf-8")
+            self.assertIn("提取码：abcd", full)
+            self.assertIn("示例项目 10集 只发夸克", public)
+            self.assertNotIn("提取码：", public)
+            self.assertNotIn("https://pan.quark.cn", public)
+            self.assertNotIn("分享ID", public)
+
+    def test_check_public_copy_rejects_share_details(self):
+        title = "示例项目 10集 只发夸克"
+        body = "只发夸克网盘，拍后提供链接 https://pan.quark.cn/s/abc123 提取码：abcd"
+        violations = check_public_copy(title, body)
+        self.assertIn("url-in-body", violations)
+        self.assertIn("delivery-field-in-body", violations)
+
+    def test_build_title_rejects_empty_values(self):
+        with self.assertRaises(ValueError):
+            build_title("", "10集")
+
+    def test_build_quark_rejects_invalid_code(self):
+        with self.assertRaises(ValueError):
+            build_quark("示例项目", "https://pan.quark.cn/s/abc123", "123")
 
     def test_write_project_rejects_empty_fields(self):
         with tempfile.TemporaryDirectory() as directory:

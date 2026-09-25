@@ -89,20 +89,55 @@ def validate_png_files(
     size: tuple[int, int] = (1080, 1080),
     names: Iterable[str] | None = None,
 ) -> list[Path]:
-    """验证一组 PNG 文件存在且尺寸正确，返回实际问题列表。"""
-    if count < 1:
+    """验证一组 PNG 文件存在且尺寸正确，返回实际问题列表。
+
+    ``names`` 只接受纯文件名，避免调用方意外把校验范围扩展到目录外。
+    损坏或无法解码的图片也作为问题返回，保证批量任务能收集完整报告。
+    """
+    if not isinstance(count, int) or isinstance(count, bool) or count < 1:
         raise ValueError("count must be greater than zero")
+    if (
+        not isinstance(size, tuple)
+        or len(size) != 2
+        or any(
+            not isinstance(value, int) or isinstance(value, bool) or value <= 0
+            for value in size
+        )
+    ):
+        raise ValueError("size must contain two positive integers")
+
     directory = Path(directory)
-    filenames = list(names) if names is not None else [f"{i:02d}.png" for i in range(1, count + 1)]
+    filenames = (
+        list(names)
+        if names is not None
+        else [f"{i:02d}.png" for i in range(1, count + 1)]
+    )
     problems: list[Path] = []
+    seen: set[str] = set()
     for filename in filenames:
+        if (
+            not isinstance(filename, str)
+            or not filename
+            or filename in {".", ".."}
+            or Path(filename).name != filename
+            or Path(filename).is_absolute()
+        ):
+            problems.append(Path(str(filename)))
+            continue
+        if filename in seen:
+            problems.append(directory / filename)
+            continue
+        seen.add(filename)
         path = directory / filename
         if not path.is_file():
             problems.append(path)
             continue
-        with Image.open(path) as image:
-            if image.format != "PNG" or image.size != size:
-                problems.append(path)
+        try:
+            with Image.open(path) as image:
+                if image.format != "PNG" or image.size != size:
+                    problems.append(path)
+        except (OSError, ValueError):
+            problems.append(path)
     return problems
 
 
