@@ -12,8 +12,8 @@ def get_font(size, bold=False):
     path = r"C:\Windows\Fonts\msyhbd.ttc" if bold else r"C:\Windows\Fonts\msyh.ttc"
     try:
         return ImageFont.truetype(path, size)
-    except:
-        return ImageFont.load_default()
+    except OSError:
+        raise RuntimeError(f"无法加载字体：{path}") from None
 
 def draw_board():
     im = Image.new("RGB", (W,H), BLUE)
@@ -241,7 +241,7 @@ im, draw = draw_board()
 draw.text((BORDER+40, BORDER+28), "发货指南", fill=DARK, font=title_font)
 draw.text((BORDER+40, BORDER+28+56), "虚拟资料 · 只发夸克网盘 · 不发百度/实物", fill=GRAY, font=sub_font)
 steps=[
-    ("1","拍下即得","夸克网盘链接自动发货，无需等待"),
+    ("1","拍后提供链接","下单后发送夸克网盘链接与提取码"),
     ("2","不限时·需提取码","带文件名，永久有效，反复下载"),
     ('3','即学即用','37个实战视频，按顺序学习即可复刻'),
     ("4","售后说明","虚拟资料不包变现承诺，按需拍"),

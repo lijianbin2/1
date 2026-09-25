@@ -1,9 +1,7 @@
 import argparse
 from pathlib import Path
 
-from PIL import Image
-
-from xianyu_common import draw_board, get_font, save_png, wrap_text
+from xianyu_common import draw_board, get_font, save_png, validate_png_files, wrap_text
 
 
 W = H = 1080
@@ -240,10 +238,9 @@ def main() -> int:
     render_outcomes(args.out)
     render_guide(args.out)
 
-    expected = [args.out / f"{i:02d}.png" for i in range(1, 5)]
-    invalid = [str(path) for path in expected if Image.open(path).size != (W, H)]
+    invalid = validate_png_files(args.out, size=(W, H))
     if invalid:
-        raise RuntimeError("图片尺寸不是 1080x1080：" + ", ".join(invalid))
+        raise RuntimeError("图片文件校验失败：" + ", ".join(str(path) for path in invalid))
     print(f"generated {args.out}")
     return 0
 

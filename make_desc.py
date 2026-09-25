@@ -89,6 +89,8 @@ def build_quark(folder: str, link: str, code: str) -> str:
     values = (folder.strip(), link.strip(), code.strip())
     if not all(values):
         raise ValueError("folder、link、code 均不能为空")
+    if any("\n" in value or "\r" in value for value in values):
+        raise ValueError("folder、link、code 不能包含换行")
     if not link.startswith("https://pan.quark.cn/s/"):
         raise ValueError("link 必须是夸克分享链接")
     labels = ("文件夹名", "链接", "提取码")
@@ -100,8 +102,13 @@ def write_project(out_dir: str | Path, title: str, body: str, quark_block: str) 
 
     校验失败时不创建目录、不写入文件，避免失败任务留下半成品。
     """
+    title = title.strip()
     body = body.strip()
-    full_body = f"{title.strip()}\n\n{body}\n\n{quark_block.strip()}"
+    quark_block = quark_block.strip()
+    if not title or not body or not quark_block:
+        print("check failed violations=empty-field")
+        return ["empty-field"]
+    full_body = f"{title}\n\n{body}\n\n{quark_block}"
     bad = check_copy(title.strip(), full_body)
     if bad:
         print(f"check failed violations={bad}")

@@ -16,8 +16,8 @@ def get_font(size, bold=False):
     p = "C:/Windows/Fonts/msyhbd.ttc" if bold else "C:/Windows/Fonts/msyh.ttc"
     try:
         return ImageFont.truetype(p, size)
-    except Exception:
-        return ImageFont.load_default()
+    except OSError:
+        raise RuntimeError(f"无法加载字体：{p}") from None
 
 def draw_board():
     im = Image.new("RGB", (W, H), BLUE)
@@ -93,7 +93,7 @@ for s in ["RAR", "ZIP", "7Z", "CAB", "ISO"]:
     d.text((sx + 14, 552), s, fill=BLUE, font=ff)
     sx += w + 12
 d.rounded_rectangle([BORDER + 40, 630, W - BORDER - 40, 760], radius=18, fill=(248, 250, 252), outline=(226, 232, 240), width=1)
-cols = [("下单秒发", "拍后发夸克链接"), ("即装即用", "双击安装右键即用"), ("小白友好", "下载就会用")]
+cols = [("拍后提供链接", "拍后发夸克链接"), ("即装即用", "双击安装右键即用"), ("小白友好", "下载就会用")]
 for j, (h, s) in enumerate(cols):
     ix = BORDER + 60 + j * ((W - 2 * BORDER - 80) // 3)
     d.text((ix, 646), h, fill=BLUE, font=get_font(22, bold=True))
@@ -111,6 +111,7 @@ d.text((BORDER + 40, BORDER + 28), "文件详情", fill=DARK, font=get_font(44, 
 d.text((BORDER + 40, BORDER + 28 + 56), "1个安装包 4.1MB Win10/11 64位", fill=GRAY, font=get_font(24))
 BADGE2_DEFAULT = "64位"
 BADGE2 = VER if VER else BADGE2_DEFAULT
+bf2 = get_font(26, bold=True)
 bw2 = d.textlength(BADGE2, font=bf2) + 44
 d.rounded_rectangle([W - BORDER - 40 - bw2, BORDER + 36, W - BORDER - 40, BORDER + 36 + 42], radius=21, fill=BLUE)
 d.text((W - BORDER - 40 - bw2 + 22, BORDER + 45), BADGE2, fill="white", font=bf2)
@@ -184,7 +185,7 @@ print("03 saved", (out / "03.png").stat().st_size)
 im, d = draw_board()
 d.text((BORDER + 40, BORDER + 28), "发货指南", fill=DARK, font=get_font(44, bold=True))
 d.text((BORDER + 40, BORDER + 28 + 56), "虚拟资料 只发夸克网盘 不发实物", fill=GRAY, font=get_font(24))
-steps = [("1", "拍下即得", "夸克网盘链接发货 无需等待"), ("2", "不限时需提取码", "带文件名 永久有效反复下"), ("3", "即装即用", "exe双击安装右键即用"), ("4", "售后说明", "虚拟资料按需拍不包退换")]
+steps = [("1", "拍后提供链接", "夸克网盘链接发货 无需等待"), ("2", "不限时需提取码", "带文件名 永久有效反复下"), ("3", "即装即用", "exe双击安装右键即用"), ("4", "售后说明", "虚拟资料按需拍不包退换")]
 yy = BORDER + 120
 for n, t, s in steps:
     d.rounded_rectangle([BORDER + 40, yy, W - BORDER - 40, yy + 110], radius=18, fill=(248, 250, 252), outline=(226, 232, 240), width=1)

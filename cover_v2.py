@@ -7,7 +7,7 @@ BLUE=(37,80,255); DEEP=(18,32,120); DARK=(24,32,54); GRAY=(95,110,135); WHITE=(2
 def get_font(size, bold=False):
     p = r"C:\Windows\Fonts\msyhbd.ttc" if bold else r"C:\Windows\Fonts\msyh.ttc"
     try: return ImageFont.truetype(p, size)
-    except: return ImageFont.load_default()
+    except OSError: raise RuntimeError(f"无法加载字体：{p}") from None
 
 def grad_bg(c1, c2):
     im = Image.new("RGB",(W,H),c1); d = ImageDraw.Draw(im)
@@ -64,12 +64,12 @@ def make(style, path):
         mf=get_font(20,True); mt="一看就会" if i==0 else ("即学即用" if i==1 else "覆盖办公")
         mw=d.textlength(mt,font=mf); d.text((x+(cw-mw)//2,y0+172),mt,fill=WHITE,font=mf)
     # meta strip
-    mtxt="37课时 · 目录实拍 · 小白可学 · 自动发货"
+    mtxt="37课时 · 目录实拍 · 小白可学 · 拍后提供链接"
     mf2=get_font(26); mw2=d.textlength(mtxt,font=mf2)
     d.text(((W-mw2)//2,680),mtxt,fill=GRAY,font=mf2)
     # info box fills middle blank
     d.rounded_rectangle([90,724,W-90,856],radius=22,fill=(238,243,255) if style=="B" else (232,238,255),outline=(37,80,255) if style=="A" else (205,218,250),width=2)
-    il=[("下单秒发","拍后自动发夸克链接"),("多端可看","手机电脑平板随时学"),("小白友好","37集从入门到实战")]
+    il=[("拍后提供链接","拍后发夸克链接"),("多端可看","手机电脑平板随时学"),("小白友好","37集从入门到实战")]
     for j,(h,s) in enumerate(il):
         ix=130+j*((W-180)//3)
         hf=get_font(26,True); d.text((ix,744),h,fill=BLUE,font=hf)
