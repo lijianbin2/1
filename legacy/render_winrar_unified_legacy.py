@@ -5,6 +5,12 @@ VER = os.environ.get("XIANYU_LEGACY_VERSION", "v7.23").strip()
 VER_PREFIX = (VER + " ") if VER else ""
 import pathlib
 
+# 安装包体积集中声明。默认 4.1MB 对应源文件实测 4,102,490 字节（十进制 MB）；
+# 换版本时用环境变量覆盖，或用 verify_source.py 重新核验后改这里。
+PACKAGE_MB = os.environ.get("XIANYU_WINRAR_MB", "4.1").strip()
+SIZE_LABEL = f"约{PACKAGE_MB}MB"
+SIZE_SHORT = f"{PACKAGE_MB}MB"
+
 W = H = 1080
 BORDER = 38
 BLUE = (47, 93, 255)
@@ -135,7 +141,7 @@ for j, (h, s) in enumerate(cols):
     d.text((ix, info_y + 20), h, fill=BLUE, font=get_font(22, bold=True))
     d.text((ix, info_y + 62), s, fill=GRAY, font=get_font(18))
     d.text((ix, info_y + 90), "无需等待" if j == 0 else ("Win10/11亲测" if j == 1 else "装机必备"), fill=GRAY, font=get_font(18))
-d.text((BORDER + 40, foot_y), "WinRAR " + VER_PREFIX + "64位 单文件安装包 约4.1MB", fill=GRAY, font=get_font(22))
+d.text((BORDER + 40, foot_y), "WinRAR " + VER_PREFIX + "64位 单文件安装包 " + SIZE_LABEL, fill=GRAY, font=get_font(22))
 d.text((BORDER + 40, foot_y + 30), "下载exe 双击安装 右键即见解压菜单", fill=GRAY, font=get_font(20))
 bottom_bar(d, "只发夸克", "虚拟资料 拍后发网盘链接 无需物流")
 im.save(out / "01.png", "PNG")
@@ -144,14 +150,14 @@ print("01 saved", (out / "01.png").stat().st_size)
 # ---------- 02 file detail ----------
 im, d = draw_board()
 d.text((BORDER + 40, BORDER + 28), "文件详情", fill=DARK, font=get_font(44, bold=True))
-d.text((BORDER + 40, BORDER + 28 + 56), "1个安装包 4.1MB Win10/11 64位", fill=GRAY, font=get_font(24))
+d.text((BORDER + 40, BORDER + 28 + 56), "1个安装包 " + SIZE_SHORT + " Win10/11 64位", fill=GRAY, font=get_font(24))
 BADGE2_DEFAULT = "64位"
 BADGE2 = VER if VER else BADGE2_DEFAULT
 bf2 = get_font(26, bold=True)
 bw2 = d.textlength(BADGE2, font=bf2) + 44
 d.rounded_rectangle([W - BORDER - 40 - bw2, BORDER + 36, W - BORDER - 40, BORDER + 36 + 42], radius=21, fill=BLUE)
 d.text((W - BORDER - 40 - bw2 + 22, BORDER + 45), BADGE2, fill="white", font=bf2)
-cards = [("文件名", "WinRAR " + VER_PREFIX + "64位 单文件版"), ("大小", "约4.1MB 单文件"), ("系统", "Win10 / Win11 64位"), ("格式", "RAR ZIP 7Z CAB ISO全解")]
+cards = [("文件名", "WinRAR " + VER_PREFIX + "64位 单文件版"), ("大小", SIZE_LABEL + " 单文件"), ("系统", "Win10 / Win11 64位"), ("格式", "RAR ZIP 7Z CAB ISO全解")]
 cw = (W - 2 * BORDER - 80) // 2
 INFO_CARD_H = 110
 GRID_H = INFO_CARD_H * 2 + 20
@@ -182,7 +188,7 @@ d.text((BORDER + 60, step_y + 20), "安装3步", fill=DARK, font=get_font(22, bo
 d.text((BORDER + 60, step_y + 62), "下载exe 双击安装 右键即见解压菜单", fill=GRAY, font=get_font(20))
 d.rounded_rectangle([BORDER + 40, pure_y, W - BORDER - 40, pure_y + BOX_H], radius=18, fill=(248, 250, 252), outline=(226, 232, 240), width=1)
 d.text((BORDER + 60, pure_y + 20), "单文件纯净包", fill=DARK, font=get_font(22, bold=True))
-d.text((BORDER + 60, pure_y + 62), "4.1MB 下载快 不捆绑 到手即装即用", fill=GRAY, font=get_font(20))
+d.text((BORDER + 60, pure_y + 62), SIZE_SHORT + " 下载快 不捆绑 到手即装即用", fill=GRAY, font=get_font(20))
 d.text((BORDER + 40, foot_y + 4), "右键菜单集成 选中文件即压即解 无需开软件", fill=GRAY, font=get_font(20))
 bottom_bar(d, "只发夸克", "虚拟资料 拍后发网盘链接 整理即用")
 im.save(out / "02.png", "PNG")

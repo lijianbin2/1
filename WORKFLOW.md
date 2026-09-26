@@ -1,32 +1,36 @@
 # 闲鱼图文发布工作流程
 
-这份文档是本项目唯一的发布流程说明。目标是任何一个新项目都能按同一套步骤
-走完：核验素材 → 生成四张图 → 生成正文 → 备好分享信息 → 填表 → 确认发布。
+这是本项目唯一的流程说明。新项目照这七步走完即可发布：
 
-核心原则：**数字必须实测，文案必须可复制，发布必须先确认。**
+```text
+① 核验素材 → ② 生成四张图 → ③ 生成正文 → ④ 备好分享信息
+        → ⑤ 填表 → ⑥ 展示摘要等确认 → ⑦ 发布并交付
+```
+
+三条底线：**数字来自实测，文案可一键复制，发布必须先确认。**
 
 ## 1. 硬规则
 
 1. 闲鱼正文不能出现网盘 URL、分享 ID、提取码或密码。
-2. 夸克链接和提取码只作为独立交付信息，不进正文、不进 Git、不进代码和测试。
-3. 点击"发布"前必须得到用户明确确认。
-4. 登录、扫码、短信验证码、安全验证由用户本人完成。
-5. 没核验过的文件数量、体积、格式不能写进正文和商品图。
-6. 四张图必须通过尺寸和完整性校验才能上传。
-7. 用户已经给过的信息（项目名、源目录、价格、素材统计）不要重复索要。
+2. 夸克链接和提取码只作独立交付信息，不进正文、不进 Git、不进代码和测试。
+3. 点"发布"前必须拿到用户明确确认。
+4. 登录、扫码、验证码、安全验证由用户本人完成。
+5. 没实测过的数量、体积、格式不准写进正文和商品图。
+6. 四张图通过尺寸和完整性校验才能上传，且每张都要目视看过。
+7. 用户已给过的信息（项目名、源目录、价格、素材统计）不要重复索要。
 
 ## 2. 项目状态
 
 ```text
-待核验 → 素材已核验 → 图片已生成 → 文案已生成
-      → 分享信息已准备 → 表单已填写 → 待用户确认 → 已发布 → 已交付
+待核验 → 素材已核验 → 图片已生成 → 文案已生成 → 分享信息已准备
+      → 表单已填写 → 待用户确认 → 已发布 → 已交付
 ```
 
-"图片已上传"不等于"已发布"，"分享信息已准备"不等于"已交付"。
+"图片已上传"不等于"已发布"，"链接已备好"不等于"已交付"。
 
 ## 3. 收集信息
 
-开工前一次性确认，缺项才问：
+开工时一次性确认，只问缺的：
 
 | 信息 | 来源 |
 | --- | --- |
@@ -43,7 +47,7 @@ python verify_source.py --root "M:\WebDAV\夸克\软件\项目名"
 ```
 
 输出文件总数、总体积、一级分类数量、扩展名分布。**不要用 PowerShell 手数，
-不要凭目录名推断。** 退出码非 0 表示目录名标注与实际文件数不符，以实际为准。
+不要凭目录名猜。** 退出码非 0 表示目录名标注和实际文件数对不上，以实际为准。
 
 文案写好后再连同数量声明一起校验：
 
@@ -51,8 +55,24 @@ python verify_source.py --root "M:\WebDAV\夸克\软件\项目名"
 python verify_source.py --root "M:\WebDAV\夸克\软件\项目名" --copy "D:\闲鱼\项目名\闲鱼发布文案_直接复制.txt"
 ```
 
-非 0 退出就按报告改正文或源素材，不带着偏差往下走。实际文件数明显少于预期时，
-先查同步是否失败，不要为了对上目录名而虚报数量。
+非 0 退出就按报告改正文或素材，改完重跑。实际文件数明显少于预期时先查同步是否
+失败，不要为了对上目录名而虚报数量。
+
+### 已核验基准值
+
+改数据表或常量前先核验，别凭记忆。以下是 2026-09-26 对真实源目录的实测结果，
+对应测试里钉住的值：
+
+| 项目 | 源目录实测 | 代码位置 |
+| --- | --- | --- |
+| 高清一亿像素地图矢量图 | 468 个文件 / 7.24GB | 自动读取，无需改代码 |
+| 宣传片背景音乐合集 | 970 首，7 类 37/67/69/88/111/111/487 | `render_promo_music.py` `CATEGORIES` |
+| 相机基础入门课 | 41 个视频，12 个章节 | `render_camera_basics.py` `LESSONS` / `CHAPTERS` |
+| WorkBuddy 智能体实战 | 37 个视频 | `legacy/render_workbuddy_legacy.py` `LESSONS` |
+| WinRAR 单文件安装包 | 4,102,490 字节 ≈ 4.1MB | `legacy/render_winrar_unified_legacy.py` `PACKAGE_MB` |
+
+Codex 办公课的源目录当前不在素材盘上，55 这个数字暂时无法复核，
+用 `XIANYU_CODEX_LESSONS` 覆盖前请先跑一次 `verify_source.py`。
 
 ## 5. 生成四张图
 
@@ -80,15 +100,25 @@ python render_winrar_unified.py --version "v7.23" --out "D:\闲鱼\项目名"
 
 ### 图上数量怎么来
 
-数量永远不允许手打：
+数量永远不允许手打，只允许来自三个地方之一：
 
-- 地图项目：`render_map_collection.py` 调 `scan_source()` 实测源目录，
-  文件数和体积直接进图。
-- 宣传片音乐：改 `CATEGORIES` 数据表，总数由它求和。
-- 相机课程：改 `LESSONS` / `CHAPTERS` 常量，文案用 `LESSON_LABEL` 推导。
+- 实测：`render_map_collection.py` 调 `scan_source()` 扫源目录，文件数和体积直接进图。
+- 数据表：`render_promo_music.py` 的 `CATEGORIES`，总数由它求和。
+- 常量：`render_camera_basics.py` 的 `LESSONS` / `CHAPTERS`，文案用
+  `LESSON_LABEL` / `CHAPTER_LABEL` 推导。
 
-`tests/test_render_promo_music.py` 和 `tests/test_render_camera_basics.py`
-会扫描源码，发现数据表和常量之外的手打数量就让测试失败。
+`legacy/` 下的四个脚本同样遵守：数量集中在 `LESSONS` / `MODULES` / `PACKAGE_MB`，
+并且能用环境变量覆盖，换课不用改代码：
+
+```powershell
+$env:XIANYU_WORKBUDDY_LESSONS = "37"
+$env:XIANYU_CODEX_LESSONS      = "55"
+$env:XIANYU_WINRAR_MB          = "4.1"
+```
+
+`tests/test_render_promo_music.py`、`tests/test_render_camera_basics.py`、
+`tests/test_legacy_constants.py` 会扫描源码，发现常量和数据表之外的手打数量就让
+测试失败；前两个还把实测值钉死，数据表过期会立刻红。
 
 ### 版式怎么调
 
@@ -122,6 +152,17 @@ problems = validate_png_files(r"D:\闲鱼\项目名", size=(1080, 1080))
 除程序校验外，**每张图都要目视看过**：文字不出框、不重叠、不被裁切，
 预览图不拉伸变形。
 
+纯重构（比如把硬编码数字换成常量）必须证明版式没变，用临时 worktree 对比哈希：
+
+```powershell
+git worktree add D:\tmp\xb_head HEAD
+python render_workbuddy.py --out D:\tmp\xb_old\workbuddy
+python render_workbuddy.py --out D:\tmp\xb_new\workbuddy   # 改完的代码
+git worktree remove D:\tmp\xb_head --force
+```
+
+两目录同名 PNG 哈希应完全一致。哈希变了说明改常量时手滑动了别的地方。
+
 ## 6. 生成正文
 
 一条命令产出标题、正文和交付文件：
@@ -142,6 +183,8 @@ desc.txt                    完整交付包，含分享信息，只作本地记�
 
 拿分享信息之前也可以先只生成公开正文；等链接有了再执行第 7 步补齐 `desc.txt`。
 
+校验不过就非 0 退出并列出违规项，改正文重跑，不要带着违规往下走。
+
 ## 7. 准备夸克分享信息
 
 在夸克网盘找到同名文件夹，确认是**私密永久分享**，然后一条命令写入并
@@ -151,7 +194,7 @@ desc.txt                    完整交付包，含分享信息，只作本地记�
 python make_desc.py --out "D:\闲鱼\项目名" --core "项目名称" --count "10集" --intro "一句话介绍" --module "内容明细一" --audience "摄影新手" --folder "项目名称" --link "https://pan.quark.cn/s/真实ID" --code "a1b2" --copy
 ```
 
-`--copy` 会把严格三行放进系统剪贴板：
+`--copy` 走 Windows `clip`（UTF-16LE），中文不会乱码，会把严格三行放进剪贴板：
 
 ```text
 文件夹名：项目名称
@@ -160,7 +203,8 @@ python make_desc.py --out "D:\闲鱼\项目名" --core "项目名称" --count "1
 ```
 
 输出 `clipboard=ok` 才算复制成功；失败会打印 `clipboard=failed` 并把三行
-打到终端，此时手动复制，不要谎称已复制。
+打到终端，此时手动复制，不要谎称已复制。**这一步做完就不要再问用户要链接，
+用户只需要粘一次。**
 
 交付纪律：
 
@@ -172,7 +216,7 @@ python make_desc.py --out "D:\闲鱼\项目名" --core "项目名称" --count "1
 
 1. 打开闲鱼发布页，确认已登录正确账号。
 2. 出现扫码、验证码或安全验证就停下，请用户本人完成。
-3. 上传 `01.png` ~ `04.png`，确认页面显示四张都已上传。
+3. 上传 `01.png` ~ `04.png`，确认页面显示四张都已上传（"图片已上传"≠"已发布"）。
 4. 标题、正文取自 `闲鱼发布文案_直接复制.txt`，不手敲。
 5. 填用户确认的价格，选择页面实际提供的分类，虚拟资料选"无需邮寄"。
 6. 任何一步都不要把夸克链接或提取码填进表单。
@@ -197,6 +241,8 @@ python make_desc.py --out "D:\闲鱼\项目名" --core "项目名称" --count "1
 确认后再点发布，等待成功提示或商品链接，记录真实结果。
 发布成功后再单独交付剪贴板里的分享信息。
 
+没拿到确认就停在"待用户确认"，不要自己点。
+
 ## 10. 故障处理
 
 | 问题 | 处理方式 |
@@ -213,6 +259,8 @@ python make_desc.py --out "D:\闲鱼\项目名" --core "项目名称" --count "1
 | `clipboard=failed` | 手动复制终端打印的三行 |
 | 未得到发布确认 | 停在"待用户确认" |
 | 发布后无成功提示 | 保留页面，报实际状态，不谎称成功 |
+| 改常量后图片哈希变了 | 查是不是手滑改了坐标或尺寸，重来 |
+| 测试报"实测值"不匹配 | 素材同步可能变了，重跑 `verify_source.py` 再更新数据表 |
 
 ## 11. 提交前检查
 
@@ -222,7 +270,7 @@ python -m compileall -q .
 git diff --check
 ```
 
-确认没有把凭据和浏览器数据带进版本库，两条命令都应无输出：
+确认没有把凭据和浏览器数据带进版本库，三条命令都应无输出：
 
 ```powershell
 git ls-files | Select-String "chrome-profile|Cookie|playwright"
@@ -230,9 +278,11 @@ rg -n -i "pan\.quark\.cn/s/[0-9a-zA-Z]{10,}" --glob "*.py" --glob "*.md" .
 rg -n "提取码[:：]\s*[0-9a-zA-Z]{4}" --glob "*.py" --glob "!tests/**" --glob "!WORKFLOW.md" .
 ```
 
-第二条刻意排除了 `tests/` 和本文件：`tests/` 里的假提取码是校验用例的输入，
-本文件第 7 节的示例值是占位符，两者都不是真实凭据。除这两处外必须无输出，
-说明真实链接和提取码没有泄漏进源码。
+第三条刻意排除了 `tests/` 和本文件：`tests/` 里的假提取码是校验用例的输入，
+本文件第 7 节的示例值是占位符，两者都不是真实凭据。
+
+这三条必须真的跑，不能凭印象说"检查过了"——之前就出过凭据扫描看着干净、
+实际有输出的情况。
 
 装了 Ruff 再跑 `python -m ruff check .`。
 
@@ -260,3 +310,18 @@ tests/               unittest 测试
 
 `legacy/` 里的实现仍在实际运行，改动前先跑对应公开入口验证。
 后续迁移到 `xianyu_common.py` 时，保持公开入口签名不变。
+
+### 测试分工
+
+```text
+test_entrypoints.py            七个入口导入无副作用、legacy 环境变量能恢复
+test_xianyu_common.py          版式工具、区块不重叠、PNG 校验
+test_verify_source.py          统计扫描、数量声明违规能被抓到
+test_make_desc.py              正文生成、链接/提取码拦截、剪贴板
+test_render_map_collection.py  地图统计标签来自实测
+test_render_promo_music.py     分类数据表等于实测 970 首
+test_render_camera_basics.py   课时/章节等于实测 41/12，源码无手打数量
+test_legacy_constants.py       legacy 数量只在常量处声明，可被环境变量覆盖
+```
+
+渲染类测试会真的往临时目录出图，字体缺失会直接失败，这是有意的。

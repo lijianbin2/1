@@ -5,6 +5,11 @@ import pathlib
 W=H=1080
 BLUE=(37,80,255); DEEP=(18,32,120); DARK=(24,32,54); GRAY=(95,110,135); WHITE=(255,255,255)
 
+# 课时数集中声明，改数量只改这里；可用环境变量覆盖。
+LESSONS = int(os.environ.get("XIANYU_WORKBUDDY_LESSONS", "37"))
+LESSON_SHORT = f"{LESSONS}集"
+LESSON_FULL = f"{LESSONS}课时"
+
 def get_font(size, bold=False):
     p = r"C:\Windows\Fonts\msyhbd.ttc" if bold else r"C:\Windows\Fonts\msyh.ttc"
     try: return ImageFont.truetype(p, size)
@@ -38,7 +43,7 @@ def make(style, path):
     cardfill = WHITE if style=="B" else (246,248,255)
     d.rounded_rectangle(card,radius=36,fill=cardfill,outline=(200,212,245),width=2)
     # badge
-    bf=get_font(28,True); bt="37集全 · 智能体实战"
+    bf=get_font(28,True); bt=f"{LESSON_SHORT}全 · 智能体实战"
     bw=d.textlength(bt,font=bf)+56; bx=(W-bw)//2; by=120
     d.rounded_rectangle([bx,by,bx+bw,by+52],radius=26,fill=BLUE)
     d.text((bx+(bw-d.textlength(bt,font=bf))//2,by+10),bt,fill=WHITE,font=bf)
@@ -76,12 +81,12 @@ def make(style, path):
         mf=get_font(20,True); mt="一看就会" if i==0 else ("即学即用" if i==1 else "覆盖办公")
         mw=d.textlength(mt,font=mf); d.text((x+(cw-mw)//2,y0+172),mt,fill=WHITE,font=mf)
     # meta strip
-    mtxt="37课时 · 目录实拍 · 小白可学 · 拍后提供链接"
+    mtxt=f"{LESSON_FULL} · 目录实拍 · 小白可学 · 拍后提供链接"
     mf2=get_font(26); mw2=d.textlength(mtxt,font=mf2)
     d.text(((W-mw2)//2,680),mtxt,fill=GRAY,font=mf2)
     # info box fills middle blank
     d.rounded_rectangle([90,724,W-90,856],radius=22,fill=(238,243,255) if style=="B" else (232,238,255),outline=(37,80,255) if style=="A" else (205,218,250),width=2)
-    il=[("拍后提供链接","拍后发夸克链接"),("多端可看","手机电脑平板随时学"),("小白友好","37集从入门到实战")]
+    il=[("拍后提供链接","拍后发夸克链接"),("多端可看","手机电脑平板随时学"),("小白友好",f"{LESSON_SHORT}从入门到实战")]
     for j,(h,s) in enumerate(il):
         ix=130+j*((W-180)//3)
         hf=get_font(26,True); d.text((ix,744),h,fill=BLUE,font=hf)

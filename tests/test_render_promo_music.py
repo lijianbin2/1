@@ -8,6 +8,11 @@ import render_promo_music as promo
 SOURCE = Path(promo.__file__).read_text(encoding="utf-8")
 HARDCODED_COUNT = re.compile(r"[\"'][^\"'\n]*?(\d+)\s*首")
 
+# verify_source.py 对 M:\WebDAV\夸克\软件\宣传片背景音乐合集… 的实测结果：
+# 分类目录名标注数与实际 mp3 数量逐项一致，合计 970 个。
+VERIFIED_TOTAL = 970
+VERIFIED_CATEGORIES = (37, 67, 69, 88, 111, 111, 487)
+
 
 def _source_outside_category_table() -> str:
     """排除 CATEGORIES 数据表本身，只检查渲染和文案部分。"""
@@ -17,6 +22,12 @@ def _source_outside_category_table() -> str:
 
 
 class PromoMusicTests(unittest.TestCase):
+    def test_categories_match_verified_source_scan(self):
+        """分类数量必须等于源目录实测值，防止数据表悄悄过期。"""
+        counts = tuple(int(count.rstrip("首")) for _, count, _ in promo.CATEGORIES)
+        self.assertEqual(counts, VERIFIED_CATEGORIES)
+        self.assertEqual(promo.TOTAL_TRACKS, VERIFIED_TOTAL)
+
     def test_total_is_derived_from_categories(self):
         expected = sum(int(count.rstrip("首")) for _, count, _ in promo.CATEGORIES)
         self.assertEqual(promo.TOTAL_TRACKS, expected)

@@ -9,6 +9,14 @@ DARK=(30,41,59)
 GRAY=(100,116,139)
 LIGHT_BG=(248,250,252)
 
+# 课时数集中声明，改数量只改这里；找不到源目录时可用环境变量覆盖。
+LESSONS = int(os.environ.get("XIANYU_CODEX_LESSONS", "55"))
+MODULES = 6
+LESSON_SHORT = f"{LESSONS}集"
+LESSON_FULL = f"{LESSONS}课时"
+LESSON_BADGE = f"{LESSONS}节"
+MODULES_LABEL = f"{MODULES}大模块"
+
 def get_font(size, bold=False):
     path = r"C:\Windows\Fonts\msyhbd.ttc" if bold else r"C:\Windows\Fonts\msyh.ttc"
     try:
@@ -52,7 +60,7 @@ out.mkdir(parents=True, exist_ok=True)
 im, draw = draw_board()
 # top badge
 badge_font=get_font(26, bold=True)
-badge_text="55集全  多场景实战"
+badge_text=f"{LESSON_SHORT}全  多场景实战"
 # badge bg
 bw = draw.textlength(badge_text, font=badge_font)+40
 bh=42
@@ -121,11 +129,11 @@ w2=draw.textlength(bar_text2, font=bar_font2)
 draw.text((W-BORDER-40-w2, H-BORDER-bar_h+48), bar_text2, fill=(203,213,225), font=bar_font2)
 # bottom tag
 tag_font=get_font(20)
-tag="Codex · 55课时 · 办公自动化"
+tag=f"Codex · {LESSON_FULL} · 办公自动化"
 tw3=draw.textlength(tag, font=tag_font)
 draw.text(((W-tw3)//2, H-BORDER-34), tag, fill=(148,163,184), font=tag_font) if False else None
 # actually draw inside white area
-draw.text((BORDER+40, H-BORDER-bar_h-36), "Codex · 55课时 · 办公自动化 · 即学即用", fill=GRAY, font=get_font(22))
+draw.text((BORDER+40, H-BORDER-bar_h-36), f"Codex · {LESSON_FULL} · 办公自动化 · 即学即用", fill=GRAY, font=get_font(22))
 
 im.save(out/"01.png", "PNG")
 print("01 saved", (out/"01.png").stat().st_size)
@@ -135,9 +143,9 @@ im, draw = draw_board()
 title_font=get_font(44, bold=True)
 draw.text((BORDER+40, BORDER+28), "课程目录", fill=DARK, font=title_font)
 sub_font=get_font(24)
-draw.text((BORDER+40, BORDER+28+56), "55课时 · 6大模块 · 办公全场景覆盖", fill=GRAY, font=sub_font)
+draw.text((BORDER+40, BORDER+28+56), f"{LESSON_FULL} · {MODULES_LABEL} · 办公全场景覆盖", fill=GRAY, font=sub_font)
 # badge right
-badge2="55节"
+badge2=LESSON_BADGE
 bf2=get_font(26, bold=True)
 bw2=draw.textlength(badge2, font=bf2)+30
 draw.rounded_rectangle([W-BORDER-40-bw2, BORDER+36, W-BORDER-40, BORDER+36+36], radius=18, fill=(239,246,255))
