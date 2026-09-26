@@ -244,17 +244,22 @@ def fit_font(
     手写 "while 太宽就缩小" 容易漏掉下限：缩到最小仍放不下时会静默溢出，
     文字直接压出卡片。这里缩到 ``min_size`` 仍不满足就直接抛错，让版式
     问题在渲染时暴露，而不是靠目视发现。
+
+    缩小要按步长走到 ``min_size`` 为止，不能再往下掉一档：``size`` 和
+    ``min_size`` 相差不到 ``step`` 时（比如 21 和 20），照直减就会交出
+    19px，等于给了调用方一个它没要求的字号。报错信息里的字号用实际测量
+    的那个，而不是名义上的 ``min_size``，否则排查时会被误导。
     """
     current = size
     font = get_font(current, bold)
     width = draw.textlength(text, font=font)
     while width > max_w and current > min_size:
-        current -= step
+        current = max(current - step, min_size)
         font = get_font(current, bold)
         width = draw.textlength(text, font=font)
     if width > max_w:
         raise ValueError(
-            f"文字放不下：{text!r} 在 {min_size}px 下仍需 {width:.0f}px，"
+            f"文字放不下：{text!r} 在 {current}px 下仍需 {width:.0f}px，"
             f"可用宽度只有 {max_w:.0f}px"
         )
     return font, width
@@ -281,6 +286,10 @@ def validate_png_files(
 
     ``names`` 只接受纯文件名，避免调用方意外把校验范围扩展到目录外。
     损坏或无法解码的图片也作为问题返回，保证批量任务能收集完整报告。
+
+    ``names`` 为空列表同样报错。``count`` 拒绝小于 1，``names`` 却不设下限
+    的话，传个空列表就会校验零个文件然后报告"通过"——比不校验还危险，
+    因为调用方会以为产物已经验过了。
     """
     if not isinstance(count, int) or isinstance(count, bool) or count < 1:
         raise ValueError("count must be greater than zero")
@@ -295,11 +304,12 @@ def validate_png_files(
         raise ValueError("size must contain two positive integers")
 
     directory = Path(directory)
-    filenames = (
-        list(names)
-        if names is not None
-        else [f"{i:02d}.png" for i in range(1, count + 1)]
-    )
+    if names is None:
+        filenames = [f"{i:02d}.png" for i in range(1, count + 1)]
+    else:
+        filenames = list(names)
+        if not filenames:
+            raise ValueError("names must not be empty")
     problems: list[Path] = []
     seen: set[str] = set()
     for filename in filenames:

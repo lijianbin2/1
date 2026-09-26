@@ -182,11 +182,26 @@ class XianyuCommonTests(unittest.TestCase):
             validate_png_files(".", count=0)
         with self.assertRaises(ValueError):
             validate_png_files(".", size=(0, 1080))
+        with self.assertRaises(ValueError):
+            validate_png_files(".", names=[])
         with tempfile.TemporaryDirectory() as directory:
             problems = validate_png_files(directory, names=("../escape.png", "01.png", "01.png"))
             self.assertEqual(problems[0], Path("../escape.png"))
             self.assertEqual(problems[1], Path(directory) / "01.png")
             self.assertEqual(problems[2], Path(directory) / "01.png")
+
+    def test_validate_png_files_refuses_to_pass_on_an_empty_file_list(self):
+        """校验零个文件却报"通过"，比不校验更危险：调用方会以为验过了。"""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for index in range(1, 5):
+                Image.new("RGB", (1080, 1080), "white").save(root / f"{index:02d}.png")
+            with self.assertRaises(ValueError) as caught:
+                validate_png_files(root, names=[])
+            self.assertIn("names", str(caught.exception))
+            # require_valid_pngs 传空列表同样要拒，不能打印 validated
+            with self.assertRaises(ValueError):
+                require_valid_pngs(root, names=())
 
     def test_require_valid_pngs_passes_and_raises(self):
         """七个渲染入口共用的强制校验：产物可用才返回。"""
@@ -279,3 +294,43 @@ class XianyuCommonTests(unittest.TestCase):
         with self.assertRaises(ValueError) as caught:
             fit_font(draw, "这是一段无论如何都放不下的超长文字", 40, 30, min_size=16)
         self.assertIn("放不下", str(caught.exception))
+
+    def test_fit_font_never_drops_below_min_size(self):
+        """步长跨过下限时不能交出比 min_size 更小的字号。
+
+        size 和 min_size 相差不到 step 时（21 和 20），照直减就是 19px，
+        调用方拿到一个它从没要求过的字号，排版基线就悄悄变了。
+        """
+        im = Image.new("RGB", (600, 400), "white")
+        draw = ImageDraw.Draw(im)
+        for size, min_size, step in ((21, 20, 2), (15, 14, 2), (17, 15, 3)):
+            with self.subTest(size=size, min_size=min_size, step=step):
+                try:
+                    font, _width = fit_font(
+                        draw,
+                        "宣传片背景音乐合集一键提升质感",
+                        300,
+                        size,
+                        min_size=min_size,
+                        step=step,
+                    )
+                except ValueError:
+                    # 放不下时报错是正确行为，只是不该先跌破下限再报
+                    continue
+                self.assertGreaterEqual(
+                    font.size,
+                    min_size,
+                    f"字号 {font.size} 跌破了声明的下限 {min_size}",
+                )
+
+    def test_fit_font_error_reports_the_size_it_actually_measured(self):
+        """报错里的字号要是真量过的那个，否则排查会被带偏。"""
+        im = Image.new("RGB", (600, 400), "white")
+        draw = ImageDraw.Draw(im)
+        with self.assertRaises(ValueError) as caught:
+            fit_font(
+                draw, "宣传片背景音乐合集一键提升影片质感与感染力", 250, 15,
+                min_size=14, step=2,
+            )
+        self.assertIn("14px", str(caught.exception))
+        self.assertNotIn("13px", str(caught.exception))

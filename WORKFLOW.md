@@ -258,6 +258,8 @@ codex55 封面早先用了 `◉` 和 `▣`，页面上直接出现两个方框�
 
 `cover_v2.py` 出的是两张封面（`cover_A.png` / `cover_B.png`），
 其余入口出四张 1080×1080 图，所以封面走 `names=` 单独指定文件名。
+`names=` 不接受空列表：`count` 拒绝小于 1，空 `names` 却能校验零个文件后
+报"通过"，比不校验更糟，因为调用方会以为产物已经验过。传空就抛 `ValueError`。
 
 需要脱离入口单独校验时：
 
@@ -281,6 +283,10 @@ from xianyu_common import fit_font
 
 font, width = fit_font(draw, subtitle, card_w - 24, 30, bold=True, min_size=20)
 ```
+
+缩小按步长走到 `min_size` 为止，不会再往下掉一档。`size` 和 `min_size`
+相差不到 `step` 时（比如 21 和 20）照直减会交出 19px，调用方就拿到了一个
+它从没要求过的字号。放不下时报错信息里的字号是真量过的那个，不是名义下限。
 
 多行区块用 `stack_layout()` 分配位置，不要手写 `yy = BORDER + 120` 这类
 固定起点：上游标题或卡片一变高度，下游就会压字。
