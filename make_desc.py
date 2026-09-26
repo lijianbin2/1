@@ -38,7 +38,10 @@ FORBIDDEN = (
 )
 VIRTUAL_NOTICE = "【说明】虚拟资料，只发夸克网盘，拍后发网盘链接。"
 _CURRENCY_RE = re.compile(r"(?:\d+(?:\.\d+)?\s*元|[￥¥]\s*\d+)")
-_URL_RE = re.compile(r"(?:https?://|pan\.quark\.cn)", re.IGNORECASE)
+# 分享链接按 host 拦，不限定 pan. 前缀：复制分享地址时"pan."和"www."都
+# 经常被顺手丢掉，只认完整 host 的话，掉了前缀的分享地址照样能进公开正文。
+# 正文里提到"夸克网盘"是中文，不含该域名，不受影响。
+_URL_RE = re.compile(r"(?:https?://|quark\.cn)", re.IGNORECASE)
 _DELIVERY_FIELD_RE = re.compile(r"(?:文件夹名|分享\s*ID|提取码)\s*[:：]", re.IGNORECASE)
 
 

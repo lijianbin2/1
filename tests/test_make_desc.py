@@ -150,6 +150,28 @@ class MakeDescTests(unittest.TestCase):
         self.assertIn("url-in-body", violations)
         self.assertIn("delivery-field-in-body", violations)
 
+    def test_check_public_copy_rejects_share_link_without_pan_prefix(self):
+        """复制分享地址时 pan./www. 常被丢掉，这些形式同样不能进公开正文。
+
+        早先只认 pan.quark.cn，于是 quark.cn/s/abc123 和 www.quark.cn/s/abc123
+        都能原样写进商品文案——链接就这么漏出去了，而这正是公开正文要拦的东西。
+        """
+        title = "示例项目 10集 只发夸克"
+        for host in ("quark.cn", "www.quark.cn", "pan.quark.cn", "PAN.QUARK.CN"):
+            with self.subTest(host=host):
+                body = f"只发夸克网盘，拍后提供链接 {host}/s/abc123"
+                self.assertIn(
+                    "url-in-body",
+                    check_public_copy(title, body),
+                    msg=f"{host} 形式未被拦截",
+                )
+
+    def test_check_public_copy_allows_plain_quark_wording(self):
+        """正文里说"夸克网盘"是正常表述，不能因为提到平台就拦下。"""
+        title = "示例项目 10集 只发夸克"
+        body = "只发夸克网盘，拍后发送网盘链接与提取码，永久有效"
+        self.assertEqual(check_public_copy(title, body), [])
+
     def test_build_title_rejects_empty_values(self):
         with self.assertRaises(ValueError):
             build_title("", "10集")
