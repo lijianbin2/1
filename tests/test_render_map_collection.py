@@ -9,9 +9,11 @@ import render_map_collection as maps_module
 from render_map_collection import (
     W,
     H,
+    catalog_grid,
     guide_layout,
     image_fit,
     image_panel,
+    outcomes_grid,
     render_catalog,
     render_cover,
     render_guide,
@@ -70,12 +72,7 @@ class RenderMapCollectionTests(unittest.TestCase):
         """
         import render_map_collection as maps
 
-        rows = 2
-        grid_bottom = (
-            maps.CAT_CARD_TOP
-            + rows * maps.CAT_CARD_H
-            + (rows - 1) * maps.CAT_CARD_GAP
-        )
+        _, grid_bottom = catalog_grid(4)
         # 卡片区底部离底栏的间距在合理呼吸范围内（不超过 90px）
         self.assertLessEqual(
             maps.FOOTER_TOP - grid_bottom,
@@ -168,3 +165,30 @@ class RenderMapCollectionTests(unittest.TestCase):
                 f", {literal}]", source,
                 f"04 页又出现写死的坐标 {literal}，版式数字应走 guide_layout",
             )
+
+    def test_grids_are_derived_from_the_card_count(self):
+        """02、03 页的网格底边必须由卡片数推出，放不下就报错。
+
+        02 页早先把 `rows = 2` 写死，加到第 5 张卡时底边算出来的还是两行的
+        位置，校验通过、第三行直接画到画布外；03 页连底边守卫都没有，4 张卡
+        一直余量充足所以从没暴露，加到第 5 张时最后一行会压进底栏。
+        """
+        import render_map_collection as maps
+
+        for count in (1, 2, 3, 4):
+            rows, bottom = catalog_grid(count)
+            self.assertEqual(rows, -(-count // maps.CAT_COLS))
+            self.assertLessEqual(bottom, maps.FOOTER_TOP - maps.CAT_CARD_GAP)
+        for count in (1, 2, 3, 4):
+            rows, bottom = outcomes_grid(count)
+            self.assertEqual(rows, -(-count // maps.OUT_COLS))
+            self.assertLessEqual(bottom, maps.FOOTER_TOP - maps.OUT_CARD_GAP)
+
+        with self.assertRaises(ValueError):
+            catalog_grid(5)
+        with self.assertRaises(ValueError):
+            outcomes_grid(5)
+        with self.assertRaises(ValueError):
+            catalog_grid(0)
+        with self.assertRaises(ValueError):
+            outcomes_grid(0)

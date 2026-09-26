@@ -38,6 +38,13 @@ CAT_CARD_H = 196
 CAT_CARD_GAP = 32
 CAT_CARD_TOP = 480
 CAT_CARD_W = 460
+CAT_COLS = 2
+# 03 页收获卡的版式常量，同样由条目数推出底边，不写死行数
+OUT_CARD_H = 110
+OUT_CARD_GAP = 30
+OUT_CARD_TOP = 625
+OUT_CARD_W = 460
+OUT_COLS = 2
 # 04 页的版式常量：步骤卡与提示框都由这里推导，测试直接引用，
 # 避免测试里再抄一份数字（抄了就等于没有守卫）。
 GUIDE_STEP_H = 112
@@ -81,6 +88,42 @@ def guide_layout(step_count: int) -> tuple[list[int], int, int]:
             f"底栏从 {FOOTER_TOP} 开始"
         )
     return step_tops, warn_top, warn_bottom
+
+
+def catalog_grid(card_count: int) -> tuple[int, int]:
+    """按卡片数推出 02 页网格的行数与底边。
+
+    早先这里把 `rows = 2` 写死，加到第 5 张卡时底边算出来的仍是两行的位置，
+    校验通过，第三行直接画到画布外面，脚本照样退出码 0。
+    """
+    if card_count < 1:
+        raise ValueError(f"02 页至少要 1 张分类卡，实际 {card_count} 张")
+    rows = -(-card_count // CAT_COLS)
+    bottom = CAT_CARD_TOP + rows * CAT_CARD_H + (rows - 1) * CAT_CARD_GAP
+    if bottom > FOOTER_TOP - CAT_CARD_GAP:
+        raise ValueError(
+            f"02 页 {card_count} 张卡放不下：网格底边到 {bottom}，"
+            f"底栏从 {FOOTER_TOP} 开始"
+        )
+    return rows, bottom
+
+
+def outcomes_grid(card_count: int) -> tuple[int, int]:
+    """按卡片数推出 03 页收获网格的行数与底边。
+
+    03 页早先完全没有底边守卫：4 张卡时（底边 875）离底栏 956 还有余量，
+    没人动过所以一直没暴露；加到第 5 张时最后一行会压进底栏。
+    """
+    if card_count < 1:
+        raise ValueError(f"03 页至少要 1 张收获卡，实际 {card_count} 张")
+    rows = -(-card_count // OUT_COLS)
+    bottom = OUT_CARD_TOP + rows * OUT_CARD_H + (rows - 1) * OUT_CARD_GAP
+    if bottom > FOOTER_TOP - OUT_CARD_GAP:
+        raise ValueError(
+            f"03 页 {card_count} 张卡放不下：网格底边到 {bottom}，"
+            f"底栏从 {FOOTER_TOP} 开始"
+        )
+    return rows, bottom
 
 
 def image_fit(path: Path, size: tuple[int, int]) -> Image.Image:
@@ -187,12 +230,11 @@ def render_catalog(root: Path, out: Path, files_label: str, size_label: str) -> 
     # 中间空出约 200px。补一行"用得上在哪"后卡片自然长高填满这段。
     card_h = CAT_CARD_H
     card_gap = CAT_CARD_GAP
-    rows = 2
     y = CAT_CARD_TOP
-    grid_bottom = y + rows * card_h + (rows - 1) * card_gap
+    _, grid_bottom = catalog_grid(len(categories))
     for index, (title, desc, detail, color) in enumerate(categories):
-        x = 60 + (index % 2) * 500
-        yy = y + (index // 2) * (card_h + card_gap)
+        x = 60 + (index % CAT_COLS) * 500
+        yy = y + (index // CAT_COLS) * (card_h + card_gap)
         d.rounded_rectangle([x, yy, x + CAT_CARD_W, yy + card_h], radius=18, fill=PALE, outline=(226, 232, 240), width=1)
         d.rounded_rectangle([x + 20, yy + 22, x + 72, yy + 74], radius=16, fill=color)
         d.text((x + 39, yy + 34), str(index + 1), fill="white", font=get_font(22, True))
@@ -239,10 +281,11 @@ def render_outcomes(root: Path, out: Path, files_label: str, size_label: str) ->
         ("可编辑源文件", "包含 CDR、AI、PSD、EPS 等多种格式", GREEN),
         ("使用场景广", "适合设计排版、宣传物料、地理类内容制作", ORANGE),
     ]
+    _, grid_bottom = outcomes_grid(len(points))
     for index, (title, desc, color) in enumerate(points):
-        x = 60 + (index % 2) * 500
-        y = 625 + (index // 2) * 140
-        d.rounded_rectangle([x, y, x + 460, y + 110], radius=18, fill=PALE, outline=(226, 232, 240), width=1)
+        x = 60 + (index % OUT_COLS) * 500
+        y = OUT_CARD_TOP + (index // OUT_COLS) * (OUT_CARD_H + OUT_CARD_GAP)
+        d.rounded_rectangle([x, y, x + OUT_CARD_W, y + OUT_CARD_H], radius=18, fill=PALE, outline=(226, 232, 240), width=1)
         d.ellipse([x + 20, y + 28, x + 72, y + 80], fill=color)
         d.text((x + 38, y + 41), str(index + 1), fill="white", font=get_font(22, True))
         d.text((x + 94, y + 18), title, fill=DARK, font=get_font(23, True))
@@ -251,6 +294,9 @@ def render_outcomes(root: Path, out: Path, files_label: str, size_label: str) ->
             wrap_text_fit(desc, font, 340, 2, d, label=f"03 页 {title}")
         ):
             d.text((x + 94, y + 56 + line_no * 23), line, fill=GRAY, font=font)
+    assert_no_overlap(
+        [(OUT_CARD_TOP, grid_bottom), (FOOTER_TOP, H - BORDER)], "03 页收获区与底栏"
+    )
     footer(d, f"真实地图预览 · 多种格式 · {files_label}")
     save_png(im, out / "03.png")
 
