@@ -21,15 +21,35 @@ ORANGE = (249, 115, 22)
 ROSE = (225, 29, 72)
 DEFAULT_OUT = Path("D:/闲鱼/宣传片背景音乐合集，一键提升影片质感与感染力")
 
+# 数量来自 verify_source.py 对源目录的实测结果，修改前必须重新核验。
 CATEGORIES = [
     ("汽车宣传片", "37首", BLUE),
-    ("校园宣传片", "68首", PURPLE),
+    ("校园宣传片", "67首", PURPLE),
     ("广告宣传片", "69首", TEAL),
     ("城市宣传片", "88首", GREEN),
     ("旅游宣传片", "111首", ORANGE),
-    ("ZF宣传片", "112首", ROSE),
+    ("ZF宣传片", "111首", ROSE),
     ("大气企业宣传片", "487首", BLUE),
 ]
+TOTAL_TRACKS = sum(int(count.rstrip("首")) for _, count, _ in CATEGORIES)
+TOTAL_LABEL = f"{TOTAL_TRACKS}首"
+CATEGORY_COUNT = f"{len(CATEGORIES)}大分类"
+CATEGORY_SCENE = f"{len(CATEGORIES)}大宣传片场景"
+SHORT_NAMES = {
+    "汽车宣传片": "汽车",
+    "校园宣传片": "校园",
+    "广告宣传片": "广告",
+    "城市宣传片": "城市",
+    "旅游宣传片": "旅游",
+    "ZF宣传片": "ZF",
+    "大气企业宣传片": "企业",
+}
+SUMMARY_LINE = " · ".join(SHORT_NAMES[name] for name, _, _ in CATEGORIES)
+
+# 封面卡片网格。末行底边必须落在 SUMMARY_TOP 上方，否则会压住摘要文字。
+CARD_W, CARD_H, CARD_GAP = 280, 124, 18
+CARD_TOP, SUMMARY_TOP = 366, 815
+SUMMARY = "按场景选音乐，让画面情绪、节奏和氛围更到位"
 
 
 def centered(draw, text, y, font, fill=DARK):
@@ -37,7 +57,7 @@ def centered(draw, text, y, font, fill=DARK):
     draw.text(((W - width) // 2, y), text, fill=fill, font=font)
 
 
-def footer(draw, right="1072首 · 7大分类 · 宣传片配乐"):
+def footer(draw, right=f"{TOTAL_LABEL} · {CATEGORY_COUNT} · 宣传片配乐"):
     height = 86
     draw.rounded_rectangle(
         [BORDER, H - BORDER - height, W - BORDER, H - BORDER],
@@ -62,7 +82,7 @@ def footer(draw, right="1072首 · 7大分类 · 宣传片配乐"):
 
 def render_cover(out: Path) -> None:
     im, d = draw_board()
-    badge = "7大分类  1072首背景音乐"
+    badge = f"{CATEGORY_COUNT}  {TOTAL_LABEL}背景音乐"
     badge_font = get_font(25, True)
     badge_w = d.textlength(badge, font=badge_font) + 40
     badge_y = 78
@@ -77,40 +97,39 @@ def render_cover(out: Path) -> None:
     d.line([400, 308, 680, 308], fill=BLUE, width=4)
 
     cards = [
-        ("汽车", "37首", BLUE),
-        ("校园", "68首", PURPLE),
-        ("广告", "69首", TEAL),
-        ("城市", "88首", GREEN),
-        ("旅游", "111首", ORANGE),
-        ("企业", "487首", ROSE),
+        (SHORT_NAMES[name], count, color)
+        for name, count, color in CATEGORIES
     ]
-    card_w, card_h, gap = 280, 136, 24
-    start_x = (W - card_w * 3 - gap * 2) // 2
+    columns = 3
+    rows = -(-len(cards) // columns)
+    start_x = (W - CARD_W * columns - CARD_GAP * (columns - 1)) // 2
     for i, (name, count, color) in enumerate(cards):
-        row, col = divmod(i, 3)
-        x = start_x + col * (card_w + gap)
-        y = 370 + row * (card_h + gap)
+        row, col = divmod(i, columns)
+        x = start_x + col * (CARD_W + CARD_GAP)
+        y = CARD_TOP + row * (CARD_H + CARD_GAP)
+        if y + CARD_H >= SUMMARY_TOP:
+            raise ValueError(f"封面卡片第 {row + 1} 行与摘要文字重叠")
         d.rounded_rectangle(
-            [x, y, x + card_w, y + card_h],
+            [x, y, x + CARD_W, y + CARD_H],
             radius=20,
             fill=PALE,
             outline=(226, 232, 240),
             width=1,
         )
-        d.ellipse([x + 24, y + 28, x + 88, y + 92], fill=color)
-        d.text((x + 42, y + 49), "音", fill="white", font=get_font(25, True))
-        d.text((x + 106, y + 32), name, fill=DARK, font=get_font(25, True))
-        d.text((x + 106, y + 75), count, fill=color, font=get_font(25, True))
+        d.ellipse([x + 24, y + 24, x + 84, y + 84], fill=color)
+        d.text((x + 40, y + 42), "音", fill="white", font=get_font(24, True))
+        d.text((x + 104, y + 26), name, fill=DARK, font=get_font(25, True))
+        d.text((x + 104, y + 68), count, fill=color, font=get_font(25, True))
 
     d.text(
-        (BORDER + 40, 815),
-        "汽车 · 校园 · 广告 · 城市 · 旅游 · ZF · 企业",
+        (BORDER + 40, SUMMARY_TOP),
+        SUMMARY_LINE,
         fill=DARK,
         font=get_font(22, True),
     )
     d.text(
-        (BORDER + 40, 858),
-        "按场景选音乐，让画面情绪、节奏和氛围更到位",
+        (BORDER + 40, SUMMARY_TOP + 43),
+        SUMMARY,
         fill=GRAY,
         font=get_font(21),
     )
@@ -123,11 +142,11 @@ def render_catalog(out: Path) -> None:
     d.text((BORDER + 40, BORDER + 30), "分类目录", fill=DARK, font=get_font(44, True))
     d.text(
         (BORDER + 40, BORDER + 88),
-        "7大宣传片场景 · 1072首背景音乐",
+        f"{CATEGORY_SCENE} · {TOTAL_LABEL}背景音乐",
         fill=GRAY,
         font=get_font(24),
     )
-    badge = "共1072首"
+    badge = f"共{TOTAL_LABEL}"
     bf = get_font(24, True)
     bw = d.textlength(badge, font=bf) + 34
     d.rounded_rectangle(
@@ -161,7 +180,7 @@ def render_catalog(out: Path) -> None:
         label = "宣传片背景音乐"
         label_font = get_font(18)
         d.text((x + 18, y + 112), label, fill=GRAY, font=label_font)
-    footer(d, "按截图分类 · 1072首")
+    footer(d, f"按截图分类 · {TOTAL_LABEL}")
     save_png(im, out / "02.png")
 
 
@@ -206,7 +225,7 @@ def render_outcomes(out: Path) -> None:
         fill=(239, 246, 255),
     )
     d.text((BORDER + 60, 875), "适合：宣传片、广告片、企业片、校园片、城市片、旅游片等", fill=DARK, font=get_font(21, True))
-    footer(d, "7大分类 · 1072首 · 按需选曲")
+    footer(d, f"{CATEGORY_COUNT} · {TOTAL_LABEL} · 按需选曲")
     save_png(im, out / "03.png")
 
 
@@ -221,7 +240,7 @@ def render_guide(out: Path) -> None:
     )
     steps = [
         ("1", "资料内容", "汽车、校园、广告、城市、旅游、ZF、大气企业宣传片背景音乐"),
-        ("2", "数量说明", "共1072首，按截图中各分类标注数量整理"),
+        ("2", "数量说明", f"共{TOTAL_LABEL}，按截图中各分类标注数量整理"),
         ("3", "使用方式", "先确定宣传片场景，再按分类挑选适合的音乐"),
         ("4", "交付方式", "拍下后发送夸克网盘链接与提取码"),
     ]
@@ -262,7 +281,7 @@ def render_guide(out: Path) -> None:
     tip_font = get_font(18)
     for i, line in enumerate(wrap_text(tip, tip_font, W - BORDER * 2 - 130, d)[:3]):
         d.text((BORDER + 62, 804 + i * 25), line, fill=(120, 113, 108), font=tip_font)
-    footer(d, "1072首 · 宣传片背景音乐合集")
+    footer(d, f"{TOTAL_LABEL} · 宣传片背景音乐合集")
     save_png(im, out / "04.png")
 
 

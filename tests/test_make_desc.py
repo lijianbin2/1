@@ -7,6 +7,7 @@ from make_desc import (
     build_title,
     check_copy,
     check_public_copy,
+    write_public_copy,
     write_project,
 )
 
@@ -52,6 +53,22 @@ class MakeDescTests(unittest.TestCase):
             result = write_project(directory, "", "正文", "分享块")
             self.assertEqual(result, ["empty-field"])
             self.assertFalse((Path(directory) / "desc.txt").exists())
+            self.assertFalse((Path(directory) / "闲鱼发布文案_直接复制.txt").exists())
+
+    def test_write_public_copy_works_before_share_exists(self):
+        with tempfile.TemporaryDirectory() as directory:
+            result = write_public_copy(directory, "示例项目 10集 只发夸克", "只发夸克网盘")
+            self.assertEqual(result, [])
+            copy = Path(directory) / "闲鱼发布文案_直接复制.txt"
+            self.assertIn("示例项目 10集 只发夸克", copy.read_text(encoding="utf-8"))
+            self.assertFalse((Path(directory) / "desc.txt").exists())
+
+    def test_write_public_copy_rejects_share_details(self):
+        with tempfile.TemporaryDirectory() as directory:
+            result = write_public_copy(
+                directory, "示例项目 只发夸克", "链接 https://pan.quark.cn/s/abc123 提取码：abcd"
+            )
+            self.assertIn("url-in-body", result)
             self.assertFalse((Path(directory) / "闲鱼发布文案_直接复制.txt").exists())
 
 

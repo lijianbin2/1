@@ -174,3 +174,27 @@ def write_project(out_dir: str | Path, title: str, body: str, quark_block: str) 
     (p / COPY_NAME).write_text(public_body + "\n", encoding="utf-8", newline="\n")
     print(f"wrote {p} violations=[]")
     return []
+
+
+def write_public_copy(out_dir: str | Path, title: str, body: str) -> list[str]:
+    """只写入可直接粘贴到闲鱼的公开正文。
+
+    分享链接还没创建时用它先生成公开正文；``desc.txt`` 等拿到真实分享信息
+    后再用 :func:`write_project` 补齐。
+    """
+    title = title.strip()
+    body = body.strip()
+    if not title or not body:
+        print("check failed violations=empty-field")
+        return ["empty-field"]
+    public_body = f"{title}\n\n{body}"
+    bad = check_public_copy(title, public_body)
+    if bad:
+        print(f"check failed violations={bad}")
+        return bad
+
+    p = Path(out_dir)
+    p.mkdir(parents=True, exist_ok=True)
+    (p / COPY_NAME).write_text(public_body + "\n", encoding="utf-8", newline="\n")
+    print(f"wrote {p / COPY_NAME} violations=[]")
+    return []

@@ -20,6 +20,7 @@ CLI_ENTRYPOINTS = (
 
 LIBRARY_MODULES = (
     "make_desc",
+    "verify_source",
     "xianyu_common",
 )
 

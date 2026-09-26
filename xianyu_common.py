@@ -71,14 +71,6 @@ def wrap_text(text: str, font, max_w: float, draw) -> list[str]:
     return lines
 
 
-def badge_geometry(draw, text: str, font, pad_x: int = 40, height: int = 42):
-    """返回徽章的 ``(width, height)``；横向位置由调用方计算。"""
-    if pad_x < 0 or height <= 0:
-        raise ValueError("badge padding and height are invalid")
-    w = draw.textlength(text, font=font) + pad_x
-    return w, height
-
-
 def save_png(im, path: str | Path):
     """创建父目录并保存 PNG，返回文件大小（字节）。"""
     p = Path(path)
@@ -148,22 +140,3 @@ def validate_png_files(
         except (OSError, ValueError):
             problems.append(path)
     return problems
-
-
-def check_text_rules(
-    title: str,
-    body: str,
-    forbidden: Iterable[str],
-    required: Iterable[str],
-) -> list[str]:
-    """执行标题和正文的禁用词、必需词检查，返回违规代码列表。"""
-    violations = []
-    for i, word in enumerate(forbidden):
-        if word in title:
-            violations.append("forbidden[%d]-in-title" % i)
-        if word in body:
-            violations.append("forbidden[%d]-in-body" % i)
-    for i, word in enumerate(required):
-        if word not in title and word not in body:
-            violations.append("required[%d]-missing" % i)
-    return violations
