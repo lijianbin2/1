@@ -27,6 +27,7 @@ _COUNT_CLAIM = re.compile(rf"(\d+)\s*({_UNIT_ALT})")
 _SIZE = re.compile(r"(\d+(?:\.\d+)?)\s*(TB|GB|MB)", re.IGNORECASE)
 _SUM_CLAIM = re.compile(rf"共\s*(\d+)\s*(?:{_UNIT_ALT})")
 _LISTED_LINE = re.compile(r"^\s*(?:\d+\s*[.、)）]\s*)?[\d一二三四五六七八九十]+\s*[.、)）]\s*")
+_DETAIL_HEADING = "内容简介"
 _SIZE_UNITS = {"TB": 1024**4, "GB": 1024**3, "MB": 1024**2}
 
 
@@ -106,6 +107,35 @@ def _size_tolerance(displayed: str, unit: str) -> float:
     return max(step, actual_unit * 0.005)
 
 
+def _detail_indices(lines: list[str]) -> set[int]:
+    """返回明细行的下标。
+
+    早先只认"1. ""2. "这种编号前缀，但 ``make_desc.build_body`` 生成的正文
+    里明细是 ``--module`` 原样拼进去的，实际发布时常常不编号。宣传片音乐
+    那份文案就是 ``内容简介：`` 下面直接写七行"汽车宣传片 37首"…，编号
+    一条都没有，于是这七行全部落进正文检查，每行的分类数量都被拿去和
+    970 首的**总数**比一遍，报出七条 body-count-mismatch。数量本身全是对的，
+    校验器却把发布挡下来了。
+
+    所以先按结构认：``内容简介`` 标题下面那一整块连续非空行就是明细，
+    编不编号都算。找不到标题时才退回按编号前缀认，这样"1. 900张"这种
+    整份文案里唯一的数量声明仍然能被 item-sum 校验接住。
+    """
+    for index, line in enumerate(lines):
+        head = re.split(r"[：:]", line, maxsplit=1)[0].strip()
+        if head != _DETAIL_HEADING:
+            continue
+        block: set[int] = set()
+        for offset, candidate in enumerate(lines[index + 1:], start=index + 1):
+            if not candidate.strip():
+                break
+            block.add(offset)
+        if block:
+            return block
+        break
+    return {index for index, line in enumerate(lines) if _LISTED_LINE.match(line)}
+
+
 def check_claims(text: str, stats: SourceStats) -> list[str]:
     """比对文案中的数量与体积声明，返回违规代码列表。"""
     violations: list[str] = []
@@ -129,7 +159,8 @@ def check_claims(text: str, stats: SourceStats) -> list[str]:
             )
 
     lines = [line for line in text.splitlines() if line.strip()]
-    detail_lines = [line for line in lines if _LISTED_LINE.match(line)]
+    detail = _detail_indices(lines)
+    detail_lines = [lines[index] for index in sorted(detail)]
     items = [
         int(count)
         for line in detail_lines
@@ -145,7 +176,7 @@ def check_claims(text: str, stats: SourceStats) -> list[str]:
             violations.append(f"item-sum-mismatch: 明细合计{listed} 实际{stats.total_files}")
 
     body = "\n".join(
-        line for line in lines[1:] if not _LISTED_LINE.match(line)
+        line for index, line in enumerate(lines) if index and index not in detail
     )
     for raw, unit in _COUNT_CLAIM.findall(_SUM_CLAIM.sub("", lines[0] if lines else "")):
         if int(raw) != stats.total_files:

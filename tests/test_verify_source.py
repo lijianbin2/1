@@ -178,6 +178,66 @@ class VerifySourceTests(unittest.TestCase):
             copy = "示例 摄影教程\n\n共41个视频，分为12个章节。\n"
             self.assertEqual(check_claims(copy, stats), [])
 
+    def test_unnumbered_detail_lines_are_not_compared_against_the_total(self):
+        """明细不写"1. "编号时，分类数量不能拿去和总数比。
+
+        实测宣传片音乐那份文案：``内容简介：`` 下面直接是七行
+        "汽车宣传片 37首"…"大气企业宣传片 487首"，一条编号都没有。早先只按
+        编号前缀认明细，这七行全落进正文检查，每个分类数量都被拿去和 970 首
+        的总数比一遍，报出七条 body-count-mismatch——数量全对，发布却被
+        校验器挡下来。
+        """
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._make_source(root, {"01、汽车-3首": 3, "02、校园-4首": 4})
+            stats = scan_source(root)
+            copy = (
+                "示例 7首 只发夸克\n\n"
+                "本套共7首背景音乐。\n\n"
+                "内容简介：\n"
+                "汽车宣传片 3首\n"
+                "校园宣传片 4首\n\n"
+                "适合剪辑新手。\n"
+            )
+            self.assertEqual(check_claims(copy, stats), [])
+
+    def test_unnumbered_detail_wrong_count_is_still_caught(self):
+        """按结构认出明细之后，错数依然要能拦住（合计不等于总数）。"""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._make_source(root, {"01、汽车-3首": 3, "02、校园-4首": 4})
+            stats = scan_source(root)
+            copy = (
+                "示例 7首 只发夸克\n\n"
+                "本套共7首背景音乐。\n\n"
+                "内容简介：\n"
+                "汽车宣传片 3首\n"
+                "校园宣传片 9首\n\n"
+                "适合剪辑新手。\n"
+            )
+            self.assertTrue(
+                any(c.startswith("item-sum-mismatch") for c in check_claims(copy, stats)),
+                msg=f"不编号明细的错数未被拦截：{check_claims(copy, stats)}",
+            )
+
+    def test_detail_block_is_scoped_to_its_own_heading(self):
+        """内容简介块外的行仍按正文校验，不能被明细规则一起吞掉。"""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._make_source(root, {"01、汽车-3首": 3, "02、校园-4首": 4})
+            stats = scan_source(root)
+            copy = (
+                "示例 7首 只发夸克\n\n"
+                "另外还有99首加赠。\n\n"
+                "内容简介：\n"
+                "汽车宣传片 3首\n"
+                "校园宣传片 4首\n"
+            )
+            self.assertTrue(
+                any(c.startswith("body-count-mismatch") for c in check_claims(copy, stats)),
+                msg=f"明细块外的错数未被拦截：{check_claims(copy, stats)}",
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
