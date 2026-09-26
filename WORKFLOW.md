@@ -253,7 +253,7 @@ test_entrypoints.py            七个入口导入无副作用、legacy 环境变
 test_xianyu_common.py          版式工具、区块不重叠、标签行越界报错、PNG 校验、真实文字占位、控制台编码、底栏行距测量工具
 test_verify_source.py          统计扫描、数量声明违规能被抓到、根下散文件不算一级分类
 test_make_desc.py              正文生成、build_body 组装规则、链接/提取码拦截、剪贴板
-test_render_map_collection.py  地图统计标签来自实测；底栏两行不粘连
+test_render_map_collection.py  地图统计标签来自实测；底栏两行不粘连；04 页提示框由步数推导，放不下报错
 test_render_promo_music.py     分类数据表等于实测 970 首；底栏两行不粘连
 test_render_camera_basics.py   课时/章节等于实测 41/12，源码无手打数量
 test_legacy_constants.py       legacy 数量只在常量处声明，可被环境变量覆盖
@@ -442,6 +442,25 @@ for text, x, width in chip_positions(
 
 改标签文案时如果报"放不下"，正确做法是删一项、缩短文案或加大容器，不是把 `right`
 改大硬塞。
+
+### 竖向区块必须由内容推导位置
+
+一页里如果有多块纵向排布的区块（步骤卡、提示框、说明条），位置不能各自写死，
+要由前面的内容推出来，并在越到底栏时报错。地图合集 04 页早先把卡片起始位置、
+每步增量、提示框位置三个数字各自写死（190 / +132 / 750），彼此之间没有任何
+约束。实测加到第 5 步时，第 5 张卡（718-830）直接压在提示框上，而脚本仍然
+退出码 0、图片照常生成，缩略图上根本看不出来。现在统一走 `guide_layout(步数)`，
+由步数算出卡片顶边和提示框上下沿，越过 `FOOTER_TOP` 直接抛错：
+
+```python
+step_tops, warn_top, warn_bottom = guide_layout(len(steps))
+```
+
+`test_guide_tip_block_follows_the_step_count` 守住推导和报错，
+`test_guide_layout_constants_stay_in_one_place` 防止版式数字又回到绘制代码里。
+
+两段间距不同时不要硬套 `stack_blocks`：04 页卡片之间是 20，卡片到提示框是 52，
+统一成一个间距会把现有 4 步的版式改掉（4 步时版式必须保持 `94d928e0` 那张哈希）。
 
 ### 文案不要被静默截断
 
