@@ -61,7 +61,12 @@ def center_text(d, y, text, font, fill):
 # 改一个不动另一个，很容易以为改了其实没改。现在分开命名。
 NOTE_H = 60
 # 底部深色横条的顶部。
-BAR_TOP = H - BORDER - 86
+# BAR_H 是横条本身的高度，WARN_H 是 04 页"提醒"框的高度。两者数值都是 86，
+# 但含义完全无关：早先都用裸字面量 86，改一个不动另一个，
+# 看起来改过其实没改到要改的地方。
+BAR_H = 86
+WARN_H = 86
+BAR_TOP = H - BORDER - BAR_H
 
 def stack(heights, top, bottom, min_gap=20, max_gap=48):
     """把若干区块在 [top, bottom] 内纵向排布，返回每个区块的起始 y。
@@ -247,7 +252,7 @@ d.text((BORDER + 40, BORDER + 28), "发货指南", fill=DARK, font=get_font(44, 
 d.text((BORDER + 40, BORDER + 28 + 56), "虚拟资料 只发夸克网盘 不发实物", fill=GRAY, font=get_font(24))
 steps = [("1", "拍后提供链接", "夸克网盘链接发货 无需等待"), ("2", "不限时需提取码", "带文件名 永久有效反复下"), ("3", "即装即用", "exe双击安装右键即用"), ("4", "售后说明", "虚拟资料按需拍不包退换")]
 STEP_H = 124
-step_y, warn_y = stack([STEP_H * len(steps) + 22 * (len(steps) - 1), 86], BORDER + 130, BAR_TOP - 40)
+step_y, warn_y = stack([STEP_H * len(steps) + 22 * (len(steps) - 1), WARN_H], BORDER + 130, BAR_TOP - 40)
 yy = step_y
 for n, t, s in steps:
     d.rounded_rectangle([BORDER + 40, yy, W - BORDER - 40, yy + STEP_H], radius=18, fill=(248, 250, 252), outline=(226, 232, 240), width=1)
@@ -261,7 +266,7 @@ for n, t, s in steps:
     d.text((BORDER + 130, ty + 36), s, fill=GRAY, font=get_font(22))
     yy += STEP_H + 22
 wy = warn_y
-d.rounded_rectangle([BORDER + 40, wy, W - BORDER - 40, wy + 86], radius=14, fill=(255, 251, 235), outline=(253, 230, 138), width=1)
+d.rounded_rectangle([BORDER + 40, wy, W - BORDER - 40, wy + WARN_H], radius=14, fill=(255, 251, 235), outline=(253, 230, 138), width=1)
 d.text((BORDER + 60, wy + 12), "提醒", fill=(146, 64, 14), font=get_font(22, bold=True))
 warn_font = get_font(16)
 for j, ln in enumerate(wrap_text_fit("虚拟资料一经发货不退不换 请确认需要WinRAR再拍", warn_font, W - 2 * BORDER - 120, 2, d, label="提醒")):

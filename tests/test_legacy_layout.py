@@ -99,6 +99,57 @@ class CodexGuideLayoutTests(unittest.TestCase):
         self.assertNotIn("W-BORDER-60,", arrow.group(1))
 
 
+class WinrarHeightConstantsTests(unittest.TestCase):
+    """winrar 里三块高度必须各自有名，含义不同就不能共用一个常量。
+
+    横条高、页内信息条高、04 页"提醒"框高都恰好是 86 或 60，早先都用裸
+    字面量或同一个 `FOOTER` 名字。改一个不动另一个，会以为改了其实没改到。
+    """
+
+    def setUp(self):
+        self.source = (LEGACY / "render_winrar_unified_legacy.py").read_text(
+            encoding="utf-8"
+        )
+
+    def test_distinct_heights_have_distinct_names(self):
+        # 自己拼消息，别用 assertRegex：它失败时会把整个脚本源码打进报告，
+        # 几千行噪音里真正的错只有一行。
+        found = {
+            name: bool(re.search(rf"(?m)^{name}\s*=\s*\d+", self.source))
+            for name in ("NOTE_H", "BAR_H", "WARN_H")
+        }
+        missing = [name for name, ok in found.items() if not ok]
+        self.assertEqual(
+            missing, [], f"这些常量没有各自的定义：{missing}；应写成 `NAME = 数字`"
+        )
+
+    def test_no_bare_86_left_in_code(self):
+        """除常量定义处，代码里不该再有裸 86。
+
+        86 这个数值在 winrar 里出现三次，含义各不相同。留成字面量的话，
+        调横条高度会顺手把提醒框也改了，渲染出来才发现不对。
+        """
+        allowed = re.compile(r"^(NOTE_H|BAR_H|WARN_H)\s*=\s*\d+\s*$")
+        offenders = [
+            line
+            for line in self.source.splitlines()
+            if not line.lstrip().startswith("#")
+            and re.search(r"(?<![\w.])86(?![\w.])", line)
+            and not allowed.match(line.strip())
+        ]
+        self.assertEqual(
+            offenders, [], f"这些行里还有裸 86，应改用常量：{offenders}"
+        )
+
+    def test_bar_top_is_derived_from_bar_h(self):
+        collapsed = self.source.replace(" ", "")
+        self.assertIn(
+            "BAR_TOP=H-BORDER-BAR_H",
+            collapsed.splitlines(),
+            "BAR_TOP 应由 BAR_H 推导，不要退回裸字面量",
+        )
+
+
 class CodexCoverLayoutTests(unittest.TestCase):
     """封面特色块的版式回归。
 

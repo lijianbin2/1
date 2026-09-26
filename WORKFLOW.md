@@ -175,6 +175,10 @@ assert_no_overlap([(cards_y, cards_y + card_h), (meta_y, meta_y + 76)], "封面"
   `FOOTER_TOP + 12` 和 `FOOTER_TOP + 48`（实测间距 11px）。
   同一文件里不要再出现字面量 `86`：底部横条高度和页内信息条高度是两回事，
   winrar 早先两个都叫 `FOOTER`，改一个不动另一个。信息条用 `NOTE_H`。
+  winrar 里横条高度和 04 页"提醒"框高度都恰好是 86，但含义无关，
+  所以分别叫 `BAR_H` 和 `WARN_H`，不要合并成一个常量。
+  codex55 / workbuddy 的 `BAR_TOP=H-BORDER-86` **保持原样**：那里的 `FOOTER_H`
+  是 01 页封面底栏，和 04 页横条不是同一块，绑一起反而会引入新的耦合错误。
 
 ### 扫描纵向死区
 
