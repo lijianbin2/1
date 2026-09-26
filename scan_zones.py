@@ -19,7 +19,9 @@ from typing import Any
 import numpy as np
 from PIL import Image
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+from xianyu_common import enable_utf8_stdout
+
+ROOT = Path(__file__).resolve().parent
 
 # 连续空白超过这个高度就算死区，需要回头补内容。
 VOID_LIMIT = 170
@@ -123,6 +125,7 @@ def scan_page(page: Path, geo: tuple[int, int, int, int]) -> list[str]:
 
 
 def main() -> int:
+    enable_utf8_stdout()
     import legacy_runner
     import render_camera_basics as camera
     import render_codex55 as codex55
@@ -152,8 +155,11 @@ def main() -> int:
         if entry in legacy_of:
             return legacy_runner.run_legacy(legacy_of[entry], out)
         # 库渲染器走 CLI 入口，和用户实际发布的路径保持一致
+        # 脚本路径必须绝对：用相对文件名时从项目根以外运行会直接报
+        # "can't open file ... exit status 2"，扫描器就成了只能在特定目录下
+        # 跑一次的脚本。
         subprocess.run(
-            [sys.executable, entry, "--out", str(out)],
+            [sys.executable, str(ROOT / entry), "--out", str(out)],
             check=True,
             capture_output=True,
         )

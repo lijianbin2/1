@@ -149,6 +149,13 @@ def build_body(
 
     ``title`` 保留在函数签名中是为了兼容旧调用，但返回值不重复包含标题；
     ``write_project`` 会在最前面统一写入标题。
+
+    ``audience`` 传的是人群本身（"摄影新手"），函数会补上"适合"前缀。
+    传进来已经是一整句（"适合有具体需求的用户"）时不再重复追加尾句，
+    否则正文会出现"适合有具体需求的用户，适合有具体需求的用户。"。
+
+    这三段都不允许含换行：它们靠空行分段，塞进换行会打乱正文结构，
+    ``内容简介`` 里的换行还会让一行伪装成新的明细条目。
     """
     if not title.strip():
         raise ValueError("title 不能为空")
@@ -160,13 +167,21 @@ def build_body(
     audience = audience.strip()
     if not audience:
         raise ValueError("audience 不能为空")
+    for label, value in (
+        ("intro", intro.strip()),
+        ("audience", audience),
+        *[(f"module[{i}]", item) for i, item in enumerate(normalized_modules)],
+    ):
+        if "\n" in value or "\r" in value:
+            raise ValueError(f"{label} 不能包含换行")
     if not audience.startswith("适合"):
         audience = f"适合{audience}"
+    tail = "，适合有具体需求的用户。" if "有具体需求的用户" not in audience else "。"
     return "\n\n".join(
         [
             intro.strip(),
             "内容简介：\n" + "\n".join(normalized_modules),
-            audience + "，适合有具体需求的用户。",
+            audience + tail,
             VIRTUAL_NOTICE,
         ]
     )

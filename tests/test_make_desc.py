@@ -5,6 +5,7 @@ from unittest.mock import patch
 
 from make_desc import (
     FORBIDDEN,
+    build_body,
     build_quark,
     build_title,
     check_copy,
@@ -14,6 +15,62 @@ from make_desc import (
     write_public_copy,
     write_project,
 )
+
+
+class BuildBodyTests(unittest.TestCase):
+    """``build_body`` 的三条约定：人群只加一次尾句、分段不许带换行、标题不重复。"""
+
+    def test_audience_gets_prefix_and_tail_exactly_once(self):
+        """裸人群补上"适合"前缀和尾句。"""
+        body = build_body("示例 10集", "一句话", ["内容一"], "摄影新手")
+        self.assertIn("适合摄影新手，适合有具体需求的用户。", body)
+
+    def test_audience_sentence_is_not_repeated(self):
+        """传进来的已经是一整句时，不能再补一遍同样的尾句。
+
+        早先无条件拼接"适合有具体需求的用户"，传入
+        "适合有具体需求的用户"就会得到
+        "适合有具体需求的用户，适合有具体需求的用户。"，正文里出现重复子句。
+        """
+        body = build_body("示例 10集", "一句话", ["内容一"], "适合有具体需求的用户")
+        self.assertIn("适合有具体需求的用户。", body)
+        self.assertNotIn("用户，适合有具体需求的用户", body)
+        self.assertEqual(body.count("有具体需求的用户"), 1)
+
+    def test_audience_already_carrying_the_prefix_is_left_alone(self):
+        body = build_body("示例 10集", "一句话", ["内容一"], "适合摄影新手")
+        self.assertIn("适合摄影新手，", body)
+        self.assertNotIn("适合适合", body)
+
+    def test_newlines_in_segments_are_rejected(self):
+        """三段都靠空行分段，塞进换行会打乱正文结构。
+
+        换行还会让一行伪装成新的明细条目：``内容简介：`` 下面的换行能让
+        verify_source 的 ``_LISTED_LINE`` 误判成一条独立明细。
+        """
+        for label, args in (
+            ("intro", ("一句话\n偷塞一行", ["内容一"], "摄影新手")),
+            ("module", ("一句话", ["内容一\n偷塞一行"], "摄影新手")),
+            ("audience", ("一句话", ["内容一"], "摄影\n新手")),
+        ):
+            with self.subTest(label=label):
+                with self.assertRaises(ValueError):
+                    build_body("示例 10集", *args)
+
+    def test_body_does_not_repeat_the_title(self):
+        title = "示例 10集 只发夸克"
+        body = build_body(title, "一句话", ["内容一"], "摄影新手")
+        self.assertNotIn(title, body)
+
+    def test_empty_segments_are_rejected(self):
+        for args in (
+            (" ", ["内容一"], "摄影新手"),
+            ("一句话", [], "摄影新手"),
+            ("一句话", ["内容一"], "  "),
+        ):
+            with self.subTest(args=args):
+                with self.assertRaises(ValueError):
+                    build_body("示例 10集", *args)
 
 
 class MakeDescTests(unittest.TestCase):

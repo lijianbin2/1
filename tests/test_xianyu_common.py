@@ -3,6 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
 from xianyu_common import (
@@ -21,6 +22,31 @@ from xianyu_common import (
     wrap_text,
     wrap_text_fit,
 )
+
+
+def footer_text_bands(page: Path, module) -> list[tuple[int, int]]:
+    """返回底栏内文字墨迹的横带，格式为 (起始 y, 高度)。
+
+    直接量渲染结果而不是读源码坐标：源码扫描只能证明"写了什么"，
+    像素才能证明"画出来有没有叠在一起"。底栏是深色底、浅色字，
+    所以取每行的最大通道值判墨迹；左右各让出 30px 避开圆角。
+    """
+    with Image.open(page) as image:
+        pixels = np.array(image.convert("RGB")).astype(int)
+    top, bottom = module.FOOTER_TOP, module.H - module.BORDER
+    crop = pixels[top:bottom, module.BORDER + 30 : module.W - module.BORDER - 30]
+    inked = (crop.max(axis=2) > 150).any(axis=1)
+    bands: list[tuple[int, int]] = []
+    start: int | None = None
+    for offset, has_ink in enumerate(inked):
+        if has_ink and start is None:
+            start = offset
+        elif not has_ink and start is not None:
+            bands.append((start + top, offset - start))
+            start = None
+    if start is not None:
+        bands.append((start + top, len(inked) - start))
+    return bands
 
 
 class XianyuCommonTests(unittest.TestCase):

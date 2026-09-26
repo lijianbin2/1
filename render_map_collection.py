@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from PIL import Image, ImageEnhance, ImageOps
+from PIL import Image, ImageDraw, ImageEnhance, ImageOps
 
 from verify_source import SourceStats, scan_source
 from xianyu_common import (
@@ -41,8 +41,6 @@ CAT_CARD_W = 460
 DEFAULT_OUT = Path("D:/闲鱼/高清一亿像素地图矢量图合集，超精细地理素材")
 DEFAULT_ROOT = Path(r"M:/WebDAV/夸克/软件/高清一亿像素地图矢量图合集，超精细地理素材")
 
-Image.MAX_IMAGE_PIXELS = None
-
 
 def stats_labels(stats: SourceStats) -> tuple[str, str]:
     """把实测统计转成图上用的短标签，数量不再手打。"""
@@ -70,8 +68,6 @@ def image_panel(base: Image.Image, image: Image.Image, box: tuple[int, int, int,
         raise ValueError("image panel box is invalid")
     panel = ImageOps.fit(image, (right - left, bottom - top), method=Image.Resampling.LANCZOS)
     mask = Image.new("L", panel.size, 0)
-    from PIL import ImageDraw
-
     ImageDraw.Draw(mask).rounded_rectangle((0, 0, panel.width - 1, panel.height - 1), radius=radius, fill=255)
     base.paste(panel, (left, top), mask)
 
@@ -82,9 +78,12 @@ def centered(draw, text: str, y: int, font, fill=DARK) -> None:
 
 def footer(draw, right: str) -> None:
     draw.rounded_rectangle([BORDER, FOOTER_TOP, W - BORDER, H - BORDER], radius=22, fill=DARK)
-    draw.text((BORDER + 40, H - BORDER - 68), "只发夸克", fill="white", font=get_font(24, True))
+    # 两行按 FOOTER_TOP 相对定位，和相机课保持一致。写死 H-BORDER-68/-47
+    # 时两行的墨迹在纵向上是连成一片的（980-1003 与 1000-1019），左右虽有
+    # 空档不至于糊成一团，但改 FOOTER_H 时这两行不会跟着动。
+    draw.text((BORDER + 40, FOOTER_TOP + 12), "只发夸克", fill="white", font=get_font(24, True))
     font = get_font(20)
-    draw.text((W - BORDER - 40 - draw.textlength(right, font=font), H - BORDER - 47), right, fill=(203, 213, 225), font=font)
+    draw.text((W - BORDER - 40 - draw.textlength(right, font=font), FOOTER_TOP + 48), right, fill=(203, 213, 225), font=font)
 
 
 def render_cover(root: Path, out: Path, files_label: str, size_label: str) -> None:
@@ -261,6 +260,9 @@ def main() -> int:
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT, help="图片输出目录")
     args = parser.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
+    # 一亿像素原图会触发 PIL 的解压炸弹保护，只在真的要读这些大图时放开，
+    # 放在模块层会让 import 渲染器的人（测试、scan_zones）也一并失去这层防护。
+    Image.MAX_IMAGE_PIXELS = None
     # 数量与体积一律来自源目录实测，避免图上出现过期数字
     files_label, size_label = stats_labels(scan_source(args.root))
     render_cover(args.root, args.out, files_label, size_label)

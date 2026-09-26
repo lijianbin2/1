@@ -1,8 +1,11 @@
 import re
+import tempfile
 import unittest
 from pathlib import Path
 
 import render_promo_music as promo
+
+from test_xianyu_common import footer_text_bands
 
 
 SOURCE = Path(promo.__file__).read_text(encoding="utf-8")
@@ -96,6 +99,26 @@ class PromoMusicTests(unittest.TestCase):
             with self.subTest(count=bad):
                 with self.assertRaises(ValueError):
                     promo.outcomes_layout(bad)
+
+    def test_footer_two_text_lines_do_not_touch(self):
+        """底栏两行必须能分开，看清是两行而不是一团。
+
+        早先这里写死 H-BORDER-68/-47，两行只差 21px，而 24px 与 20px 的
+        真实墨迹几乎占满行高，实测间距 -4px，两行是叠在一起的。
+        相机脚本早先栽在同一个坑上，改成 FOOTER_TOP+12/+48 之后间距 +11px。
+        """
+        with tempfile.TemporaryDirectory() as directory:
+            out = Path(directory)
+            promo.render_cover(out)
+            bands = footer_text_bands(out / "01.png", promo)
+        self.assertEqual(
+            len(bands),
+            2,
+            f"底栏应该正好两行文字，实际 {len(bands)} 带：{bands}",
+        )
+        first, second = bands
+        gap = second[0] - (first[0] + first[1])
+        self.assertGreater(gap, 4, f"底栏两行间距只有 {gap}px，看起来会连成一片")
 
 
 if __name__ == "__main__":

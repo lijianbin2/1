@@ -14,6 +14,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import numpy as np
 from PIL import Image
 
 from legacy_runner import run_legacy
@@ -26,6 +27,44 @@ class LayoutZoneTests(unittest.TestCase):
         for page in sorted(out.glob("*.png")):
             problems.extend(f"{label}/{issue}" for issue in scan_page(page, geo))
         return problems
+
+    def test_scanner_runs_from_any_directory_with_readable_chinese(self):
+        """从任意目录运行，且中文提示不能变成乱码。
+
+        两件事合成一次子进程：``scan_zones.py`` 要渲染六个入口，
+        每跑一次二十多秒，拆成两个用例会把这个测试文件拖慢一倍。
+
+        早先渲染子进程用的是相对文件名 ``render_camera_basics.py``，
+        从别的目录运行时 Python 找不到脚本，直接 ``CalledProcessError``
+        退出，扫描器等于只能在特定目录下用一次。同时 ``main`` 漏了
+        ``enable_utf8_stdout()``，跳过原因那句解释实测会输出 U+FFFD——
+        那恰恰是唯一解释"为什么 cover_v2 不参与扫描"的地方。
+        """
+        import subprocess
+        import sys
+        import os
+
+        project_root = Path(__file__).resolve().parent.parent
+        with tempfile.TemporaryDirectory() as directory:
+            cwd = os.getcwd()
+            try:
+                os.chdir(directory)
+                completed = subprocess.run(
+                    [sys.executable, str(project_root / "scan_zones.py")],
+                    capture_output=True,
+                )
+            finally:
+                os.chdir(cwd)
+        self.assertEqual(
+            completed.returncode,
+            0,
+            "从项目根以外运行失败："
+            + completed.stderr.decode("utf-8", errors="replace")[-600:],
+        )
+        output = completed.stdout.decode("utf-8")
+        self.assertNotIn("\ufffd", output, "扫描报告里出现了替换字符，说明编码没切 UTF-8")
+        self.assertIn("cover_v2", output)
+        self.assertIn("整幅渐变全出血封面", output)
 
     def test_legacy_renderers_have_no_large_vertical_void(self):
         """codex55 / workbuddy / winrar 三个脚本。

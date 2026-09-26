@@ -112,8 +112,11 @@ def footer(draw, right=f"{TOTAL_LABEL} · {CATEGORY_COUNT} · 宣传片配乐"):
         radius=22,
         fill=DARK,
     )
+    # 两行按 FOOTER_TOP 相对定位，和相机课保持一致。写死 H-BORDER-68/-47
+    # 时两行的墨迹在纵向上是连成一片的（980-1003 与 1000-1019），左右虽有
+    # 空档不至于糊成一团，但改 FOOTER_H 时这两行不会跟着动。
     draw.text(
-        (BORDER + 40, H - BORDER - 68),
+        (BORDER + 40, FOOTER_TOP + 12),
         "只发夸克",
         fill="white",
         font=get_font(24, True),
@@ -121,7 +124,7 @@ def footer(draw, right=f"{TOTAL_LABEL} · {CATEGORY_COUNT} · 宣传片配乐"):
     font = get_font(20)
     width = draw.textlength(right, font=font)
     draw.text(
-        (W - BORDER - 40 - width, H - BORDER - 47),
+        (W - BORDER - 40 - width, FOOTER_TOP + 48),
         right,
         fill=(203, 213, 225),
         font=font,

@@ -5,6 +5,7 @@ from unittest.mock import patch
 
 from PIL import Image, ImageFont
 
+import render_map_collection as maps_module
 from render_map_collection import (
     W,
     H,
@@ -17,6 +18,7 @@ from render_map_collection import (
     stats_labels,
 )
 from verify_source import SourceStats
+from test_xianyu_common import footer_text_bands
 
 
 class RenderMapCollectionTests(unittest.TestCase):
@@ -98,3 +100,32 @@ class RenderMapCollectionTests(unittest.TestCase):
         _, bottom = text_extent(draw, detail, detail_font, top)
         self.assertLessEqual(bottom, card_top + card_h - 14)
         self.assertEqual(maps.FOOTER_TOP, H - 38 - 86)
+
+    def test_footer_two_text_lines_do_not_touch(self):
+        """底栏两行必须能分开，看清是两行而不是一团。
+
+        早先这里写死 H-BORDER-68/-47，两行只差 21px，而 24px 与 20px 的
+        真实墨迹几乎占满行高，实测间距 -4px，两行是叠在一起的。
+        相机脚本早先栽在同一个坑上，改成 FOOTER_TOP+12/+48 之后间距 +11px。
+        """
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "source"
+            (root / "中国各省高清晰巨幅地图").mkdir(parents=True)
+            for name in ("超高清晰世界地图.jpg", "一亿像素中国地图.jpg", "中国各省高清晰巨幅地图/中国.jpg"):
+                Image.new("RGB", (300, 180), "white").save(root / name)
+            out = Path(directory) / "out"
+            out.mkdir()
+            labels = ("468个文件", "约7.24GB")
+            # 这里不能把 get_font 换成 load_default：像素判定要量真实字形的
+            # 墨迹范围，换成点阵默认字形后测的就不是实际发布的图了。
+            render_cover(root, out, *labels)
+            bands = footer_text_bands(out / "01.png", maps_module)
+
+        self.assertEqual(
+            len(bands),
+            2,
+            f"底栏应该正好两行文字，实际 {len(bands)} 带：{bands}",
+        )
+        first, second = bands
+        gap = second[0] - (first[0] + first[1])
+        self.assertGreater(gap, 4, f"底栏两行间距只有 {gap}px，看起来会连成一片")
