@@ -28,6 +28,8 @@ class RenderMapCollectionTests(unittest.TestCase):
             base = Image.new("RGB", (200, 200), "white")
             image_panel(base, fitted, (20, 30, 120, 130), radius=8)
             self.assertEqual(base.getpixel((20, 30)), (255, 255, 255))
+            with self.assertRaises(ValueError):
+                image_panel(base, fitted, (20, 30, 10, 130))
 
     def test_all_renderers_create_four_square_images(self):
         with tempfile.TemporaryDirectory() as directory:

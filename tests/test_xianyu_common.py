@@ -12,6 +12,8 @@ class XianyuCommonTests(unittest.TestCase):
         image, draw = draw_board()
         self.assertEqual(image.size, (1080, 1080))
         self.assertEqual(draw.textlength(""), 0)
+        with self.assertRaises(ValueError):
+            draw_board(radius=-1)
 
     def test_wrap_text_handles_empty_and_wraps_by_width(self):
         image, draw = draw_board()
@@ -29,6 +31,19 @@ class XianyuCommonTests(unittest.TestCase):
             (root / "03.png").write_bytes(b"not a png")
             problems = validate_png_files(root, names=("01.png", "02.png", "03.png", "04.png"))
             self.assertEqual(problems, [root / "02.png", root / "03.png", root / "04.png"])
+
+    def test_validate_png_files_reports_truncated_png(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            data = (root / "source.png")
+            Image.new("RGB", (1080, 1080), "white").save(data)
+            truncated = root / "01.png"
+            payload = bytearray(data.read_bytes())
+            idat_offset = payload.find(b"IDAT")
+            self.assertGreaterEqual(idat_offset, 0)
+            payload[idat_offset + 4] ^= 0xFF
+            truncated.write_bytes(payload)
+            self.assertEqual(validate_png_files(root, names=("01.png",)), [truncated])
 
     def test_validate_png_files_rejects_invalid_parameters_and_paths(self):
         with self.assertRaises(ValueError):

@@ -144,9 +144,11 @@ def build_quark(folder: str, link: str, code: str) -> str:
 
 
 def write_project(out_dir: str | Path, title: str, body: str, quark_block: str) -> list[str]:
-    """校验后写入两份完全一致的 UTF-8 文案。
+    """校验后写入完整交付包和不含分享信息的公开正文。
 
-    校验失败时不创建目录、不写入文件，避免失败任务留下半成品。
+    ``desc.txt`` 保存完整交付包，``闲鱼发布文案_直接复制.txt`` 只保存可直接
+    粘贴到闲鱼的标题和正文。校验失败时不创建目录、不写入文件，避免失败
+    任务留下半成品。
     """
     title = title.strip()
     body = body.strip()

@@ -32,7 +32,14 @@ def draw_board(
     radius: int = 32,
 ):
     """Blue outer board + white rounded inner card. Returns (img, draw)."""
-    if min(w, h) <= 0 or border < 0 or border * 2 >= min(w, h):
+    if (
+        not all(isinstance(value, int) and not isinstance(value, bool) for value in (w, h, border, radius))
+        or min(w, h) <= 0
+        or border < 0
+        or radius < 0
+        or border * 2 >= min(w, h)
+        or radius * 2 > min(w, h)
+    ):
         raise ValueError("board dimensions and border are invalid")
     im = Image.new("RGB", (w, h), blue)
     draw = ImageDraw.Draw(im)
@@ -136,6 +143,8 @@ def validate_png_files(
             with Image.open(path) as image:
                 if image.format != "PNG" or image.size != size:
                     problems.append(path)
+                    continue
+                image.load()
         except (OSError, ValueError):
             problems.append(path)
     return problems

@@ -34,6 +34,17 @@ def image_fit(path: Path, size: tuple[int, int]) -> Image.Image:
 
 def image_panel(base: Image.Image, image: Image.Image, box: tuple[int, int, int, int], radius: int = 20) -> None:
     left, top, right, bottom = box
+    if (
+        not all(isinstance(value, int) and not isinstance(value, bool) for value in box)
+        or left < 0
+        or top < 0
+        or right <= left
+        or bottom <= top
+        or right > base.width
+        or bottom > base.height
+        or radius < 0
+    ):
+        raise ValueError("image panel box is invalid")
     panel = ImageOps.fit(image, (right - left, bottom - top), method=Image.Resampling.LANCZOS)
     mask = Image.new("L", panel.size, 0)
     from PIL import ImageDraw

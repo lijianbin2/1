@@ -147,8 +147,8 @@ def render_catalog(out: Path) -> None:
         d.rounded_rectangle([x, y, x + cw, y + 7], radius=6, fill=color)
         d.text((x + 16, y + 20), name, fill=DARK, font=get_font(22, True))
         d.text((x + 16, y + 60), rng, fill=color, font=get_font(20, True))
-        for line in wrap_text(desc, get_font(18), cw - 32, d)[:2]:
-            d.text((x + 16, y + 91), line, fill=INK, font=get_font(18))
+        for line_no, line in enumerate(wrap_text(desc, get_font(18), cw - 32, d)[:2]):
+            d.text((x + 16, y + 91 + line_no * 22), line, fill=INK, font=get_font(18))
     footer(d, "12个章节 · 41节视频")
     save_png(im, out / "02.png")
 
@@ -177,8 +177,8 @@ def render_outcomes(out: Path) -> None:
         nw = d.textlength(num, font=get_font(20, True))
         d.text((x + 32 - nw / 2, y + 25), num, fill="white", font=get_font(20, True))
         d.text((x + 66, y + 21), title, fill=DARK, font=get_font(24, True))
-        for line in wrap_text(desc, get_font(18), cw2 - 36, d)[:2]:
-            d.text((x + 18, y + 70), line, fill=GRAY, font=get_font(18))
+        for line_no, line in enumerate(wrap_text(desc, get_font(18), cw2 - 36, d)[:2]):
+            d.text((x + 18, y + 70 + line_no * 22), line, fill=GRAY, font=get_font(18))
 
     d.rounded_rectangle([BORDER + 40, 830, W - BORDER - 40, 930], radius=18, fill=(239, 246, 255))
     d.text((BORDER + 60, 850), "适合谁", fill=DARK, font=get_font(22, True))
