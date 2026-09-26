@@ -18,7 +18,19 @@ COPY_NAME = "闲鱼发布文案_直接复制.txt"
 QUARK_LABELS = ("文件夹名", "链接", "提取码")
 REQUIRED = (MARKER, *QUARK_LABELS)
 PUBLIC_REQUIRED = (MARKER,)
-FORBIDDEN = ("百度", "价格", "价钱", "实物", "快递", "物流", "试看", "私聊")
+# 虚拟资料在闲鱼挂闲鱼发布页，遇到实物/自动发货类承诺容易引出货不对板纠纷，
+# 一律拦在正文之外。价格也不写：平台上单独填价格栏，正文再写会前后打架。
+FORBIDDEN = (
+    "百度",
+    "价格",
+    "价钱",
+    "实物",
+    "快递",
+    "物流",
+    "试看",
+    "私聊",
+    "自动发货",
+)
 VIRTUAL_NOTICE = "【说明】虚拟资料，只发夸克网盘，拍后发网盘链接。"
 _CURRENCY_RE = re.compile(r"(?:\d+(?:\.\d+)?\s*元|[￥¥]\s*\d+)")
 _URL_RE = re.compile(r"(?:https?://|pan\.quark\.cn)", re.IGNORECASE)
@@ -166,8 +178,7 @@ def build_quark(folder: str, link: str, code: str) -> str:
         raise ValueError("link 必须是夸克分享链接")
     if not re.fullmatch(r"[A-Za-z0-9]{4}", code):
         raise ValueError("code 必须是四位字母或数字")
-    labels = ("文件夹名", "链接", "提取码")
-    return "\n".join(f"{label}：{value}" for label, value in zip(labels, values))
+    return "\n".join(f"{label}：{value}" for label, value in zip(QUARK_LABELS, values))
 
 
 def write_project(out_dir: str | Path, title: str, body: str, quark_block: str) -> list[str]:

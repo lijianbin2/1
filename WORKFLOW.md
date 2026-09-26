@@ -179,7 +179,7 @@ assert_no_overlap([(cards_y, cards_y + card_h), (meta_y, meta_y + 76)], "封面"
 ### 扫描纵向死区
 
 空洞不会让程序报错，只会让图看起来没排完，所以要靠自动扫描兜住，
-不能靠人眼。`scan_zones.py` 会渲染全部七个入口并报告白卡内、底栏以上的
+不能靠人眼。`scan_zones.py` 会渲染有白卡底栏的六个入口，并报告底栏以上的
 连续无墨迹横带：
 
 ```powershell
@@ -187,11 +187,29 @@ python scan_zones.py
 ```
 
 连续空白 **超过 170px 就是要修的死区**，低于它属于正常行距。
-这条规则已经固化进 `tests/test_layout_zones.py`，七个入口的每一页都会被扫，
-回归会让测试变红；该文件里还有一条自检用例，先在图上画出一条 200px 空白
-确认扫描器报得出来，避免"扫描器坏了所以全通过"。
+`cover_v2.py` 会被显式跳过并在输出里说明原因：它是整幅渐变的全出血封面，
+没有白卡也没有底栏，逐行问"有没有墨"必然每行都有，扫描恒为 0px，属于空跑。
 
-当前七个入口最差的一页是 163px，都在阈值内。**修空洞的办法是往卡里补实质
+这条规则已经固化进 `tests/test_layout_zones.py`，六个入口的每一页都会被扫，
+回归会让测试变红。两处细节别绕过：
+
+- **几何常量从渲染器读，不在扫描侧抄一份。** 扫描区域用
+  `scan_zones.geometry()` 从渲染器的 `W` / `H` / `BORDER` / `FOOTER_TOP`
+  取（winrar 叫 `BAR_TOP`，`geometry()` 做了兜底）。抄常量的坏处是画布或
+  底栏高度一改，扫描就落到错误区域，甚至落到画布外空跑——报告恒为 0px，
+  看着全通过其实什么都没测。legacy 三个脚本的常量靠
+  `legacy_runner.run_legacy()` 的返回值拿（它返回 `runpy` 的全局命名空间），
+  不要为了拿常量再导入一次、把图重画一遍。
+- **扫描区域超出画布必须抛错。** `ink_bands()` 要求显式传
+  `top` / `bottom` / `left` / `right`，尺寸装不下时抛 `ValueError`，
+  悄悄截断后报"没有空洞"比直接报错危险得多。
+
+`tests/test_layout_zones.py` 直接 import `scan_zones` 里的实现，工具和测试
+不会各写一套判定。该文件还有两条自检用例：先在图上画出一条 200px 空白
+确认扫描器报得出来（避免"扫描器坏了所以全通过"），再确认超区域会报错。
+
+当前六个入口最差的一页是 163px（`codex55/01` 与 `workbuddy/01`），
+都在阈值内。**修空洞的办法是往卡里补实质
 内容，然后让 `stack_layout` 居中整块；把卡片拉高只会把洞做大。**
 
 ### 文案不要被静默截断
@@ -287,6 +305,12 @@ desc.txt                    完整交付包，含分享信息，只作本地记�
 
 正文禁止出现：`pan.quark.cn` 等 URL、"分享 ID""提取码""密码"等交付字段、
 价格金额、百度网盘、自动发货、实物快递物流等不符实际的说法。
+
+这个清单不靠自觉，靠 `make_desc.py` 的 `FORBIDDEN` 常量和 `check_public_copy`
+强制执行，校验不过就非 0 退出。**文档里承诺拦住的词，代码里必须真的在拦**：
+早先文档写了"自动发货"而 `FORBIDDEN` 漏了它，正文能混过校验。
+`tests/test_make_desc.py` 的 `test_forbidden_words_match_the_documented_list`
+钉住这条，断言违规码确实是 `forbidden` 命中，不许靠别的规则顺带报错蒙混过关。
 
 拿分享信息之前也可以先只生成公开正文；等链接有了再执行第 7 步补齐 `desc.txt`。
 
@@ -408,10 +432,10 @@ git push origin xianyu
 xianyu_common.py     版式与校验公共库：字体、画板、文本换行、区块排布、真实文字占位、PNG 校验、控制台 UTF-8
 verify_source.py     素材统计与数量声明校验，唯一统计入口
 make_desc.py         正文生成、校验、写入、剪贴板复制（库 + CLI）
-legacy_runner.py     以显式环境变量执行 legacy 脚本，负责恢复环境
+legacy_runner.py     以显式环境变量执行 legacy 脚本，恢复环境并返回其全局命名空间
 render_*.py          公开入口，只做参数解析和调度，导入无副作用
 cover_v2.py          WorkBuddy 双封面入口
-scan_zones.py        死区扫描工具：渲染全部入口并报告连续空白横带
+scan_zones.py        死区扫描：库 + 命令行，报告白卡内连续空白横带
 legacy/              历史绘图实现，由对应入口经 legacy_runner 调用，不是死代码
 tests/               unittest 测试
 ```
@@ -431,7 +455,7 @@ test_render_promo_music.py     分类数据表等于实测 970 首
 test_render_camera_basics.py   课时/章节等于实测 41/12，源码无手打数量
 test_legacy_constants.py       legacy 数量只在常量处声明，可被环境变量覆盖
 test_legacy_layout.py          legacy 版式回归：底栏行距、提醒框高度、箭头不出框
-test_layout_zones.py           七个入口的每一页都不能有 >170px 纵向死区，并自检扫描器
+test_layout_zones.py           六个入口的每一页都不能有 >170px 纵向死区；扫描器自检 + 超区域报错
 ```
 
 渲染类测试会真的往临时目录出图，字体缺失会直接失败，这是有意的。

@@ -4,6 +4,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from make_desc import (
+    FORBIDDEN,
     build_quark,
     build_title,
     check_copy,
@@ -16,6 +17,28 @@ from make_desc import (
 
 
 class MakeDescTests(unittest.TestCase):
+    def test_forbidden_words_match_the_documented_list(self):
+        """WORKFLOW.md 承诺拦住的词，代码里必须真的在拦。
+
+        文档写了"自动发货"但 FORBIDDEN 漏了它，正文就能混过校验，
+        买家在闲鱼看到实物/自动发货承诺就是货不对板。
+        """
+        self.assertIn("自动发货", FORBIDDEN)
+        self.assertIn("百度", FORBIDDEN)
+        for word in ("自动发货", "实物快递", "拍下自动发货"):
+            with self.subTest(word=word):
+                violations = check_public_copy(
+                    "示例项目 10集 只发夸克", f"只发夸克网盘\n{word}"
+                )
+                # 必须是 forbidden 真的命中，不能靠别的规则顺带报错蒙混过关
+                self.assertTrue(
+                    any(
+                        "forbidden" in code and code.endswith("-in-body")
+                        for code in violations
+                    ),
+                    f"正文里的“{word}”没有被 forbidden 规则拦下：{violations}",
+                )
+
     def test_check_copy_rejects_currency_and_accepts_valid_copy(self):
         quark = build_quark("示例项目", "https://pan.quark.cn/s/abc123", "abcd")
         body = "只发夸克网盘\n" + quark

@@ -5,78 +5,46 @@
 
 用墨迹行扫描而不是人眼看图：早先后加卡片高度时，180px 的内容塞进 460px 的
 卡里，反而多出一大片空白。补内容才对，拉高卡片只会把洞做大。
+
+扫描实现放在 ``scan_zones.py``，测试直接 import 同一份代码，避免工具和测试
+各写一套判定、跑到不同结论。
 """
 
 import tempfile
 import unittest
 from pathlib import Path
 
-import numpy as np
 from PIL import Image
 
 from legacy_runner import run_legacy
-
-# 白卡内边距，四个渲染器一致。
-BORDER = 38
-# 底部深色横条高度，扫描范围要在它上面。
-FOOTER_H = 86
-# 连续空白超过这个高度就算死区，需要回头补内容。
-VOID_LIMIT = 170
-# 报告用的下限，低于它的空白属于正常行距，不打印。
-REPORT_LIMIT = 60
-
-LEGACY_RENDERERS = {
-    "cover_v2": "cover_v2_legacy.py",
-    "codex55": "render_codex55_legacy.py",
-    "workbuddy": "render_workbuddy_legacy.py",
-    "winrar": "render_winrar_unified_legacy.py",
-}
-
-
-def ink_bands(
-    path: Path,
-    *,
-    top: int = BORDER,
-    bottom: int = 1080 - BORDER - FOOTER_H,
-    limit: int = REPORT_LIMIT,
-) -> list[tuple[int, int]]:
-    """返回图中连续无墨迹的横带，格式为 (起始 y, 高度)。"""
-    gray = np.array(Image.open(path).convert("L"))
-    inner = gray[top:bottom, BORDER : 1080 - BORDER]
-    has_ink = (inner < 240).any(axis=1)
-    bands: list[tuple[int, int]] = []
-    start: int | None = None
-    for offset, inked in enumerate(has_ink):
-        if inked:
-            if start is not None:
-                bands.append((start + top, offset - start))
-                start = None
-        elif start is None:
-            start = offset
-    if start is not None:
-        bands.append((start + top, len(has_ink) - start))
-    return [band for band in bands if band[1] >= limit]
+from scan_zones import ABOVE_FOOTER, geometry, ink_bands, scan_page
 
 
 class LayoutZoneTests(unittest.TestCase):
-    def _scan(self, out: Path, label: str) -> list[str]:
-        problems = []
+    def _scan(self, out: Path, label: str, geo: tuple[int, int, int, int]) -> list[str]:
+        problems: list[str] = []
         for page in sorted(out.glob("*.png")):
-            for start, height in ink_bands(page):
-                if height > VOID_LIMIT:
-                    problems.append(
-                        f"{label}/{page.name} 在 y={start} 处空了 {height}px"
-                    )
+            problems.extend(f"{label}/{issue}" for issue in scan_page(page, geo))
         return problems
 
     def test_legacy_renderers_have_no_large_vertical_void(self):
+        """codex55 / workbuddy / winrar 三个脚本。
+
+        cover_v2 不参与：它是整幅渐变的全出血封面，没有白卡也没有底栏，
+        逐行问"有没有墨"必然每行都有，扫描会恒为 0px，属于空跑。
+        """
         problems: list[str] = []
         with tempfile.TemporaryDirectory() as root:
-            for label, script in LEGACY_RENDERERS.items():
+            for label, script in (
+                ("codex55", "render_codex55_legacy.py"),
+                ("workbuddy", "render_workbuddy_legacy.py"),
+                ("winrar", "render_winrar_unified_legacy.py"),
+            ):
                 out = Path(root) / label
                 out.mkdir(parents=True, exist_ok=True)
-                run_legacy(script, out)
-                problems.extend(self._scan(out, label))
+                namespace = run_legacy(script, out)
+                problems.extend(self._scan(out, label, geometry(namespace)))
+
         self.assertEqual(problems, [], "版面出现大片空白：\n" + "\n".join(problems))
 
     def test_library_renderers_have_no_large_vertical_void(self):
@@ -93,7 +61,7 @@ class LayoutZoneTests(unittest.TestCase):
                 camera.render_guide,
             ):
                 render(out)
-            problems.extend(self._scan(out, "camera"))
+            problems.extend(self._scan(out, "camera", geometry(camera)))
 
             for render in (
                 promo.render_cover,
@@ -102,7 +70,7 @@ class LayoutZoneTests(unittest.TestCase):
                 promo.render_guide,
             ):
                 render(out)
-            problems.extend(self._scan(out, "promo"))
+            problems.extend(self._scan(out, "promo", geometry(promo)))
         self.assertEqual(problems, [], "版面出现大片空白：\n" + "\n".join(problems))
 
     def test_map_renderer_has_no_large_vertical_void(self):
@@ -133,7 +101,7 @@ class LayoutZoneTests(unittest.TestCase):
                     maps.render_guide,
                 ):
                     render(source, out, *labels)
-            problems.extend(self._scan(out, "map"))
+            problems.extend(self._scan(out, "map", geometry(maps)))
         self.assertEqual(problems, [], "版面出现大片空白：\n" + "\n".join(problems))
 
     def test_scanner_detects_a_planted_void(self):
@@ -146,11 +114,19 @@ class LayoutZoneTests(unittest.TestCase):
                 for x in range(38, 1042):
                     pixels[x, y] = (200, 200, 200)
             canvas.save(page)
-            bands = ink_bands(page, limit=50)
+            bands = ink_bands(page, top=38, bottom=956 - ABOVE_FOOTER, left=38, right=1042, limit=50)
             self.assertTrue(
                 any(height >= 200 for _, height in bands),
                 f"扫描器漏掉了人为画出的 200px 空洞：{bands}",
             )
+
+    def test_scanner_rejects_a_region_larger_than_the_page(self):
+        """扫描区域超出画布必须报错，不能悄悄截断后报"没有空洞"。"""
+        with tempfile.TemporaryDirectory() as root:
+            page = Path(root) / "small.png"
+            Image.new("RGB", (400, 400), "white").save(page)
+            with self.assertRaises(ValueError):
+                ink_bands(page, top=38, bottom=900, left=38, right=1042)
 
 
 if __name__ == "__main__":
