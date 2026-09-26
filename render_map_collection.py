@@ -8,7 +8,15 @@ from pathlib import Path
 from PIL import Image, ImageEnhance, ImageOps
 
 from verify_source import SourceStats, scan_source
-from xianyu_common import draw_board, get_font, save_png, validate_png_files, wrap_text
+from xianyu_common import (
+    assert_text_above,
+    draw_board,
+    enable_utf8_stdout,
+    get_font,
+    require_valid_pngs,
+    save_png,
+    wrap_text,
+)
 
 
 W = H = 1080
@@ -72,20 +80,26 @@ def footer(draw, right: str) -> None:
 
 def render_cover(root: Path, out: Path, files_label: str, size_label: str) -> None:
     im, d = draw_board()
-    world = image_fit(root / "超高清晰世界地图.jpg", (960, 510))
-    china = image_fit(root / "一亿像素中国地图.jpg", (360, 510))
-    image_panel(im, china, (60, 258, 420, 768), radius=18)
-    image_panel(im, world, (440, 258, 1020, 768), radius=18)
-    d.rounded_rectangle([60, 258, 1020, 768], radius=18, outline=(255, 255, 255), width=6)
-    d.rounded_rectangle([60, 258, 420, 768], radius=18, outline=(255, 255, 255), width=6)
+    world = image_fit(root / "超高清晰世界地图.jpg", (960, 500))
+    china = image_fit(root / "一亿像素中国地图.jpg", (360, 500))
+    image_panel(im, china, (60, 268, 420, 768), radius=18)
+    image_panel(im, world, (440, 268, 1020, 768), radius=18)
+    d.rounded_rectangle([60, 268, 1020, 768], radius=18, outline=(255, 255, 255), width=6)
+    d.rounded_rectangle([60, 268, 420, 768], radius=18, outline=(255, 255, 255), width=6)
 
     badge = f"{files_label} · {size_label}"
     font = get_font(24, True)
     badge_w = d.textlength(badge, font=font) + 40
     d.rounded_rectangle([(W - badge_w) / 2, 78, (W + badge_w) / 2, 120], radius=21, fill=BLUE)
     centered(d, badge, 86, font, "white")
-    centered(d, "高清一亿像素地图", 150, get_font(50, True))
-    centered(d, "超精细地理素材合集", 224, get_font(30), GRAY)
+    centered(d, "高清一亿像素地图", 146, get_font(50, True))
+    # 30px 字号在 y=214 时实际占据 220~250，给 268 的图框留出安全间距；
+    # 早先的 224 会让文字底部被图框白色描边压掉 2px。
+    subtitle_font = get_font(30)
+    centered(d, "超精细地理素材合集", 214, subtitle_font, GRAY)
+    assert_text_above(
+        d, "超精细地理素材合集", subtitle_font, 214, 268, "封面副标题与图框"
+    )
     d.rounded_rectangle([60, 802, 1020, 914], radius=20, fill=PALE, outline=(226, 232, 240), width=1)
     d.text((86, 826), "中国地图 · 世界地图 · 各省区域 · 矢量源文件", fill=DARK, font=get_font(24, True))
     d.text((86, 869), "高清预览、分类齐全，设计排版更省心", fill=GRAY, font=get_font(21))
@@ -176,6 +190,7 @@ def render_guide(root: Path, out: Path, files_label: str, size_label: str) -> No
 
 
 def main() -> int:
+    enable_utf8_stdout()
     parser = argparse.ArgumentParser(description="生成高清地图矢量素材合集四张图文")
     parser.add_argument("--root", type=Path, default=DEFAULT_ROOT, help="地图素材源目录")
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT, help="图片输出目录")
@@ -187,9 +202,7 @@ def main() -> int:
     render_catalog(args.root, args.out, files_label, size_label)
     render_outcomes(args.root, args.out, files_label, size_label)
     render_guide(args.root, args.out, files_label, size_label)
-    invalid = validate_png_files(args.out, size=(W, H))
-    if invalid:
-        raise RuntimeError("图片文件校验失败：" + ", ".join(str(path) for path in invalid))
+    require_valid_pngs(args.out, size=(W, H))
     print(f"generated {args.out}")
     return 0
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 from typing import Iterable
 
@@ -9,6 +10,22 @@ from PIL import Image, ImageDraw, ImageFont
 
 FONT_REGULAR = r"C:/Windows/Fonts/msyh.ttc"
 FONT_BOLD = r"C:/Windows/Fonts/msyhbd.ttc"
+
+
+def enable_utf8_stdout() -> None:
+    """把标准输出切到 UTF-8，避免中文路径和提示在控制台显示成乱码。
+
+    Windows 控制台默认按本地代码页解码 Python 的输出，而这里的路径和提示
+    都含中文，不切换就会打印成乱码，用户看不到图到底存到了哪里。
+    """
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            try:
+                reconfigure(encoding="utf-8", errors="replace")
+            except (ValueError, OSError):
+                # 已被重定向到不支持编码设置的对象时，保持原状即可
+                pass
 
 
 def get_font(size: int, bold: bool = False, strict: bool = True):
@@ -163,6 +180,27 @@ def assert_no_overlap(blocks: Iterable[tuple[float, float]], label: str) -> None
             raise ValueError(f"{label} 区块重叠：{prev_bottom} > {top}")
 
 
+def text_extent(draw, text: str, font, y: float) -> tuple[float, float]:
+    """返回文本以 ``y`` 为基线起点时实际占据的纵向区间。
+
+    ``draw.text`` 的 y 是文字顶部锚点，真实墨迹范围由 ``textbbox`` 决定，
+    并不等于 ``y + 字号``：msyh 30px 实测占据 ``y+6`` 到 ``y+36``。凭锚点估算
+    间距会低估文字底部，把字压到下一块内容上，所以版式校验一律用这个函数量
+    真实范围。
+    """
+    left, top, right, bottom = draw.textbbox((0, 0), text, font=font)
+    return y + top, y + bottom
+
+
+def assert_text_above(
+    draw, text: str, font, y: float, limit: float, label: str
+) -> None:
+    """断言文本不会碰到 ``limit`` 以下的下一个内容块。"""
+    _, bottom = text_extent(draw, text, font, y)
+    if bottom > limit:
+        raise ValueError(f"{label} 文字底部 {bottom:.0f} 超出可用范围 {limit:.0f}")
+
+
 def save_png(im, path: str | Path):
     """创建父目录并保存 PNG，返回文件大小（字节）。"""
     p = Path(path)
@@ -232,3 +270,23 @@ def validate_png_files(
         except (OSError, ValueError):
             problems.append(path)
     return problems
+
+
+def require_valid_pngs(
+    directory: str | Path,
+    *,
+    count: int = 4,
+    size: tuple[int, int] = (1080, 1080),
+    names: Iterable[str] | None = None,
+    label: str = "图片",
+) -> None:
+    """校验产物并在有问题时抛错，成功时打印一行结果。
+
+    所有公开渲染入口都应该在结束时调用它，这样"生成成功"和"产物可用"
+    是同一件事，不依赖调用方记得再手动校验一次。
+    """
+    materialized = None if names is None else list(names)
+    problems = validate_png_files(directory, count=count, size=size, names=materialized)
+    if problems:
+        raise RuntimeError(f"{label}校验失败：" + ", ".join(str(path) for path in problems))
+    print(f"validated {label} files={count if materialized is None else len(materialized)}")

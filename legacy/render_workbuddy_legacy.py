@@ -165,7 +165,8 @@ CAT_COLS=2
 CAT_ROWS=3
 CAT_GAP=24
 CAT_TOP=BORDER+130
-CAT_FOOT=H-BORDER-86
+# 末行卡片与底栏之间留出 20px 呼吸空间，否则卡片底边几乎贴着深色底栏
+CAT_FOOT=H-BORDER-86-20
 card_w=(W-2*BORDER-80-CAT_GAP)//CAT_COLS
 max_items=max(len(m[2]) for m in mods)
 # 卡片高度由可用高度反推，行距吃掉剩余空间，避免大片空白

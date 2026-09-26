@@ -5,7 +5,14 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from xianyu_common import draw_board, get_font, save_png, validate_png_files, wrap_text
+from xianyu_common import (
+    draw_board,
+    enable_utf8_stdout,
+    get_font,
+    require_valid_pngs,
+    save_png,
+    wrap_text,
+)
 
 
 W = H = 1080
@@ -286,6 +293,7 @@ def render_guide(out: Path) -> None:
 
 
 def main() -> int:
+    enable_utf8_stdout()
     parser = argparse.ArgumentParser(description="生成宣传片背景音乐合集四张图文")
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT, help=f"输出目录（默认：{DEFAULT_OUT}）")
     args = parser.parse_args()
@@ -296,9 +304,7 @@ def main() -> int:
     render_outcomes(args.out)
     render_guide(args.out)
 
-    invalid = validate_png_files(args.out, size=(W, H))
-    if invalid:
-        raise RuntimeError("图片文件校验失败：" + ", ".join(str(path) for path in invalid))
+    require_valid_pngs(args.out, size=(W, H))
     print(f"generated {args.out}")
     return 0
 

@@ -141,13 +141,27 @@ assert_no_overlap([(cards_y, cards_y + card_h), (meta_y, meta_y + 76)], "封面"
 
 ### 校验
 
-每个脚本结束时会自己校验，也可单独调用：
+七个公开入口（`cover_v2.py`、`render_promo_music.py`、`render_camera_basics.py`、
+`render_map_collection.py`、`render_codex55.py`、`render_workbuddy.py`、
+`render_winrar_unified.py`）结束时都会自己调用 `require_valid_pngs()`，
+产物缺失、尺寸不对或打不开就抛 `RuntimeError` 并非 0 退出。
+"打印了 generated" 不等于"图能用"——校验不过就不算生成成功，别手动绕过。
+
+`cover_v2.py` 出的是两张封面（`cover_A.png` / `cover_B.png`），
+其余入口出四张 1080×1080 图，所以封面走 `names=` 单独指定文件名。
+
+需要脱离入口单独校验时：
 
 ```python
 from xianyu_common import validate_png_files
 
 problems = validate_png_files(r"D:\闲鱼\项目名", size=(1080, 1080))
 ```
+
+文字间距不要用 `y + 字号` 估算：`draw.text` 的 y 是顶部锚点，真实墨迹由
+`textbbox` 决定，msyh 30px 实测占 `y+6` 到 `y+36`，按锚点算会低估文字底部
+并把字压到下一个图框上。改版式时用 `text_extent()` 量真实范围，或直接
+`assert_text_above()` 让越界在渲染时抛错。
 
 除程序校验外，**每张图都要目视看过**：文字不出框、不重叠、不被裁切，
 预览图不拉伸变形。
@@ -298,7 +312,7 @@ git push origin xianyu
 ## 12. 代码结构
 
 ```text
-xianyu_common.py     版式与校验公共库：字体、画板、文本换行、区块排布、PNG 校验
+xianyu_common.py     版式与校验公共库：字体、画板、文本换行、区块排布、真实文字占位、PNG 校验、控制台 UTF-8
 verify_source.py     素材统计与数量声明校验，唯一统计入口
 make_desc.py         正文生成、校验、写入、剪贴板复制（库 + CLI）
 legacy_runner.py     以显式环境变量执行 legacy 脚本，负责恢复环境
@@ -314,8 +328,8 @@ tests/               unittest 测试
 ### 测试分工
 
 ```text
-test_entrypoints.py            七个入口导入无副作用、legacy 环境变量能恢复
-test_xianyu_common.py          版式工具、区块不重叠、PNG 校验
+test_entrypoints.py            七个入口导入无副作用、legacy 环境变量能恢复、缺图时报错
+test_xianyu_common.py          版式工具、区块不重叠、PNG 校验、真实文字占位、控制台编码
 test_verify_source.py          统计扫描、数量声明违规能被抓到
 test_make_desc.py              正文生成、链接/提取码拦截、剪贴板
 test_render_map_collection.py  地图统计标签来自实测

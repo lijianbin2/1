@@ -4,11 +4,12 @@ from pathlib import Path
 from xianyu_common import (
     assert_no_overlap,
     draw_board,
+    enable_utf8_stdout,
     get_font,
+    require_valid_pngs,
     save_png,
     stack_blocks,
     stack_layout,
-    validate_png_files,
     wrap_text,
 )
 
@@ -295,6 +296,7 @@ def render_guide(out: Path) -> None:
     save_png(im, out / "04.png")
 
 def main() -> int:
+    enable_utf8_stdout()
     parser = argparse.ArgumentParser(description="生成相机基础课程四张图文")
     parser.add_argument(
         "--out",
@@ -310,9 +312,7 @@ def main() -> int:
     render_outcomes(args.out)
     render_guide(args.out)
 
-    invalid = validate_png_files(args.out, size=(W, H))
-    if invalid:
-        raise RuntimeError("图片文件校验失败：" + ", ".join(str(path) for path in invalid))
+    require_valid_pngs(args.out, size=(W, H))
     print(f"generated {args.out}")
     return 0
 
