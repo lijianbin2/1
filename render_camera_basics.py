@@ -46,16 +46,17 @@ def centered(draw, text, y, font, fill=DARK):
 
 def footer(draw, right=None):
     right = right or f"相机基础 · {LESSON_LABEL} · 摄影入门"
-    h = 86
     draw.rounded_rectangle(
-        [BORDER, H - BORDER - h, W - BORDER, H - BORDER],
+        [BORDER, FOOTER_TOP, W - BORDER, H - BORDER],
         radius=22,
         fill=DARK,
     )
-    draw.text((BORDER + 40, H - BORDER - 68), "只发夸克", fill="white", font=get_font(24, True))
+    # 两行按 FOOTER_TOP 相对定位，别再用 H-BORDER-68/-47 硬写：
+    # 24px 与 20px 两行墨迹几乎占满行高，差值一旦被改小就会连成一片。
+    draw.text((BORDER + 40, FOOTER_TOP + 12), "只发夸克", fill="white", font=get_font(24, True))
     rf = get_font(20)
     rw = draw.textlength(right, font=rf)
-    draw.text((W - BORDER - 40 - rw, H - BORDER - 47), right, fill=(203, 213, 225), font=rf)
+    draw.text((W - BORDER - 40 - rw, FOOTER_TOP + 48), right, fill=(203, 213, 225), font=rf)
 
 
 def render_cover(out: Path) -> None:

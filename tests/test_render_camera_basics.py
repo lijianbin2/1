@@ -3,6 +3,9 @@ import unittest
 from pathlib import Path
 
 import render_camera_basics as camera
+from PIL import Image, ImageDraw
+
+from xianyu_common import get_font, text_extent
 
 
 SOURCE = Path(camera.__file__).read_text(encoding="utf-8")
@@ -49,6 +52,39 @@ class CameraBasicsTests(unittest.TestCase):
     def test_layout_blocks_stay_above_footer(self):
         self.assertLess(camera.FOOTER_TOP, camera.H)
         self.assertGreater(camera.FOOTER_TOP, 0)
+
+    def test_footer_two_lines_do_not_overlap(self):
+        """底栏两行必须按 FOOTER_TOP 相对定位，墨迹之间要有可见间距。
+
+        早先这里写成 H-BORDER-68 / H-BORDER-47，相差 21px，而 24px 与 20px
+        两行的真实墨迹几乎占满行高，实测间距 -4px，两行是叠在一起的。
+        """
+        footer_body = re.search(
+            r"^def footer\(.*?(?=^\S)", SOURCE, re.MULTILINE | re.DOTALL
+        )
+        assert footer_body is not None, "找不到 footer 函数"
+        # 注释里会引用旧写法说明来由，负向检查只针对真实代码
+        body = "\n".join(
+            line
+            for line in footer_body.group(0).splitlines()
+            if not line.lstrip().startswith("#")
+        )
+        self.assertNotIn("H-BORDER-68", body.replace(" ", ""))
+        self.assertNotIn("H-BORDER-47", body.replace(" ", ""))
+        self.assertIn("FOOTER_TOP+12", body.replace(" ", ""))
+        self.assertIn("FOOTER_TOP+48", body.replace(" ", ""))
+
+        draw = ImageDraw.Draw(Image.new("RGB", (camera.W, camera.H), "white"))
+        first = text_extent(draw, "只发夸克", get_font(24, True), camera.FOOTER_TOP + 12)
+        second = text_extent(
+            draw,
+            f"相机基础 · {camera.LESSON_LABEL} · 摄影入门",
+            get_font(20),
+            camera.FOOTER_TOP + 48,
+        )
+        self.assertGreater(
+            second[0] - first[1], 6, "底栏两行墨迹几乎贴在一起，会看成一团"
+        )
 
 
 if __name__ == "__main__":

@@ -18,7 +18,6 @@ _TOTAL_FILES = re.compile(r"(\d+)\s*个文件")
 _SIZE = re.compile(r"(\d+(?:\.\d+)?)\s*(TB|GB|MB)", re.IGNORECASE)
 _SUM_CLAIM = re.compile(r"共\s*(\d+)\s*首")
 _ITEM_COUNT = re.compile(r"(\d+)\s*首")
-_DETAIL_LINE = re.compile(r"^\s*\d+\s*[.、)）]\s*")
 _LISTED_LINE = re.compile(r"^\s*(?:\d+\s*[.、)）]\s*)?[\d一二三四五六七八九十]+\s*[.、)）]\s*")
 _SIZE_UNITS = {"TB": 1024**4, "GB": 1024**3, "MB": 1024**2}
 

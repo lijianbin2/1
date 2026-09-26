@@ -169,6 +169,30 @@ assert_no_overlap([(cards_y, cards_y + card_h), (meta_y, meta_y + 76)], "封面"
 - **文字按卡片自身内边距裁剪，不能按画布边界。** 居中后向左溢出时，
   用 `max(BORDER+10, ...)` 挡不住，文字会跑到卡片边框外面。codex55 封面
   的副标题就是这么漏出卡片的。
+- **底栏两行必须按 `FOOTER_TOP` / `BAR_TOP` 相对定位。** 早先相机课底栏写成
+  `H-BORDER-68` / `H-BORDER-47`，两行相差 21px，但 24px 与 20px 的真实墨迹
+  几乎占满行高，实测间距 **-4px**，两行是叠在一起的。统一改成
+  `FOOTER_TOP + 12` 和 `FOOTER_TOP + 48`（实测间距 11px）。
+  同一文件里不要再出现字面量 `86`：底部横条高度和页内信息条高度是两回事，
+  winrar 早先两个都叫 `FOOTER`，改一个不动另一个。信息条用 `NOTE_H`。
+
+### 扫描纵向死区
+
+空洞不会让程序报错，只会让图看起来没排完，所以要靠自动扫描兜住，
+不能靠人眼。`scan_zones.py` 会渲染全部七个入口并报告白卡内、底栏以上的
+连续无墨迹横带：
+
+```powershell
+python scan_zones.py
+```
+
+连续空白 **超过 170px 就是要修的死区**，低于它属于正常行距。
+这条规则已经固化进 `tests/test_layout_zones.py`，七个入口的每一页都会被扫，
+回归会让测试变红；该文件里还有一条自检用例，先在图上画出一条 200px 空白
+确认扫描器报得出来，避免"扫描器坏了所以全通过"。
+
+当前七个入口最差的一页是 163px，都在阈值内。**修空洞的办法是往卡里补实质
+内容，然后让 `stack_layout` 居中整块；把卡片拉高只会把洞做大。**
 
 ### 文案不要被静默截断
 
@@ -387,6 +411,7 @@ make_desc.py         正文生成、校验、写入、剪贴板复制（库 + CL
 legacy_runner.py     以显式环境变量执行 legacy 脚本，负责恢复环境
 render_*.py          公开入口，只做参数解析和调度，导入无副作用
 cover_v2.py          WorkBuddy 双封面入口
+scan_zones.py        死区扫描工具：渲染全部入口并报告连续空白横带
 legacy/              历史绘图实现，由对应入口经 legacy_runner 调用，不是死代码
 tests/               unittest 测试
 ```
@@ -406,6 +431,7 @@ test_render_promo_music.py     分类数据表等于实测 970 首
 test_render_camera_basics.py   课时/章节等于实测 41/12，源码无手打数量
 test_legacy_constants.py       legacy 数量只在常量处声明，可被环境变量覆盖
 test_legacy_layout.py          legacy 版式回归：底栏行距、提醒框高度、箭头不出框
+test_layout_zones.py           七个入口的每一页都不能有 >170px 纵向死区，并自检扫描器
 ```
 
 渲染类测试会真的往临时目录出图，字体缺失会直接失败，这是有意的。

@@ -46,17 +46,21 @@ def wrap_text(text, font, max_w, d):
     return lines
 
 def bottom_bar(d, left, right):
-    top = H - BORDER - 86
-    d.rounded_rectangle([BORDER, top, W - BORDER, H - BORDER], radius=22, fill=(30, 41, 59))
-    d.text((BORDER + 40, top + 16), left, fill="white", font=get_font(24, bold=True))
+    d.rounded_rectangle([BORDER, BAR_TOP, W - BORDER, H - BORDER], radius=22, fill=(30, 41, 59))
+    d.text((BORDER + 40, BAR_TOP + 16), left, fill="white", font=get_font(24, bold=True))
     f2 = get_font(20)
     w2 = d.textlength(right, font=f2)
-    d.text((W - BORDER - 60 - w2, top + 40), right, fill=(203, 213, 225), font=f2)
+    d.text((W - BORDER - 60 - w2, BAR_TOP + 40), right, fill=(203, 213, 225), font=f2)
 
 def center_text(d, y, text, font, fill):
     w = d.textlength(text, font=font)
     d.text(((W - w) // 2, y), text, fill=fill, font=font)
 
+# 页内信息条的高度（封面 01 的"下载exe…"那一条）。
+# 早先它和底部深色横条都叫 FOOTER_H，但两者含义完全不同：
+# 改一个不动另一个，很容易以为改了其实没改。现在分开命名。
+NOTE_H = 60
+# 底部深色横条的顶部。
 BAR_TOP = H - BORDER - 86
 
 def stack(heights, top, bottom, min_gap=20, max_gap=48):
@@ -104,10 +108,9 @@ d.line([(W - 200) // 2, by + 42 + 40 + 82 + 56, (W + 200) // 2, by + 42 + 40 + 8
 feats = [("1", "极速解压", "RAR ZIP 7Z全支持"), ("2", "压缩分卷", "加密分卷批量处理"), ("3", "稳定纯净", "Win10/11 64位亲测")]
 FEAT_H = 176
 INFO_H = 140
-FOOTER_H = 60
 y0 = by + 42 + 40 + 82 + 76 + 34
 fmt_y, info_y, foot_y = stack(
-    [110, INFO_H, FOOTER_H],
+    [110, INFO_H, NOTE_H],
     by + 42 + 40 + 82 + 76 + 34 + FEAT_H + 34,
     BAR_TOP - 40,
 )
