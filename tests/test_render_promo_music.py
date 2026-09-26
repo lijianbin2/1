@@ -100,6 +100,24 @@ class PromoMusicTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     promo.outcomes_layout(bad)
 
+    def test_catalog_grid_is_derived_from_the_category_count(self):
+        """02 页网格底边必须由分类数推出，放不下就报错。
+
+        7 个分类在两列下是 4 行，底边 872，离底栏 956 还有余量，所以早先一直
+        没写守卫。加到第 9 个分类时是 5 行，底边会到 1048，画到画布和底栏外面，
+        而渲染仍然退出码 0。
+        """
+        rows, bottom = promo.catalog_grid(len(promo.CATEGORIES))
+        self.assertEqual(rows, -(-len(promo.CATEGORIES) // promo.CAT_COLS))
+        self.assertLessEqual(bottom, promo.FOOTER_TOP - promo.CAT_CARD_GAP)
+
+        with self.assertRaises(ValueError):
+            promo.catalog_grid(9)
+        for bad in (0, -1, True, 1.5, "4"):
+            with self.subTest(count=bad):
+                with self.assertRaises(ValueError):
+                    promo.catalog_grid(bad)
+
     def test_footer_two_text_lines_do_not_touch(self):
         """底栏两行必须能分开，看清是两行而不是一团。
 

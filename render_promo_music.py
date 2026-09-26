@@ -62,10 +62,35 @@ CARD_W, CARD_H, CARD_GAP = 280, 124, 18
 CARD_TOP, SUMMARY_TOP = 366, 815
 SUMMARY = "按场景选音乐，让画面情绪、节奏和氛围更到位"
 
+# 02 页分类卡的版式常量，位置由条目数推出，不写死行数
+CAT_COLS = 2
+CAT_CARD_H = 154
+CAT_CARD_GAP = 22
+CAT_CARD_TOP = 190
+
 
 def centered(draw, text, y, font, fill=DARK):
     width = draw.textlength(text, font=font)
     draw.text(((W - width) // 2, y), text, fill=fill, font=font)
+
+
+def catalog_grid(card_count: int) -> tuple[int, int]:
+    """按分类数推出 02 页网格的行数与底边。
+
+    7 个分类在两列下是 4 行，最后一行底边 872，离底栏 956 还有余量，所以
+    早先一直没人写守卫。加到第 9 个分类时是 5 行，底边会到 1048，直接画到
+    底栏和画布外面，而渲染仍然退出码 0。
+    """
+    if not isinstance(card_count, int) or isinstance(card_count, bool) or card_count < 1:
+        raise ValueError("02 页至少要 1 个分类")
+    rows = -(-card_count // CAT_COLS)
+    bottom = CAT_CARD_TOP + rows * CAT_CARD_H + (rows - 1) * CAT_CARD_GAP
+    if bottom > FOOTER_TOP - CAT_CARD_GAP:
+        raise ValueError(
+            f"02 页 {card_count} 个分类放不下：网格底边到 {bottom}，"
+            f"底栏从 {FOOTER_TOP} 开始"
+        )
+    return rows, bottom
 
 
 # 03 页"使用收获"的版式参数。抽成模块级常量并由 outcomes_layout 计算，
@@ -213,11 +238,12 @@ def render_catalog(out: Path) -> None:
     )
 
     card_w = (W - BORDER * 2 - 80 - 24) // 2
-    card_h = 154
+    card_h = CAT_CARD_H
+    _, grid_bottom = catalog_grid(len(CATEGORIES))
     for i, (name, count, color) in enumerate(CATEGORIES):
-        row, col = divmod(i, 2)
+        row, col = divmod(i, CAT_COLS)
         x = BORDER + 40 + col * (card_w + 24)
-        y = 190 + row * (card_h + 22)
+        y = CAT_CARD_TOP + row * (card_h + CAT_CARD_GAP)
         d.rounded_rectangle(
             [x, y, x + card_w, y + card_h],
             radius=18,
@@ -231,6 +257,9 @@ def render_catalog(out: Path) -> None:
         label = "宣传片背景音乐"
         label_font = get_font(18)
         d.text((x + 18, y + 112), label, fill=GRAY, font=label_font)
+    assert_no_overlap(
+        [(CAT_CARD_TOP, grid_bottom), (FOOTER_TOP, H - BORDER)], "02 页分类区与底栏"
+    )
     footer(d, f"按截图分类 · {TOTAL_LABEL}")
     save_png(im, out / "02.png")
 
