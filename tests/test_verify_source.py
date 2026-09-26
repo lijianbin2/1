@@ -73,6 +73,35 @@ class VerifySourceTests(unittest.TestCase):
                 any(c.startswith("item-sum-mismatch") for c in check_claims(copy, stats))
             )
 
+    def test_single_listed_line_wrong_count_is_caught(self):
+        """整份文案只有一条明细时，错数也必须报出来。
+
+        明细行会被排除在正文检查之外，唯一的数量声明落在明细里时，正文和
+        标题两道检查都够不着它。早先的累加校验还要求明细多于一条，于是
+        "1. 900张"（素材实际 7 个文件）返回空违规列表，是校验器最该拦下的
+        那种错数却完全放行。
+        """
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._make_source(root, {"01、汽车-3首": 3, "02、校园-4首": 4})
+            stats = scan_source(root)
+            wrong = "示例 素材合集\n\n内容简介：\n1. 全部素材：900首\n"
+            self.assertTrue(
+                any(c.startswith("item-sum-mismatch") for c in check_claims(wrong, stats)),
+                msg=f"单条明细错数未被拦截：{check_claims(wrong, stats)}",
+            )
+            right = "示例 素材合集\n\n内容简介：\n1. 全部素材：7首\n"
+            self.assertEqual(check_claims(right, stats), [])
+
+    def test_listed_line_without_any_count_is_not_flagged(self):
+        """明细里没有数量声明时不能凭空报违规。"""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._make_source(root, {"01、汽车-3首": 3, "02、校园-4首": 4})
+            stats = scan_source(root)
+            copy = "示例 素材合集\n\n内容简介：\n1. 中国地图、世界地图、各省区域图\n"
+            self.assertEqual(check_claims(copy, stats), [])
+
     def test_scan_source_rejects_missing_directory(self):
         with self.assertRaises(NotADirectoryError):
             scan_source(Path("no-such-source-dir"))

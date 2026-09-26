@@ -135,7 +135,11 @@ def check_claims(text: str, stats: SourceStats) -> list[str]:
         for line in detail_lines
         for count, _unit in _COUNT_CLAIM.findall(_SUM_CLAIM.sub("", line))
     ]
-    if len(items) > 1:
+    # 明细是总数的一份划分，累加必须等于总数——只有一条时同样要校。
+    # 早先写成 len(items) > 1，理由是怕单条明细被当成总数重复报，但明细行
+    # 已经被排除在正文检查之外，"1. 900张"这种整份文案里唯一的数量声明
+    # 就此完全没人管：对 468 个文件的素材目录实测返回空违规列表。
+    if items:
         listed = sum(items)
         if listed != stats.total_files:
             violations.append(f"item-sum-mismatch: 明细合计{listed} 实际{stats.total_files}")
