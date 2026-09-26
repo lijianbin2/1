@@ -13,11 +13,19 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
-_DECLARED_IN_NAME = re.compile(r"[-—_](\d+)\s*(?:首|个|张|套|集|期)\s*$")
+# 计数单位取自目录名的标注习惯（见 _DECLARED_IN_NAME）。
+# 文案里的计数声明必须用同一套单位，否则"468张矢量图"这种错数会一路
+# 放行——校验器只认"个文件"和"首"，其余单位等于没测。
+#
+# "个"故意不进 _COUNT_CLAIM：正文里"41个视频""12个章节"里的"个"数的是
+# 章节而不是文件，拿它跟文件总数比必然误报。个文件 由 _TOTAL_FILES 单独管。
+_COUNT_UNITS = ("首", "张", "套", "集", "期")
+_UNIT_ALT = "|".join(_COUNT_UNITS)
+_DECLARED_IN_NAME = re.compile(rf"[-—_](\d+)\s*(?:个|{_UNIT_ALT})\s*$")
 _TOTAL_FILES = re.compile(r"(\d+)\s*个文件")
+_COUNT_CLAIM = re.compile(rf"(\d+)\s*({_UNIT_ALT})")
 _SIZE = re.compile(r"(\d+(?:\.\d+)?)\s*(TB|GB|MB)", re.IGNORECASE)
-_SUM_CLAIM = re.compile(r"共\s*(\d+)\s*首")
-_ITEM_COUNT = re.compile(r"(\d+)\s*首")
+_SUM_CLAIM = re.compile(rf"共\s*(\d+)\s*(?:{_UNIT_ALT})")
 _LISTED_LINE = re.compile(r"^\s*(?:\d+\s*[.、)）]\s*)?[\d一二三四五六七八九十]+\s*[.、)）]\s*")
 _SIZE_UNITS = {"TB": 1024**4, "GB": 1024**3, "MB": 1024**2}
 
@@ -105,16 +113,19 @@ def check_claims(text: str, stats: SourceStats) -> list[str]:
                 f"total-size-mismatch: 文案{displayed}{unit.upper()} 实际{stats.size_gb:.2f}GB"
             )
 
-    for raw in _SUM_CLAIM.findall(text):
-        if int(raw) != stats.total_files:
-            violations.append(f"sum-claim-mismatch: 文案共{raw}首 实际{stats.total_files}")
+    for match in _SUM_CLAIM.finditer(text):
+        claimed = int(match.group(1))
+        if claimed != stats.total_files:
+            violations.append(
+                f"sum-claim-mismatch: 文案{match.group(0).strip()} 实际{stats.total_files}"
+            )
 
     lines = [line for line in text.splitlines() if line.strip()]
     detail_lines = [line for line in lines if _LISTED_LINE.match(line)]
     items = [
-        int(n)
+        int(count)
         for line in detail_lines
-        for n in _ITEM_COUNT.findall(_SUM_CLAIM.sub("", line))
+        for count, _unit in _COUNT_CLAIM.findall(_SUM_CLAIM.sub("", line))
     ]
     if len(items) > 1:
         listed = sum(items)
@@ -124,12 +135,16 @@ def check_claims(text: str, stats: SourceStats) -> list[str]:
     body = "\n".join(
         line for line in lines[1:] if not _LISTED_LINE.match(line)
     )
-    for raw in _ITEM_COUNT.findall(_SUM_CLAIM.sub("", lines[0] if lines else "")):
+    for raw, unit in _COUNT_CLAIM.findall(_SUM_CLAIM.sub("", lines[0] if lines else "")):
         if int(raw) != stats.total_files:
-            violations.append(f"title-count-mismatch: 标题{raw}首 实际{stats.total_files}")
-    for raw in _ITEM_COUNT.findall(_SUM_CLAIM.sub("", body)):
+            violations.append(
+                f"title-count-mismatch: 标题{raw}{unit} 实际{stats.total_files}"
+            )
+    for raw, unit in _COUNT_CLAIM.findall(_SUM_CLAIM.sub("", body)):
         if int(raw) != stats.total_files:
-            violations.append(f"body-count-mismatch: 正文{raw}首 实际{stats.total_files}")
+            violations.append(
+                f"body-count-mismatch: 正文{raw}{unit} 实际{stats.total_files}"
+            )
 
     return violations
 

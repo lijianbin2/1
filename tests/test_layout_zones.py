@@ -128,6 +128,25 @@ class LayoutZoneTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 ink_bands(page, top=38, bottom=900, left=38, right=1042)
 
+    def test_scanner_rejects_degenerate_regions(self):
+        """负坐标和倒置区域必须报错，不能静悄悄报"没有空洞"。
+
+        numpy 的负索引会把负 top 变成从末尾数，切片悄悄变空，检查等于
+        被关掉：真出现空洞也扫不出来。
+        """
+        with tempfile.TemporaryDirectory() as root:
+            page = Path(root) / "page.png"
+            Image.new("RGB", (1080, 1080), "white").save(page)
+            for kwargs in (
+                {"top": -5, "bottom": 900, "left": 38, "right": 1042},
+                {"top": 38, "bottom": 900, "left": -5, "right": 1042},
+                {"top": 900, "bottom": 100, "left": 38, "right": 1042},
+                {"top": 38, "bottom": 900, "left": 1042, "right": 38},
+            ):
+                with self.subTest(**kwargs):
+                    with self.assertRaises(ValueError):
+                        ink_bands(page, **kwargs)
+
 
 if __name__ == "__main__":
     unittest.main()

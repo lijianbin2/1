@@ -39,6 +39,33 @@ class MakeDescTests(unittest.TestCase):
                     f"正文里的“{word}”没有被 forbidden 规则拦下：{violations}",
                 )
 
+    def test_forbidden_covers_physical_fulfilment_promises(self):
+        """虚拟资料写"包邮""现货""秒发"同样是承诺实物发货，必须拦。"""
+        for word in ("包邮", "现货", "秒发", "全国包邮", "大量现货"):
+            with self.subTest(word=word):
+                violations = check_public_copy(
+                    "示例项目 10集 只发夸克", f"只发夸克网盘\n{word}"
+                )
+                self.assertTrue(
+                    any(
+                        "forbidden" in code and code.endswith("-in-body")
+                        for code in violations
+                    ),
+                    f"正文里的“{word}”没有被 forbidden 规则拦下：{violations}",
+                )
+
+    def test_forbidden_still_allows_neutral_shipping_wording(self):
+        """"发货指南""这类中性说法不是承诺，不能被新加的词误伤。"""
+        for phrase in ("发货方式：无需邮寄", "拍后发网盘链接，无需邮寄"):
+            with self.subTest(phrase=phrase):
+                self.assertEqual(
+                    check_public_copy(
+                        "示例项目 10集 只发夸克", f"只发夸克网盘\n{phrase}"
+                    ),
+                    [],
+                    f"中性表述“{phrase}”被误判了",
+                )
+
     def test_check_copy_rejects_currency_and_accepts_valid_copy(self):
         quark = build_quark("示例项目", "https://pan.quark.cn/s/abc123", "abcd")
         body = "只发夸克网盘\n" + quark

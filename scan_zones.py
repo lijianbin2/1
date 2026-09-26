@@ -74,8 +74,15 @@ def ink_bands(
     """返回图中连续无墨迹的横带，格式为 (起始 y, 高度)。
 
     扫描区域必须由调用方显式给出，且不能超出画布：悄悄截断后报没有空洞，
-    比直接报错危险得多。
+    比直接报错危险得多。负坐标和上下颠倒的区域同样要拒——numpy 的负索引
+    会让切片悄悄变成空数组，照样报"没有空洞"，等于把检查关掉了。
     """
+    if min(top, left) < 0:
+        raise ValueError(f"{path} 扫描区域起点不能为负：y={top} x={left}")
+    if bottom <= top or right <= left:
+        raise ValueError(
+            f"{path} 扫描区域上下颠倒：y=[{top},{bottom}) x=[{left},{right})"
+        )
     gray = np.array(Image.open(path).convert("L"))
     if gray.shape[0] < bottom or gray.shape[1] < right:
         raise ValueError(

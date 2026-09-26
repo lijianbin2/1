@@ -77,6 +77,42 @@ class VerifySourceTests(unittest.TestCase):
         with self.assertRaises(NotADirectoryError):
             scan_source(Path("no-such-source-dir"))
 
+    def test_check_claims_catches_every_project_count_unit(self):
+        """目录名和正文用同一套单位，漏一个单位就等于少测一种错数。"""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._make_source(root, {"01、汽车-3首": 3, "02、校园-4首": 4})
+            stats = scan_source(root)
+            for unit in ("首", "张", "套", "集", "期"):
+                with self.subTest(unit=unit):
+                    codes = check_claims(f"示例 468{unit} 素材合集\n", stats)
+                    self.assertTrue(
+                        any(c.startswith("title-count-mismatch") for c in codes),
+                        msg=f"{unit} 未被拦截：{codes}",
+                    )
+
+    def test_check_claims_generalizes_sum_claim_to_all_units(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._make_source(root, {"01、汽车-3首": 3, "02、校园-4首": 4})
+            stats = scan_source(root)
+            for unit in ("首", "张", "套", "集", "期"):
+                with self.subTest(unit=unit):
+                    codes = check_claims(f"示例 素材合集\n\n本套共468{unit}，含多类。\n", stats)
+                    self.assertTrue(
+                        any(c.startswith("sum-claim-mismatch") for c in codes),
+                        msg=f"共N{unit} 未被拦截：{codes}",
+                    )
+
+    def test_check_claims_ignores_bare_ge_counted_in_chapters(self):
+        """“个”排除在外：章节数不是文件数，拿去比对必然误报。"""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._make_source(root, {"01、汽车-3首": 3, "02、校园-4首": 4})
+            stats = scan_source(root)
+            copy = "示例 摄影教程\n\n共41个视频，分为12个章节。\n"
+            self.assertEqual(check_claims(copy, stats), [])
+
 
 if __name__ == "__main__":
     unittest.main()
