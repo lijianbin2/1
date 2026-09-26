@@ -48,10 +48,16 @@ def make(style, path):
     tw=d.textlength(t,font=tf); d.text(((W-tw)//2,200),t,fill=DARK if style=="B" else DEEP,font=tf)
     sw=d.textlength(s,font=sf); d.text(((W-sw)//2,296),s,fill=GRAY,font=sf)
     d.line([(W-220)//2,362,(W+220)//2,362],fill=BLUE,width=5)
-    # 3 cards
-    y0=400; cw=(W-120-40)//3
+    # 3 cards，从白色面板内边界反推宽度，避免第三张卡越出面板
+    PAD=90
+    GAP=20
+    y0=400
+    inner=(W-PAD)-PAD
+    cw=(inner-GAP*2)//3
+    if PAD+2*(cw+GAP)+cw > W-PAD:
+        raise ValueError("特色卡片超出面板宽度")
     for i,(n,a,b) in enumerate(feats):
-        x=90+i*(cw+20)
+        x=PAD+i*(cw+GAP)
         fill=(238,243,255) if style=="B" else WHITE
         d.rounded_rectangle([x,y0,x+cw,y0+230],radius=22,fill=fill,outline=(37,80,255) if style=="A" else (205,218,250),width=3)
         nf=get_font(30,True); nw=d.textlength(n,font=nf)

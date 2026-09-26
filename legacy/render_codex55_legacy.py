@@ -143,7 +143,7 @@ bw2=draw.textlength(badge2, font=bf2)+30
 draw.rounded_rectangle([W-BORDER-40-bw2, BORDER+36, W-BORDER-40, BORDER+36+36], radius=18, fill=(239,246,255))
 draw.text((W-BORDER-40-bw2+15, BORDER+42), badge2, fill=BLUE, font=bf2)
 
-# modules 6 cards 3 columns x 2 rows
+# modules 6 cards 2 columns x 3 rows
 mods=[
     ("模块1 基础入门", "1-5", ["课程介绍","软件安装/登录","CCSwitch切国产模型","切第三方模型","配置模型生图/音视频"], BLUE),
     ("模块2 模型实战", "6-10", ["gpt-image2生图","Seedream生图","Seedance生视频","豆包生语音","edge文本转语音"], (124,58,237)),
@@ -152,13 +152,23 @@ mods=[
     ("模块5 视频与电商", "27-41", ["自动化剪辑","字幕/音乐/切片","文稿生成视频/特效","产品套图流水线","带货视频/宣传视频","数字人多角度/口播"], (249,115,22)),
     ("模块6 飞书与知识库", "42-55", ["飞书多场景办公","安装/上手CLI","云文档/会议/表格","管理项目任务","Obsidian知识库","资讯归档/Skill/PPT"], (225,29,72)),
 ]
-card_w=(W-2*BORDER-80)//3
-card_h=  (H-2*BORDER-140-86)//2 - 10
-start_y=BORDER+130
-gap=20
+CAT_COLS=2
+CAT_ROWS=3
+CAT_GAP=24
+CAT_TOP=BORDER+130
+CAT_FOOT=H-BORDER-86
+card_w=(W-2*BORDER-80-CAT_GAP)//CAT_COLS
+max_items=max(len(m[2]) for m in mods)
+# 卡片高度由可用高度反推，再让行距吃掉剩余空间，避免大片空白
+card_h=(CAT_FOOT-CAT_TOP-(CAT_ROWS-1)*CAT_GAP)//CAT_ROWS
+item_pitch=(card_h-52-18)//max_items
+start_y=CAT_TOP
+gap=CAT_GAP
+if item_pitch < 22:
+    raise ValueError("课程目录行距过小，版式无法容纳")
 for idx, (mtitle, mrange, items, color) in enumerate(mods):
-    col=idx%3
-    row=idx//3
+    col=idx%CAT_COLS
+    row=idx//CAT_COLS
     x=BORDER+40+col*(card_w+gap)
     y=start_y+row*(card_h+gap)
     # card bg
@@ -173,13 +183,13 @@ for idx, (mtitle, mrange, items, color) in enumerate(mods):
     draw.rounded_rectangle([x+card_w-14-rw-14, y+18, x+card_w-14, y+18+22], radius=11, fill=color)
     draw.text((x+card_w-14-rw-7, y+19), mrange, fill="white", font=rf)
     # items
-    it_font=get_font(18)
+    it_font=get_font(20)
     iy=y+52
     for it in items:
         # bullet
         draw.ellipse([x+14, iy+7, x+14+6, iy+7+6], fill=color)
         draw.text((x+26, iy), "· "+it, fill=(51,65,85), font=it_font)
-        iy+=22
+        iy+=item_pitch
 
 # bottom bar
 draw.rounded_rectangle([BORDER, H-BORDER-86, W-BORDER, H-BORDER], radius=22, fill=(30,41,59))
@@ -203,23 +213,42 @@ points=[
     ("企业知识库闭环", "Obsidian+Codex+Skill，白板知识地图与资讯归档"),
 ]
 y=start_y
+PT_COLS=2
+PT_ROWS=3
+# 副标题在 BORDER+84 处，24 号字高约 33，卡片必须从它下方开始
+PT_TOP=BORDER+170
+SUIT_TOP=H-BORDER-86-140
+PT_FOOT=SUIT_TOP-20
+PT_PAD=22
+PT_GAP_MAX=56
+PT_GAP=20
+pt_w=(W-2*BORDER-80-PT_GAP)//PT_COLS
+pt_desc_font=get_font(16)
+pt_lines={t:wrap_text(d, pt_desc_font, pt_w-32, draw)[:2] for t,d in points}
+max_block=max(44+len(v)*22 for v in pt_lines.values())
+PT_H=max_block+PT_PAD*2
+PT_GAP=min(PT_GAP_MAX, (PT_FOOT-PT_TOP-PT_ROWS*PT_H)//(PT_ROWS-1))
+if PT_GAP < 16:
+    raise ValueError("收获卡片与适合谁区块重叠")
+# 间距封顶后整块垂直居中，避免底部堆积空白
+pt_top=PT_TOP+(PT_FOOT-PT_TOP-(PT_ROWS*PT_H+(PT_ROWS-1)*PT_GAP))//2
 for i,(ptitle, pdesc) in enumerate(points):
-    col=i%2
-    row=i//2
-    x=BORDER+40+col*( (W-2*BORDER-80)//2 +20)
-    yy=BORDER+110+row*145
-    draw.rounded_rectangle([x, yy, x+(W-2*BORDER-80)//2, yy+125], radius=18, fill=(248,250,252), outline=(226,232,240), width=1)
+    col=i%PT_COLS
+    row=i//PT_COLS
+    x=BORDER+40+col*(pt_w+PT_GAP)
+    yy=pt_top+row*(PT_H+PT_GAP)
+    draw.rounded_rectangle([x, yy, x+pt_w, yy+PT_H], radius=18, fill=(248,250,252), outline=(226,232,240), width=1)
+    lines=pt_lines[ptitle]
+    oy=yy+PT_PAD
     # number
     num_font=get_font(20, bold=True)
-    draw.rounded_rectangle([x+14, yy+14, x+14+28, yy+14+28], radius=14, fill=BLUE)
-    draw.text((x+14+8, yy+16), str(i+1), fill="white", font=num_font)
-    draw.text((x+14+40, yy+16), ptitle, fill=DARK, font=get_font(22, bold=True))
+    draw.rounded_rectangle([x+14, oy, x+14+28, oy+28], radius=14, fill=BLUE)
+    draw.text((x+14+8, oy+2), str(i+1), fill="white", font=num_font)
+    draw.text((x+14+40, oy+2), ptitle, fill=DARK, font=get_font(22, bold=True))
     # desc wrap
-    df=get_font(16)
-    lines=wrap_text(pdesc, df, (W-2*BORDER-80)//2 -32, draw)
-    dy=yy+52
+    dy=oy+44
     for l in lines[:2]:
-        draw.text((x+14, dy), l, fill=GRAY, font=df)
+        draw.text((x+14, dy), l, fill=GRAY, font=pt_desc_font)
         dy+=22
 
 # suitable scenes bottom

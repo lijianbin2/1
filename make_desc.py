@@ -1,11 +1,15 @@
 """生成并校验闲鱼商品文案。
 
 模块只负责纯文本生成和文件写入，不依赖 PIL，也不会在导入时访问 D 盘。
+既可以当库用，也可以直接 ``python make_desc.py ...`` 跑完整流程。
 """
 
 from __future__ import annotations
 
+import argparse
 import re
+import subprocess
+import sys
 from pathlib import Path
 
 MARKER = "只发夸克"
@@ -19,6 +23,29 @@ VIRTUAL_NOTICE = "【说明】虚拟资料，只发夸克网盘，拍后发网�
 _CURRENCY_RE = re.compile(r"(?:\d+(?:\.\d+)?\s*元|[￥¥]\s*\d+)")
 _URL_RE = re.compile(r"(?:https?://|pan\.quark\.cn)", re.IGNORECASE)
 _DELIVERY_FIELD_RE = re.compile(r"(?:文件夹名|分享\s*ID|提取码)\s*[:：]", re.IGNORECASE)
+
+
+def copy_to_clipboard(text: str) -> bool:
+    """把文本放进系统剪贴板，交付分享信息时避免手动分段复制。
+
+    成功返回 ``True``；没有可用的剪贴板命令时返回 ``False``，由调用方
+    决定是否退回手动复制，而不是静默假装已经复制成功。
+    """
+    text = text.strip()
+    if not text:
+        raise ValueError("复制内容不能为空")
+    if sys.platform != "win32":
+        return False
+    try:
+        completed = subprocess.run(
+            ["clip"],
+            input=text.encode("utf-16-le"),
+            capture_output=True,
+            check=True,
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return False
+    return completed.returncode == 0
 
 
 def _forbidden_hits(text: str, word: str) -> list[str]:
@@ -198,3 +225,55 @@ def write_public_copy(out_dir: str | Path, title: str, body: str) -> list[str]:
     (p / COPY_NAME).write_text(public_body + "\n", encoding="utf-8", newline="\n")
     print(f"wrote {p / COPY_NAME} violations=[]")
     return []
+
+
+def main() -> int:
+    """命令行入口：一条命令产出公开正文，需要时补齐完整交付包。"""
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
+    parser = argparse.ArgumentParser(description="生成闲鱼正文和夸克分享块")
+    parser.add_argument("--out", type=Path, required=True, help="输出目录")
+    parser.add_argument("--core", required=True, help="项目名称，用于标题")
+    parser.add_argument("--count", required=True, help="数量描述，例如 10集")
+    parser.add_argument("--intro", required=True, help="一句话介绍")
+    parser.add_argument("--module", action="append", default=[], help="内容明细，可重复")
+    parser.add_argument("--audience", required=True, help="适合人群")
+    parser.add_argument("--folder", help="夸克文件夹名（标题）")
+    parser.add_argument("--link", help="夸克分享链接")
+    parser.add_argument("--code", help="四位提取码")
+    parser.add_argument(
+        "--copy",
+        action="store_true",
+        help="把文件夹名、链接和提取码三行复制到剪贴板",
+    )
+    args = parser.parse_args()
+
+    title = build_title(args.core, args.count)
+    body = build_body(title, args.intro, args.module, args.audience)
+
+    share = (args.folder, args.link, args.code)
+    if any(share):
+        if not all(share):
+            parser.error("--folder、--link、--code 必须同时提供")
+        quark_block = build_quark(*share)
+        violations = write_project(args.out, title, body, quark_block)
+    else:
+        quark_block = ""
+        violations = write_public_copy(args.out, title, body)
+    if violations:
+        return 1
+
+    if args.copy:
+        if not quark_block:
+            parser.error("--copy 需要同时提供 --folder、--link、--code")
+        if copy_to_clipboard(quark_block):
+            print("clipboard=ok")
+        else:
+            print("clipboard=failed，请手动复制下面的分享信息")
+            print(quark_block)
+            return 1
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -7,6 +7,7 @@ from pathlib import Path
 
 from PIL import Image, ImageEnhance, ImageOps
 
+from verify_source import SourceStats, scan_source
 from xianyu_common import draw_board, get_font, save_png, validate_png_files, wrap_text
 
 
@@ -24,6 +25,11 @@ DEFAULT_OUT = Path("D:/闲鱼/高清一亿像素地图矢量图合集，超精�
 DEFAULT_ROOT = Path(r"M:/WebDAV/夸克/软件/高清一亿像素地图矢量图合集，超精细地理素材")
 
 Image.MAX_IMAGE_PIXELS = None
+
+
+def stats_labels(stats: SourceStats) -> tuple[str, str]:
+    """把实测统计转成图上用的短标签，数量不再手打。"""
+    return f"{stats.total_files}个文件", f"约{stats.size_gb:.2f}GB"
 
 
 def image_fit(path: Path, size: tuple[int, int]) -> Image.Image:
@@ -64,7 +70,7 @@ def footer(draw, right: str) -> None:
     draw.text((W - BORDER - 40 - draw.textlength(right, font=font), H - BORDER - 47), right, fill=(203, 213, 225), font=font)
 
 
-def render_cover(root: Path, out: Path) -> None:
+def render_cover(root: Path, out: Path, files_label: str, size_label: str) -> None:
     im, d = draw_board()
     world = image_fit(root / "超高清晰世界地图.jpg", (960, 510))
     china = image_fit(root / "一亿像素中国地图.jpg", (360, 510))
@@ -73,7 +79,7 @@ def render_cover(root: Path, out: Path) -> None:
     d.rounded_rectangle([60, 258, 1020, 768], radius=18, outline=(255, 255, 255), width=6)
     d.rounded_rectangle([60, 258, 420, 768], radius=18, outline=(255, 255, 255), width=6)
 
-    badge = "468个文件 · 约7.24GB"
+    badge = f"{files_label} · {size_label}"
     font = get_font(24, True)
     badge_w = d.textlength(badge, font=font) + 40
     d.rounded_rectangle([(W - badge_w) / 2, 78, (W + badge_w) / 2, 120], radius=21, fill=BLUE)
@@ -83,11 +89,11 @@ def render_cover(root: Path, out: Path) -> None:
     d.rounded_rectangle([60, 802, 1020, 914], radius=20, fill=PALE, outline=(226, 232, 240), width=1)
     d.text((86, 826), "中国地图 · 世界地图 · 各省区域 · 矢量源文件", fill=DARK, font=get_font(24, True))
     d.text((86, 869), "高清预览、分类齐全，设计排版更省心", fill=GRAY, font=get_font(21))
-    footer(d, "468个文件 · 地图素材合集")
+    footer(d, f"{files_label} · 地图素材合集")
     save_png(im, out / "01.png")
 
 
-def render_catalog(root: Path, out: Path) -> None:
+def render_catalog(root: Path, out: Path, files_label: str, size_label: str) -> None:
     im, d = draw_board()
     d.text((BORDER + 40, BORDER + 30), "素材目录", fill=DARK, font=get_font(44, True))
     d.text((BORDER + 40, BORDER + 88), "按地图类型与源文件格式整理，查找更直观", fill=GRAY, font=get_font(24))
@@ -108,11 +114,11 @@ def render_catalog(root: Path, out: Path) -> None:
         d.text((x + 39, yy + 34), str(index + 1), fill="white", font=get_font(22, True))
         d.text((x + 94, yy + 23), title, fill=DARK, font=get_font(24, True))
         d.text((x + 94, yy + 65), desc, fill=GRAY, font=get_font(18))
-    footer(d, "高清图片 · 矢量源文件 · 468个文件")
+    footer(d, f"高清图片 · 矢量源文件 · {files_label}")
     save_png(im, out / "02.png")
 
 
-def render_outcomes(root: Path, out: Path) -> None:
+def render_outcomes(root: Path, out: Path, files_label: str, size_label: str) -> None:
     im, d = draw_board()
     d.text((BORDER + 40, BORDER + 30), "使用收获", fill=DARK, font=get_font(44, True))
     d.text((BORDER + 40, BORDER + 88), "一套素材，覆盖多种地图视觉与设计需求", fill=GRAY, font=get_font(24))
@@ -135,11 +141,11 @@ def render_outcomes(root: Path, out: Path) -> None:
         font = get_font(17)
         for line_no, line in enumerate(wrap_text(desc, font, 340, d)[:2]):
             d.text((x + 94, y + 56 + line_no * 23), line, fill=GRAY, font=font)
-    footer(d, "真实地图预览 · 多种格式")
+    footer(d, f"真实地图预览 · 多种格式 · {files_label}")
     save_png(im, out / "03.png")
 
 
-def render_guide(root: Path, out: Path) -> None:
+def render_guide(root: Path, out: Path, files_label: str, size_label: str) -> None:
     im, d = draw_board()
     d.text((BORDER + 40, BORDER + 30), "购买前说明", fill=DARK, font=get_font(44, True))
     d.text((BORDER + 40, BORDER + 88), "虚拟资料 · 下单后提供网盘链接与提取码", fill=GRAY, font=get_font(24))
@@ -165,7 +171,7 @@ def render_guide(root: Path, out: Path) -> None:
     font = get_font(18)
     for line_no, line in enumerate(wrap_text(tip, font, W - BORDER * 2 - 130, d)[:3]):
         d.text((BORDER + 62, 822 + line_no * 25), line, fill=(120, 113, 108), font=font)
-    footer(d, "468个文件 · 约7.24GB")
+    footer(d, f"{files_label} · {size_label}")
     save_png(im, out / "04.png")
 
 
@@ -175,10 +181,12 @@ def main() -> int:
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT, help="图片输出目录")
     args = parser.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
-    render_cover(args.root, args.out)
-    render_catalog(args.root, args.out)
-    render_outcomes(args.root, args.out)
-    render_guide(args.root, args.out)
+    # 数量与体积一律来自源目录实测，避免图上出现过期数字
+    files_label, size_label = stats_labels(scan_source(args.root))
+    render_cover(args.root, args.out, files_label, size_label)
+    render_catalog(args.root, args.out, files_label, size_label)
+    render_outcomes(args.root, args.out, files_label, size_label)
+    render_guide(args.root, args.out, files_label, size_label)
     invalid = validate_png_files(args.out, size=(W, H))
     if invalid:
         raise RuntimeError("图片文件校验失败：" + ", ".join(str(path) for path in invalid))

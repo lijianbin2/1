@@ -14,7 +14,9 @@ from render_map_collection import (
     render_cover,
     render_guide,
     render_outcomes,
+    stats_labels,
 )
+from verify_source import SourceStats
 
 
 class RenderMapCollectionTests(unittest.TestCase):
@@ -40,13 +42,19 @@ class RenderMapCollectionTests(unittest.TestCase):
 
             out = Path(directory) / "out"
             out.mkdir()
+            labels = ("3个文件", "约0.00GB")
             with patch("render_map_collection.get_font", return_value=ImageFont.load_default()):
-                render_cover(root, out)
-                render_catalog(root, out)
-                render_outcomes(root, out)
-                render_guide(root, out)
+                render_cover(root, out, *labels)
+                render_catalog(root, out, *labels)
+                render_outcomes(root, out, *labels)
+                render_guide(root, out, *labels)
 
             self.assertEqual((W, H), (1080, 1080))
             for number in range(1, 5):
                 with Image.open(out / f"{number:02d}.png") as image:
                     self.assertEqual(image.size, (W, H))
+
+    def test_stats_labels_come_from_measured_source(self):
+        """数量和体积必须由实测统计推导，不能手打。"""
+        stats = SourceStats(root=Path("any"), total_files=468, total_bytes=int(7.24 * 1024**3))
+        self.assertEqual(stats_labels(stats), ("468个文件", "约7.24GB"))

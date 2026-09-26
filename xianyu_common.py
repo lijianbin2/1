@@ -71,6 +71,98 @@ def wrap_text(text: str, font, max_w: float, draw) -> list[str]:
     return lines
 
 
+def stack_blocks(
+    heights: Iterable[float],
+    top: float,
+    bottom: float,
+    *,
+    grow: Iterable[int] = (),
+    min_gap: float = 20,
+    max_gap: float = 48,
+    max_grow: float | None = None,
+) -> list[int]:
+    """同 :func:`stack_layout`，只返回每个区块的起始 y。"""
+    tops, _ = stack_layout(
+        heights,
+        top,
+        bottom,
+        grow=grow,
+        min_gap=min_gap,
+        max_gap=max_gap,
+        max_grow=max_grow,
+    )
+    return tops
+
+
+def stack_layout(
+    heights: Iterable[float],
+    top: float,
+    bottom: float,
+    *,
+    grow: Iterable[int] = (),
+    min_gap: float = 20,
+    max_gap: float = 48,
+    max_grow: float | None = None,
+) -> tuple[list[int], list[float]]:
+    """把若干纵向区块排布在 ``[top, bottom]`` 内，返回每个区块的起始 y。
+
+    ``grow`` 里的下标对应可伸缩区块，会按比例吸收剩余空间（``max_grow``
+    可限制单个区块的增长上限），避免内容偏少时在底部留下大片空白。
+    伸缩后仍有剩余时再均分到首尾做居中。调整文案行数不需要改写死坐标。
+    总高度超出可用区域时直接报错，避免静默溢出画布。
+
+    返回 ``(起始 y 列表, 实际高度列表)``，需要按伸缩后的高度绘制内容时用
+    :func:`stack_layout`，只需要起始位置时用 :func:`stack_blocks`。
+    """
+    sizes = [float(value) for value in heights]
+    if not sizes:
+        return [], []
+    if any(value <= 0 for value in sizes):
+        raise ValueError("block heights must be greater than zero")
+    if min_gap < 0 or max_gap < min_gap:
+        raise ValueError("gap bounds are invalid")
+    if bottom <= top:
+        raise ValueError("bottom must be greater than top")
+
+    growable = {int(index) for index in grow}
+    if any(index < 0 or index >= len(sizes) for index in growable):
+        raise ValueError("grow index out of range")
+    if max_grow is not None and max_grow <= 0:
+        raise ValueError("max_grow must be greater than zero")
+
+    if growable:
+        slack = bottom - top - sum(sizes) - min_gap * (len(sizes) - 1)
+        if slack > 0:
+            share = slack / len(growable)
+            if max_grow is not None:
+                share = min(share, max_grow)
+            for index in growable:
+                sizes[index] += share
+
+    slack = bottom - top - sum(sizes)
+    count = len(sizes) - 1
+    gap = min(max_gap, max(min_gap, slack // count)) if count else 0
+    used = sum(sizes) + gap * count
+    leftover = bottom - top - used
+    y = top + (leftover // 2 if leftover > 0 else 0)
+
+    tops: list[int] = []
+    for size in sizes:
+        tops.append(int(y))
+        y += size + gap
+    if tops[-1] + sizes[-1] > bottom:
+        raise ValueError("区块总高度超出可用区域，版式无法容纳")
+    return tops, sizes
+
+
+def assert_no_overlap(blocks: Iterable[tuple[float, float]], label: str) -> None:
+    """断言若干纵向区间互不重叠，label 用于失败时定位。"""
+    ordered = sorted((float(top), float(bottom)) for top, bottom in blocks)
+    for (prev_top, prev_bottom), (top, bottom) in zip(ordered, ordered[1:]):
+        if top < prev_bottom:
+            raise ValueError(f"{label} 区块重叠：{prev_bottom} > {top}")
+
+
 def save_png(im, path: str | Path):
     """创建父目录并保存 PNG，返回文件大小（字节）。"""
     p = Path(path)

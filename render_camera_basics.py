@@ -1,7 +1,16 @@
 import argparse
 from pathlib import Path
 
-from xianyu_common import draw_board, get_font, save_png, validate_png_files, wrap_text
+from xianyu_common import (
+    assert_no_overlap,
+    draw_board,
+    get_font,
+    save_png,
+    stack_blocks,
+    stack_layout,
+    validate_png_files,
+    wrap_text,
+)
 
 
 W = H = 1080
@@ -19,6 +28,14 @@ PURPLE = (124, 58, 237)
 ROSE = (225, 29, 72)
 
 DEFAULT_OUT = Path("D:/闲鱼/相机基础入门课，光圈快门曝光度一次搞懂")
+FOOTER_H = 86
+FOOTER_TOP = H - BORDER - FOOTER_H
+
+# 课程规模来自 verify_source.py 对源目录的实测结果，改数量只改这里。
+LESSONS = 41
+CHAPTERS = 12
+LESSON_LABEL = f"{LESSONS}节"
+CHAPTER_LABEL = f"{CHAPTERS}个章节"
 
 
 def centered(draw, text, y, font, fill=DARK):
@@ -26,7 +43,8 @@ def centered(draw, text, y, font, fill=DARK):
     draw.text(((W - width) // 2, y), text, fill=fill, font=font)
 
 
-def footer(draw, right="相机基础 · 41节 · 摄影入门"):
+def footer(draw, right=None):
+    right = right or f"相机基础 · {LESSON_LABEL} · 摄影入门"
     h = 86
     draw.rounded_rectangle(
         [BORDER, H - BORDER - h, W - BORDER, H - BORDER],
@@ -43,7 +61,7 @@ def render_cover(out: Path) -> None:
     """生成封面。"""
     im, d = draw_board()
     bf = get_font(26, True)
-    badge = "41节全  摄影基础实战"
+    badge = f"{LESSON_LABEL}全  摄影基础实战"
     bw = d.textlength(badge, font=bf) + 40
     by = BORDER + 36
     d.rounded_rectangle([(W - bw) // 2, by, (W + bw) // 2, by + 42], radius=21, fill=BLUE)
@@ -59,20 +77,34 @@ def render_cover(out: Path) -> None:
         ("构图实战", "对焦景深同步学习"),
     ]
     card_w = 270
+    card_h = 150
+    meta_h = 76
+    # 特色卡吸收分隔线与页脚之间的剩余空间，说明文字紧随其后
+    (cards_y, meta_y), (card_h, _) = stack_layout(
+        [card_h, meta_h],
+        by + 248 + 60,
+        FOOTER_TOP - 40,
+        grow=[0],
+        max_grow=110,
+        max_gap=90,
+    )
     start = (W - card_w * 3 - GAP * 2) // 2
     for i, (title, sub) in enumerate(features):
         x = start + i * (card_w + GAP)
-        y = 560
+        y = cards_y
+        # 图标、标题、副标题整体在卡片内垂直居中，卡片变高也不会顶到边
+        content_h = 62 + 10 + 30 + 2 + 24
+        top = y + (card_h - content_h) // 2
         d.rounded_rectangle(
-            [x, y, x + card_w, y + 150],
+            [x, y, x + card_w, y + card_h],
             radius=20,
             fill=PALE,
             outline=(226, 232, 240),
             width=1,
         )
-        cx, cy = x + card_w // 2, y + 51
+        cx, cy = x + card_w // 2, top + 31
         d.ellipse(
-            [cx - 31, y + 20, cx + 31, y + 82],
+            [cx - 31, top, cx + 31, top + 62],
             fill=(239, 246, 255),
             outline=BLUE,
             width=2,
@@ -92,21 +124,25 @@ def render_cover(out: Path) -> None:
         title_font = get_font(24, True)
         sub_font = get_font(18)
         tw = d.textlength(title, font=title_font)
-        d.text((x + (card_w - tw) / 2, y + 92), title, fill=DARK, font=title_font)
+        d.text((x + (card_w - tw) / 2, top + 72), title, fill=DARK, font=title_font)
         sw = d.textlength(sub, font=sub_font)
-        d.text((x + (card_w - sw) / 2, y + 124), sub, fill=GRAY, font=sub_font)
+        d.text((x + (card_w - sw) / 2, top + 104), sub, fill=GRAY, font=sub_font)
 
     d.text(
-        (BORDER + 40, 840),
+        (BORDER + 40, meta_y),
         "焦距 · 透视 · 测光 · 白平衡 · 对焦 · 景深 · 构图",
         fill=INK,
         font=get_font(22),
     )
     d.text(
-        (BORDER + 40, 878),
+        (BORDER + 40, meta_y + 38),
         "适合摄影新手、相机入门用户与想提升拍摄基础的人群",
         fill=GRAY,
         font=get_font(20),
+    )
+    assert_no_overlap(
+        [(cards_y, cards_y + card_h), (meta_y, meta_y + meta_h)],
+        "封面",
     )
     footer(d)
     save_png(im, out / "01.png")
@@ -116,8 +152,8 @@ def render_catalog(out: Path) -> None:
     """生成 Catalog。"""
     im, d = draw_board()
     d.text((BORDER + 40, BORDER + 30), "课程目录", fill=DARK, font=get_font(44, True))
-    d.text((BORDER + 40, BORDER + 88), "41节视频 · 12个章节 · 从基础概念到实拍技巧", fill=GRAY, font=get_font(24))
-    badge2 = "41节"
+    d.text((BORDER + 40, BORDER + 88), f"{LESSON_LABEL}视频 · {CHAPTER_LABEL} · 从基础概念到实拍技巧", fill=GRAY, font=get_font(24))
+    badge2 = LESSON_LABEL
     bf2 = get_font(26, True)
     bw2 = d.textlength(badge2, font=bf2) + 34
     d.rounded_rectangle([W - BORDER - 40 - bw2, BORDER + 36, W - BORDER - 40, BORDER + 78], radius=20, fill=(239, 246, 255))
@@ -139,17 +175,23 @@ def render_catalog(out: Path) -> None:
     ]
     cw = (W - 2 * BORDER - 80 - GAP * 2) // 3
     ch = 132
+    rows = (len(modules) + 2) // 3
+    grid_top = stack_blocks(
+        [ch * rows + (rows - 1) * 14],
+        188,
+        FOOTER_TOP - 40,
+    )[0]
     for i, (name, rng, desc, color) in enumerate(modules):
         col, row = i % 3, i // 3
         x = BORDER + 40 + col * (cw + GAP)
-        y = 188 + row * 146
+        y = grid_top + row * (ch + 14)
         d.rounded_rectangle([x, y, x + cw, y + ch], radius=18, fill=PALE, outline=(226, 232, 240), width=1)
         d.rounded_rectangle([x, y, x + cw, y + 7], radius=6, fill=color)
         d.text((x + 16, y + 20), name, fill=DARK, font=get_font(22, True))
         d.text((x + 16, y + 60), rng, fill=color, font=get_font(20, True))
         for line_no, line in enumerate(wrap_text(desc, get_font(18), cw - 32, d)[:2]):
             d.text((x + 16, y + 91 + line_no * 22), line, fill=INK, font=get_font(18))
-    footer(d, "12个章节 · 41节视频")
+    footer(d, f"{CHAPTER_LABEL} · {LESSON_LABEL}视频")
     save_png(im, out / "02.png")
 
 
@@ -167,29 +209,49 @@ def render_outcomes(out: Path) -> None:
         ("拍出层次", "运用景深、超焦距、快门与构图", ROSE),
     ]
     cw2 = (W - 2 * BORDER - 80 - GAP) // 2
+    card_h = 125
+    suit_h = 100
+    pt_rows = (len(points) + 1) // 2
+    (grid_y, suit_y), (grid_h, suit_h) = stack_layout(
+        [125 * pt_rows + (pt_rows - 1) * GAP, 100],
+        190,
+        FOOTER_TOP - 40,
+        grow=[0, 1],
+        max_grow=40,
+    )
+    card_h = (grid_h - (pt_rows - 1) * GAP) / pt_rows
     for i, (title, desc, color) in enumerate(points):
         col, row = i % 2, i // 2
         x = BORDER + 40 + col * (cw2 + GAP)
-        y = 190 + row * 150
-        d.rounded_rectangle([x, y, x + cw2, y + 125], radius=18, fill=PALE, outline=(226, 232, 240), width=1)
-        d.rounded_rectangle([x + 14, y + 14, x + 50, y + 50], radius=18, fill=color)
+        y = grid_y + row * (card_h + GAP)
+        # 编号、标题和描述在卡片内垂直居中，卡片被拉高时不会挤在顶部
+        body = "\n".join(wrap_text(desc, get_font(18), cw2 - 36, d)[:2])
+        content_h = 36 + 8 + 8 + 22 * body.count("\n") + 22
+        top = y + (card_h - content_h) / 2
+        d.rounded_rectangle([x, y, x + cw2, y + card_h], radius=18, fill=PALE, outline=(226, 232, 240), width=1)
+        d.rounded_rectangle([x + 14, top + 2, x + 50, top + 38], radius=18, fill=color)
         num = str(i + 1)
         nw = d.textlength(num, font=get_font(20, True))
-        d.text((x + 32 - nw / 2, y + 25), num, fill="white", font=get_font(20, True))
-        d.text((x + 66, y + 21), title, fill=DARK, font=get_font(24, True))
-        for line_no, line in enumerate(wrap_text(desc, get_font(18), cw2 - 36, d)[:2]):
-            d.text((x + 18, y + 70 + line_no * 22), line, fill=GRAY, font=get_font(18))
+        d.text((x + 32 - nw / 2, top + 13), num, fill="white", font=get_font(20, True))
+        d.text((x + 66, top + 9), title, fill=DARK, font=get_font(24, True))
+        for line_no, line in enumerate(body.splitlines()):
+            d.text((x + 18, top + 54 + line_no * 22), line, fill=GRAY, font=get_font(18))
 
-    d.rounded_rectangle([BORDER + 40, 830, W - BORDER - 40, 930], radius=18, fill=(239, 246, 255))
-    d.text((BORDER + 60, 850), "适合谁", fill=DARK, font=get_font(22, True))
+    d.rounded_rectangle([BORDER + 40, suit_y, W - BORDER - 40, suit_y + suit_h], radius=18, fill=(239, 246, 255))
+    suit_top = suit_y + (suit_h - 70) / 2
+    d.text((BORDER + 60, suit_top), "适合谁", fill=DARK, font=get_font(22, True))
     scenes = ["摄影新手", "相机入门", "旅行拍摄", "人像与风光"]
     sx = BORDER + 60
     for scene in scenes:
         sf = get_font(19)
         sw2 = d.textlength(scene, font=sf) + 28
-        d.rounded_rectangle([sx, 890, sx + sw2, 920], radius=15, fill="white", outline=BLUE, width=1)
-        d.text((sx + 14, 895), scene, fill=BLUE, font=sf)
+        d.rounded_rectangle([sx, suit_top + 40, sx + sw2, suit_top + 70], radius=15, fill="white", outline=BLUE, width=1)
+        d.text((sx + 14, suit_top + 45), scene, fill=BLUE, font=sf)
         sx += sw2 + 14
+    assert_no_overlap(
+        [(grid_y, grid_y + grid_h), (suit_y, suit_y + suit_h)],
+        "收获",
+    )
     footer(d, "摄影入门 · 基础实拍 · 构图提升")
     save_png(im, out / "03.png")
 
@@ -200,26 +262,36 @@ def render_guide(out: Path) -> None:
     d.text((BORDER + 40, BORDER + 30), "购买前说明", fill=DARK, font=get_font(44, True))
     d.text((BORDER + 40, BORDER + 88), "虚拟资料 · 只发夸克网盘 · 按需学习", fill=GRAY, font=get_font(24))
     steps = [
-        ("1", "资料内容", "41节MP4视频，按章节顺序学习"),
+        ("1", "资料内容", f"{LESSON_LABEL}MP4视频，按章节顺序学习"),
         ("2", "适合人群", "摄影新手、相机入门及基础提升用户"),
         ("3", "交付方式", "拍下后发送夸克网盘链接与提取码"),
         ("4", "使用提示", "建议边看边练，结合相机参数实践"),
     ]
-    y = 190
+    step_h = 104
+    step_gap = 18
+    warn_h = 115
+    steps_y, warn_y = stack_blocks(
+        [step_h * len(steps) + step_gap * (len(steps) - 1), warn_h],
+        190,
+        FOOTER_TOP - 40,
+    )
+    y = steps_y
     for num, title, desc in steps:
-        d.rounded_rectangle([BORDER + 40, y, W - BORDER - 40, y + 104], radius=18, fill=PALE, outline=(226, 232, 240), width=1)
-        d.ellipse([BORDER + 60, y + 28, BORDER + 104, y + 72], fill=BLUE)
+        d.rounded_rectangle([BORDER + 40, y, W - BORDER - 40, y + step_h], radius=18, fill=PALE, outline=(226, 232, 240), width=1)
+        ncy = y + (step_h - 44) // 2
+        d.ellipse([BORDER + 60, ncy, BORDER + 104, ncy + 44], fill=BLUE)
         nw = d.textlength(num, font=get_font(24, True))
-        d.text((BORDER + 82 - nw / 2, y + 38), num, fill="white", font=get_font(24, True))
-        d.text((BORDER + 126, y + 22), title, fill=DARK, font=get_font(24, True))
-        d.text((BORDER + 126, y + 58), desc, fill=GRAY, font=get_font(20))
-        y += 122
+        d.text((BORDER + 82 - nw / 2, ncy + 7), num, fill="white", font=get_font(24, True))
+        ty = y + (step_h - 62) // 2
+        d.text((BORDER + 126, ty), title, fill=DARK, font=get_font(24, True))
+        d.text((BORDER + 126, ty + 34), desc, fill=GRAY, font=get_font(20))
+        y += step_h + step_gap
 
-    d.rounded_rectangle([BORDER + 40, 710, W - BORDER - 40, 825], radius=18, fill=(255, 251, 235), outline=(253, 230, 138), width=1)
-    d.text((BORDER + 62, 730), "提醒", fill=(146, 64, 14), font=get_font(22, True))
+    d.rounded_rectangle([BORDER + 40, warn_y, W - BORDER - 40, warn_y + warn_h], radius=18, fill=(255, 251, 235), outline=(253, 230, 138), width=1)
+    d.text((BORDER + 62, warn_y + 18), "提醒", fill=(146, 64, 14), font=get_font(22, True))
     for i, line in enumerate(wrap_text("本资料为摄影基础知识课程，适合自学与实操练习；请根据自身设备和拍摄需求选择使用。", get_font(18), W - 2 * BORDER - 130, d)[:3]):
-        d.text((BORDER + 62, 770 + i * 23), line, fill=(120, 113, 108), font=get_font(18))
-    footer(d, "相机基础 · 41节视频 · 即学即练")
+        d.text((BORDER + 62, warn_y + 58 + i * 23), line, fill=(120, 113, 108), font=get_font(18))
+    footer(d, f"相机基础 · {LESSON_LABEL}视频 · 即学即练")
     save_png(im, out / "04.png")
 
 def main() -> int:
