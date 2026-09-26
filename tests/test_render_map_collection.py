@@ -9,6 +9,7 @@ import render_map_collection as maps_module
 from render_map_collection import (
     W,
     H,
+    guide_layout,
     image_fit,
     image_panel,
     render_catalog,
@@ -129,3 +130,41 @@ class RenderMapCollectionTests(unittest.TestCase):
         first, second = bands
         gap = second[0] - (first[0] + first[1])
         self.assertGreater(gap, 4, f"底栏两行间距只有 {gap}px，看起来会连成一片")
+
+    def test_guide_tip_block_follows_the_step_count(self):
+        """04 页提示框必须跟着步骤数走，放不下就报错，不能压在底栏上。
+
+        早先这里把卡片起始位置、每步增量和提示框位置各自写死（190 / +132 /
+        750），三者之间没有约束。实测加到第 5 步时，第 5 张卡（718-830）直接
+        压在提示框上，而脚本仍然退出码 0、图片照常生成。
+        """
+        import render_map_collection as maps
+
+        # 4 步是当前版式：四张卡互不重叠，提示框留在底栏之上
+        step_tops, warn_top, warn_bottom = guide_layout(4)
+        self.assertEqual(len(step_tops), 4)
+        for upper, lower in zip(step_tops, step_tops[1:]):
+            self.assertGreaterEqual(
+                lower - (upper + maps.GUIDE_STEP_H), maps.GUIDE_STEP_GAP,
+                "相邻步骤卡压在一起了",
+            )
+        self.assertEqual(warn_top, step_tops[-1] + maps.GUIDE_STEP_H + maps.GUIDE_WARN_GAP)
+        self.assertLessEqual(warn_bottom, maps.FOOTER_TOP)
+
+        # 5 步在 1080 高的版面上放不下（第 5 张卡就到 830，提示框要到 1044），
+        # 早先正是这个情况被静默画成重叠。现在必须报错。
+        with self.assertRaises(ValueError):
+            guide_layout(5)
+        with self.assertRaises(ValueError):
+            guide_layout(0)
+
+    def test_guide_layout_constants_stay_in_one_place(self):
+        """04 页不许再把版式数字写死在绘制代码里。"""
+        import render_map_collection as maps
+
+        source = (Path(maps.__file__)).read_text(encoding="utf-8")
+        for literal in ("750", "912"):
+            self.assertNotIn(
+                f", {literal}]", source,
+                f"04 页又出现写死的坐标 {literal}，版式数字应走 guide_layout",
+            )

@@ -38,6 +38,14 @@ CAT_CARD_H = 196
 CAT_CARD_GAP = 32
 CAT_CARD_TOP = 480
 CAT_CARD_W = 460
+# 04 页的版式常量：步骤卡与提示框都由这里推导，测试直接引用，
+# 避免测试里再抄一份数字（抄了就等于没有守卫）。
+GUIDE_STEP_H = 112
+GUIDE_STEP_GAP = 20
+GUIDE_STEP_TOP = 190
+GUIDE_WARN_GAP = 52
+GUIDE_WARN_H = 162
+GUIDE_WARN_TEXT_LINES = 3
 DEFAULT_OUT = Path("D:/闲鱼/高清一亿像素地图矢量图合集，超精细地理素材")
 DEFAULT_ROOT = Path(r"M:/WebDAV/夸克/软件/高清一亿像素地图矢量图合集，超精细地理素材")
 
@@ -45,6 +53,34 @@ DEFAULT_ROOT = Path(r"M:/WebDAV/夸克/软件/高清一亿像素地图矢量图�
 def stats_labels(stats: SourceStats) -> tuple[str, str]:
     """把实测统计转成图上用的短标签，数量不再手打。"""
     return f"{stats.total_files}个文件", f"约{stats.size_gb:.2f}GB"
+
+
+def guide_layout(step_count: int) -> tuple[list[int], int, int]:
+    """由步骤数量推出 04 页的卡片顶边与提示框上下沿。
+
+    这一页原来把卡片起始位置、每步增量和提示框位置各自写死：卡片从 190 起、
+    每步 +132，提示框钉在 750，三者之间没有任何约束。实测加到第 5 步时，第 5
+    张卡（718-830）直接压在提示框上，脚本仍然退出码 0、图片照常生成，缩略图
+    上根本看不出来。改成由卡片推出提示框位置，放不下就报错。
+
+    这里不用 stack_blocks：卡片之间的间距是 20，卡片到提示框之间是 52，
+    两段间距并不相同，套一个统一间距的排布会把 4 步时的版式改掉。
+    """
+    if step_count < 1:
+        raise ValueError(f"04 页至少要 1 步，实际 {step_count} 步")
+    step_tops = [
+        GUIDE_STEP_TOP + i * (GUIDE_STEP_H + GUIDE_STEP_GAP)
+        for i in range(step_count)
+    ]
+    steps_bottom = step_tops[-1] + GUIDE_STEP_H
+    warn_top = steps_bottom + GUIDE_WARN_GAP
+    warn_bottom = warn_top + GUIDE_WARN_H
+    if warn_bottom > FOOTER_TOP:
+        raise ValueError(
+            f"04 页 {step_count} 步放不下：提示框会到 {warn_bottom}，"
+            f"底栏从 {FOOTER_TOP} 开始"
+        )
+    return step_tops, warn_top, warn_bottom
 
 
 def image_fit(path: Path, size: tuple[int, int]) -> Image.Image:
@@ -229,9 +265,10 @@ def render_guide(root: Path, out: Path, files_label: str, size_label: str) -> No
         ("3", "使用方式", "先浏览目录，再根据设计项目选择地图或可编辑源文件"),
         ("4", "交付方式", "拍后提供网盘链接与提取码，链接不写入商品文案"),
     ]
-    y = 190
-    for number, title, desc in steps:
-        d.rounded_rectangle([BORDER + 40, y, W - BORDER - 40, y + 112], radius=18, fill=PALE, outline=(226, 232, 240), width=1)
+    step_tops, warn_top, warn_bottom = guide_layout(len(steps))
+    steps_bottom = step_tops[-1] + GUIDE_STEP_H
+    for y, (number, title, desc) in zip(step_tops, steps):
+        d.rounded_rectangle([BORDER + 40, y, W - BORDER - 40, y + GUIDE_STEP_H], radius=18, fill=PALE, outline=(226, 232, 240), width=1)
         d.ellipse([BORDER + 62, y + 31, BORDER + 108, y + 77], fill=BLUE)
         d.text((BORDER + 78, y + 41), number, fill="white", font=get_font(22, True))
         d.text((BORDER + 132, y + 21), title, fill=DARK, font=get_font(24, True))
@@ -240,15 +277,18 @@ def render_guide(root: Path, out: Path, files_label: str, size_label: str) -> No
             wrap_text_fit(desc, font, W - BORDER * 2 - 170, 2, d, label=f"04 页 {title}")
         ):
             d.text((BORDER + 132, y + 58 + line_no * 24), line, fill=GRAY, font=font)
-        y += 132
-    d.rounded_rectangle([BORDER + 40, 750, W - BORDER - 40, 912], radius=18, fill=(255, 251, 235), outline=(253, 230, 138), width=1)
-    d.text((BORDER + 62, 778), "温馨提示", fill=(146, 64, 14), font=get_font(23, True))
+    assert_no_overlap(
+        [(step_tops[0], steps_bottom), (warn_top, warn_bottom)],
+        "04 页步骤卡与提示框",
+    )
+    d.rounded_rectangle([BORDER + 40, warn_top, W - BORDER - 40, warn_bottom], radius=18, fill=(255, 251, 235), outline=(253, 230, 138), width=1)
+    d.text((BORDER + 62, warn_top + 28), "温馨提示", fill=(146, 64, 14), font=get_font(23, True))
     tip = "素材包含不同尺寸和格式，请根据软件兼容性、设计需求和使用场景选择文件。购买前可先咨询需要的地图或格式。"
     font = get_font(18)
     for line_no, line in enumerate(
-        wrap_text_fit(tip, font, W - BORDER * 2 - 130, 3, d, label="04 页提示")
+        wrap_text_fit(tip, font, W - BORDER * 2 - 130, GUIDE_WARN_TEXT_LINES, d, label="04 页提示")
     ):
-        d.text((BORDER + 62, 822 + line_no * 25), line, fill=(120, 113, 108), font=font)
+        d.text((BORDER + 62, warn_top + 72 + line_no * 25), line, fill=(120, 113, 108), font=font)
     footer(d, f"{files_label} · {size_label}")
     save_png(im, out / "04.png")
 
