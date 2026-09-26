@@ -143,7 +143,13 @@ draw.text((BORDER + 40, BORDER + 28 + 56), f'从入门到实战，{len(points)}�
 
 `test_legacy_constants.py` 里的 `test_codex_module_ranges_chain_to_lesson_count`
 会解析模块区间，断言它们从第 1 课首尾相接排到 `LESSONS`；区间断档或止于旧数字
-都会失败。`test_step_counts_are_derived_from_lists` 拦截手打的"N步"。
+都会失败。`test_no_hand_typed_step_counts_anywhere` 扫全部四个 legacy 渲染器的
+非注释行，任意位置出现"数字+步"就失败——winrar 的"安装3步"就是这样被抓出来的，
+现在由 `INSTALL_STEPS` 列表派生，正文那句也改成 `" ".join(INSTALL_STEPS)`。
+
+这条检查早先只认"，N步"一种写法，在真实源码里 `findall` 返回空列表，等于
+什么都没测，改成"共6步"照样放行。**断言规则本身也要用变异测试验证**：
+把派生改回字面量，测试必须变红，否则它只是摆设。
 
 ### 版式怎么调
 

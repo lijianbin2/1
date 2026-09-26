@@ -194,8 +194,11 @@ for s in ["RAR", "ZIP", "7Z", "CAB", "ISO", "TAR", "GZ"]:
     d.text((sx + 14, fmt_y + 54), s, fill=BLUE, font=ff)
     sx += w + 12
 d.rounded_rectangle([BORDER + 40, step_y, W - BORDER - 40, step_y + BOX_H], radius=18, fill=(248, 250, 252), outline=(226, 232, 240), width=1)
-d.text((BORDER + 60, step_y + 20), "安装3步", fill=DARK, font=get_font(22, bold=True))
-d.text((BORDER + 60, step_y + 62), "下载exe 双击安装 右键即见解压菜单", fill=GRAY, font=get_font(20))
+# 步数从列表长度派生。写死"3步"时增删一条动作，副标题会与下面那句不符，
+# 而图上两行都是正常文字，肉眼看不出数字对不上。
+INSTALL_STEPS = ("下载exe", "双击安装", "右键即见解压菜单")
+d.text((BORDER + 60, step_y + 20), f"安装{len(INSTALL_STEPS)}步", fill=DARK, font=get_font(22, bold=True))
+d.text((BORDER + 60, step_y + 62), " ".join(INSTALL_STEPS), fill=GRAY, font=get_font(20))
 d.rounded_rectangle([BORDER + 40, pure_y, W - BORDER - 40, pure_y + BOX_H], radius=18, fill=(248, 250, 252), outline=(226, 232, 240), width=1)
 d.text((BORDER + 60, pure_y + 20), "单文件纯净包", fill=DARK, font=get_font(22, bold=True))
 d.text((BORDER + 60, pure_y + 62), SIZE_SHORT + " 下载快 不捆绑 到手即装即用", fill=GRAY, font=get_font(20))

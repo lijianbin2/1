@@ -8,6 +8,7 @@ DECLARATIONS = ("LESSONS =", "MODULES =", "PACKAGE_MB =", "LESSON_", "SIZE_")
 LESSON_COUNT = re.compile(r"(\d+)\s*(?:集|课时|节)")
 VIDEO_COUNT = re.compile(r"(\d+)\s*个\S*视频")
 PACKAGE_SIZE = re.compile(r"(\d+(?:\.\d+)?)\s*MB")
+STEP_COUNT = re.compile(r"\d+\s*步")
 
 LESSON_FILES = (
     "cover_v2_legacy.py",
@@ -15,6 +16,12 @@ LESSON_FILES = (
     "render_workbuddy_legacy.py",
 )
 SIZE_FILES = ("render_winrar_unified_legacy.py",)
+STEP_FILES = (
+    "cover_v2_legacy.py",
+    "render_codex55_legacy.py",
+    "render_workbuddy_legacy.py",
+    "render_winrar_unified_legacy.py",
+)
 
 
 def _offenders(name: str, pattern) -> list:
@@ -106,12 +113,36 @@ class LegacyConstantTests(unittest.TestCase):
                     source,
                     f"{name} 的步数应写成 len(points)}}步",
                 )
-                for literal in re.findall(r"[一-鿿，](\d+)步", source):
-                    self.assertNotIn(
-                        f"，{literal}步",
-                        source,
-                        f"{name} 的 {literal}步 是手打的，应改用 len(points)",
-                    )
+
+    def test_no_hand_typed_step_counts_anywhere(self):
+        """任何渲染器里都不该有手打的"N步"。
+
+        早先的检查只认"，N步"这一种写法，真实源码里 findall 返回空列表，
+        等于什么都没测：改成"共6步"照样放行。现在直接扫非注释行里任意
+        位置的"数字+步"，winrar 那个写死的"安装3步"才会被抓出来。
+        """
+        for name in STEP_FILES:
+            with self.subTest(name=name):
+                offenders = [
+                    line.strip()
+                    for line in (LEGACY / name).read_text(encoding="utf-8").splitlines()
+                    if not line.lstrip().startswith("#") and STEP_COUNT.search(line)
+                ]
+                self.assertEqual(
+                    offenders,
+                    [],
+                    f"{name} 里的手打步数应改用 len(...)：{offenders}",
+                )
+
+    def test_winrar_install_steps_derive_their_own_count(self):
+        """winrar 的"安装N步"和下面那句正文必须来自同一个列表。"""
+        source = (LEGACY / "render_winrar_unified_legacy.py").read_text(encoding="utf-8")
+        match = re.search(r"INSTALL_STEPS = \(([^)]*)\)", source)
+        self.assertIsNotNone(match, "应把安装动作收进 INSTALL_STEPS 列表")
+        steps = re.findall(r'"([^"]+)"', match.group(1))
+        self.assertGreaterEqual(len(steps), 2)
+        self.assertIn('f"安装{len(INSTALL_STEPS)}步"', source)
+        self.assertIn('" ".join(INSTALL_STEPS)', source)
 
 
 if __name__ == "__main__":
