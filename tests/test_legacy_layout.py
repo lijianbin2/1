@@ -92,11 +92,30 @@ class CodexGuideLayoutTests(unittest.TestCase):
         self.assertGreaterEqual(int(match.group(1)), 86)
 
     def test_step_arrow_stays_inside_the_card(self):
-        """箭头早先画在 W-BORDER-60，溢出到卡片右缘外面。"""
-        source = (LEGACY / "render_codex55_legacy.py").read_text(encoding="utf-8")
-        arrow = re.search(r'draw\.text\(\((W-BORDER[^,]+),\s*yy\+\d+\),\s*"→"', source)
-        self.assertIsNotNone(arrow, "应使用卡片内侧的箭头坐标")
-        self.assertNotIn("W-BORDER-60,", arrow.group(1))
+        """箭头必须画在卡片内侧，而且墨迹真的不能越出卡片右缘。
+
+        codex55 早先画在 W-BORDER-60，workbuddy 抄了同一份坐标却没跟着修，
+        两个脚本各漏一半。这里两边一起守，并按真实字宽核对墨迹位置。
+        """
+        for name in ("render_codex55_legacy.py", "render_workbuddy_legacy.py"):
+            with self.subTest(name=name):
+                source = (LEGACY / name).read_text(encoding="utf-8")
+                arrow = re.search(
+                    r'draw\.text\(\((W-BORDER[^,]+),\s*\w+\+\d+\),\s*"→"', source
+                )
+                self.assertIsNotNone(arrow, "应使用卡片内侧的箭头坐标")
+                self.assertNotIn("W-BORDER-60,", arrow.group(1))
+
+                inset = int(arrow.group(1).rsplit("-", 1)[1].rstrip(")"))
+                draw = _draw()
+                arrow_w = draw.textlength("→", font=get_font(28))
+                arrow_right = 1080 - 38 - inset + arrow_w
+                card_right = 1080 - 38 - 40
+                self.assertLessEqual(
+                    arrow_right,
+                    card_right,
+                    f"箭头墨迹到 {arrow_right}，越出卡片右缘 {card_right}",
+                )
 
 
 class WinrarHeightConstantsTests(unittest.TestCase):

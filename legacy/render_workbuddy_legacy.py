@@ -367,9 +367,10 @@ for num, ttitle, tdesc in steps:
     ty=yy+(STEP_H-36-30)//2
     draw.text((BORDER+130, ty), ttitle, fill=DARK, font=get_font(26, bold=True))
     draw.text((BORDER+130, ty+36), tdesc, fill=GRAY, font=get_font(22))
-    # arrow
+    # 箭头放在卡片右缘内侧。实测画在 W-BORDER-60 时箭头墨迹到 1008，
+    # 而卡片右缘在 1002，会溢出到卡片外面。codex55 早已修过，这里跟着对齐。
     if num!="4":
-        draw.text((W-BORDER-60, num_cy+2), "→", fill=(226,232,240), font=get_font(28))
+        draw.text((W-BORDER-92, num_cy+2), "→", fill=(226,232,240), font=get_font(28))
     yy+=STEP_H+STEP_GAP
 
 # warning box
