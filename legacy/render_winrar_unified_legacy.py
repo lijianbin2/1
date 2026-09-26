@@ -1,5 +1,6 @@
 from PIL import Image, ImageDraw, ImageFont
 import os
+from xianyu_common import wrap_text_fit
 
 VER = os.environ.get("XIANYU_LEGACY_VERSION", "v7.23").strip()
 VER_PREFIX = (VER + " ") if VER else ""
@@ -172,8 +173,9 @@ for i, (k, v) in enumerate(cards):
     y = grid_y + (i // 2) * (INFO_CARD_H + 20)
     d.rounded_rectangle([x, y, x + cw, y + INFO_CARD_H], radius=18, fill=(248, 250, 252), outline=(226, 232, 240), width=1)
     d.text((x + 16, y + 12), k, fill=BLUE, font=get_font(20, bold=True))
-    for j, ln in enumerate(wrap_text(v, get_font(22, bold=True), cw - 32, d)[:2]):
-        d.text((x + 16, y + 46 + j * 28), ln, fill=DARK, font=get_font(22, bold=True))
+    info_font = get_font(22, bold=True)
+    for j, ln in enumerate(wrap_text_fit(v, info_font, cw - 32, 2, d, label=f"要点 {k}")):
+        d.text((x + 16, y + 46 + j * 28), ln, fill=DARK, font=info_font)
 d.rounded_rectangle([BORDER + 40, fmt_y, W - BORDER - 40, fmt_y + 124], radius=18, fill=(239, 246, 255))
 d.text((BORDER + 60, fmt_y + 14), "解压全支持", fill=DARK, font=get_font(22, bold=True))
 sx = BORDER + 60
@@ -216,7 +218,7 @@ for i, (t, s) in enumerate(pts):
     d.text((x + 54, y + 16), t, fill=DARK, font=get_font(22, bold=True))
     df = get_font(16)
     dy = y + 52
-    for ln in wrap_text(s, df, cw - 32, d)[:2]:
+    for ln in wrap_text_fit(s, df, cw - 32, 2, d, label=f"步骤 {t}"):
         d.text((x + 14, dy), ln, fill=GRAY, font=df)
         dy += 22
 center_text(d, line_y, "右键菜单集成 选中文件即压即解 办公传文件更顺", get_font(20), GRAY)
@@ -258,8 +260,9 @@ for n, t, s in steps:
 wy = warn_y
 d.rounded_rectangle([BORDER + 40, wy, W - BORDER - 40, wy + 86], radius=14, fill=(255, 251, 235), outline=(253, 230, 138), width=1)
 d.text((BORDER + 60, wy + 12), "提醒", fill=(146, 64, 14), font=get_font(22, bold=True))
-for j, ln in enumerate(wrap_text("虚拟资料一经发货不退不换 请确认需要WinRAR再拍", get_font(16), W - 2 * BORDER - 120, d)[:2]):
-    d.text((BORDER + 60, wy + 44 + j * 20), ln, fill=(120, 113, 108), font=get_font(16))
+warn_font = get_font(16)
+for j, ln in enumerate(wrap_text_fit("虚拟资料一经发货不退不换 请确认需要WinRAR再拍", warn_font, W - 2 * BORDER - 120, 2, d, label="提醒")):
+    d.text((BORDER + 60, wy + 44 + j * 20), ln, fill=(120, 113, 108), font=warn_font)
 # 底栏两行用 BAR_TOP 相对定位并留足行距。早先按 H-BORDER-68/-38 硬写，
 # 24px 与 18px 两行的真实墨迹只差 3px，几乎连成一片。
 d.rounded_rectangle([BORDER, BAR_TOP, W - BORDER, H - BORDER], radius=22, fill=(30, 41, 59))

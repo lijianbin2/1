@@ -1,3 +1,4 @@
+import re
 import tempfile
 import unittest
 from pathlib import Path
@@ -11,12 +12,14 @@ from xianyu_common import (
     draw_board,
     enable_utf8_stdout,
     fit_font,
+    get_font,
     require_valid_pngs,
     stack_blocks,
     stack_layout,
     text_extent,
     validate_png_files,
     wrap_text,
+    wrap_text_fit,
 )
 
 
@@ -70,6 +73,87 @@ class XianyuCommonTests(unittest.TestCase):
         lines = wrap_text("abcdef", font, 20, draw)
         self.assertGreater(len(lines), 1)
         self.assertEqual("".join(lines), "abcdef")
+
+    def test_wrap_text_fit_rejects_silent_truncation(self):
+        """超行必须报错，而不是像 wrap_text(...)[:N] 那样丢掉末行。"""
+        image, draw = draw_board()
+        font = get_font(18)
+        base = "素材包含不同尺寸和格式，请根据软件兼容性、设计需求和使用场景选择文件。"
+        width = 400
+        self.assertEqual(len(wrap_text(base, font, width, draw)), 2)
+        # 正好占满上限时放行
+        self.assertEqual(len(wrap_text_fit(base, font, width, 2, draw)), 2)
+        # 再加一句就变 3 行，旧写法会静默丢掉第 3 行
+        longer = base + "另外还包含大量高清预览与配套源文件可直接使用。"
+        self.assertEqual(len(wrap_text(longer, font, width, draw)), 3)
+        with self.assertRaises(ValueError) as ctx:
+            wrap_text_fit(longer, font, width, 2, draw, label="04 页提示")
+        message = str(ctx.exception)
+        self.assertIn("04 页提示", message)
+        self.assertIn("3 行", message)
+
+    def test_wrap_text_fit_validates_max_lines(self):
+        image, draw = draw_board()
+        font = get_font(18)
+        for bad in (0, -1, True, False, 1.5, "2"):
+            with self.subTest(max_lines=bad):
+                with self.assertRaises(ValueError):
+                    wrap_text_fit("文案", font, 300, bad, draw)
+
+    def test_no_renderer_silently_truncates_wrapped_text(self):
+        """渲染器里不允许再出现 wrap_text(...)[:N]，那种写法会悄悄丢文案。"""
+        root = Path(__file__).resolve().parent.parent
+        targets = sorted(
+            [*(root / "legacy").glob("*.py"), *root.glob("*.py")]
+        )
+        # 用非贪婪 .* 兼容嵌套括号，如 wrap_text(v, get_font(22, True), cw-32, d)[:2]；
+        # 字面量 "wrap_text(" 不会匹配 wrap_text_fit(。
+        pattern = re.compile(r"wrap_text\(.*\)\s*\[:\s*\d+\s*\]")
+        offenders = []
+        for path in targets:
+            if path.name == "xianyu_common.py":
+                continue
+            for number, line in enumerate(
+                path.read_text(encoding="utf-8").splitlines(), 1
+            ):
+                if pattern.search(line):
+                    offenders.append(f"{path.name}:{number} {line.strip()}")
+        self.assertEqual(offenders, [], "改用 wrap_text_fit 以便超行时报警")
+
+    def test_symbols_in_source_exist_in_font(self):
+        """源码里的符号必须在 msyh 里有字形，否则图上会出现豆腐块。
+
+        codex55 封面早先用了 ◉ 和 ▣，两个字形 msyh 都没有，页面上直接出现
+        两个方框。这里用私用区字符（必定缺字）做指纹，逐一比对源码里出现的
+        非中文符号是否和缺字渲染结果一致。
+        """
+        root = Path(__file__).resolve().parent.parent
+        targets = sorted(
+            [*(root / "legacy").glob("*.py"), *root.glob("*.py")]
+        )
+        image, draw = draw_board()
+        font = get_font(28, True)
+
+        def rendered(char: str) -> bytes:
+            draw.rectangle([0, 0, 200, 200], fill="white")
+            draw.text((10, 10), char, font=font, fill="black")
+            return draw._image.tobytes()
+
+        tofu = {rendered(chr(code)) for code in (0xE000, 0xE001, 0xE002)}
+        offenders = []
+        for path in targets:
+            source = path.read_text(encoding="utf-8")
+            # 只查字符串字面量里的非中文、非 ASCII 字符
+            for literal in re.findall(r'"([^"\n]*)"|\'([^\'\n]*)\'', source):
+                text = literal[0] or literal[1]
+                for char in text:
+                    if ord(char) < 128 or "一" <= char <= "鿿":
+                        continue
+                    if rendered(char) in tofu:
+                        offenders.append(f"{path.name}: {char!r} (U+{ord(char):04X})")
+        self.assertEqual(
+            sorted(set(offenders)), [], "这些符号在 msyh 里缺字，会渲染成豆腐块"
+        )
 
     def test_validate_png_files_reports_missing_wrong_size_and_corrupt_files(self):
         with tempfile.TemporaryDirectory() as directory:

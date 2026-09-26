@@ -6,12 +6,14 @@ import argparse
 from pathlib import Path
 
 from xianyu_common import (
+    assert_no_overlap,
     draw_board,
     enable_utf8_stdout,
     get_font,
     require_valid_pngs,
     save_png,
-    wrap_text,
+    stack_layout,
+    wrap_text_fit,
 )
 
 
@@ -27,6 +29,8 @@ GREEN = (16, 185, 129)
 ORANGE = (249, 115, 22)
 ROSE = (225, 29, 72)
 DEFAULT_OUT = Path("D:/闲鱼/宣传片背景音乐合集，一键提升影片质感与感染力")
+FOOTER_H = 86
+FOOTER_TOP = H - BORDER - FOOTER_H
 
 # 数量来自 verify_source.py 对源目录的实测结果，修改前必须重新核验。
 CATEGORIES = [
@@ -64,10 +68,47 @@ def centered(draw, text, y, font, fill=DARK):
     draw.text(((W - width) // 2, y), text, fill=fill, font=font)
 
 
+# 03 页"使用收获"的版式参数。抽成模块级常量并由 outcomes_layout 计算，
+# 便于测试直接校验几何，不必渲染整页图片。
+OUTCOME_GAP = 24
+OUTCOME_CARD_H = 190
+OUTCOME_SUIT_H = 82
+OUTCOME_TOP = 190
+
+
+def outcomes_layout(count: int) -> tuple[int, int, int]:
+    """返回 03 页的 (卡片区顶部 y, 适合横条顶部 y, 单卡高度)。
+
+    卡片区与横条用 stack_layout 分配可用高度：早先两者都写死 y，卡片区
+    结束后到横条之间空出约 250px 死区。max_grow 压到 40，卡片最多长到
+    210px，剩余空间由 stack_layout 均分到上下，不会拉出大片空腔。
+
+    注意 stack_layout 返回 ``(tops, sizes)``，sizes[0] 才是卡片区高度。
+    曾经误取 sizes[1]（横条高度 82）当卡片高度，卡片被压成 29px 全部重叠。
+    """
+    if not isinstance(count, int) or isinstance(count, bool) or count < 1:
+        raise ValueError("count must be a positive integer")
+    rows = -(-count // 2)
+    tops, sizes = stack_layout(
+        [OUTCOME_CARD_H * rows + OUTCOME_GAP * (rows - 1), OUTCOME_SUIT_H],
+        OUTCOME_TOP,
+        FOOTER_TOP - 40,
+        grow=[0],
+        max_grow=40,
+    )
+    card_h = int((sizes[0] - OUTCOME_GAP * (rows - 1)) / rows)
+    if card_h < OUTCOME_CARD_H:
+        raise ValueError(f"03 页卡片高度 {card_h} 小于基准 {OUTCOME_CARD_H}，布局计算有误")
+    assert_no_overlap(
+        [(tops[0], tops[0] + sizes[0]), (tops[1], tops[1] + OUTCOME_SUIT_H)],
+        "03 页",
+    )
+    return tops[0], tops[1], card_h
+
+
 def footer(draw, right=f"{TOTAL_LABEL} · {CATEGORY_COUNT} · 宣传片配乐"):
-    height = 86
     draw.rounded_rectangle(
-        [BORDER, H - BORDER - height, W - BORDER, H - BORDER],
+        [BORDER, FOOTER_TOP, W - BORDER, H - BORDER],
         radius=22,
         fill=DARK,
     )
@@ -206,11 +247,12 @@ def render_outcomes(out: Path) -> None:
         ("强化情绪", "匹配宣传片主题，增强氛围、情绪和感染力", TEAL),
         ("提高效率", "减少反复寻找配乐的时间，拿来即可筛选使用", GREEN),
     ]
-    card_w, card_h, gap = 460, 190, 24
+    card_w, gap = 460, OUTCOME_GAP
+    grid_y, suit_y, card_h = outcomes_layout(len(points))
     for i, (title, desc, color) in enumerate(points):
         row, col = divmod(i, 2)
         x = BORDER + 40 + col * (card_w + gap)
-        y = 190 + row * (card_h + gap)
+        y = grid_y + row * (card_h + gap)
         d.rounded_rectangle(
             [x, y, x + card_w, y + card_h],
             radius=20,
@@ -223,15 +265,15 @@ def render_outcomes(out: Path) -> None:
         d.text((x + 96, y + 25), title, fill=DARK, font=get_font(25, True))
         body_font = get_font(18)
         for line_no, line in enumerate(
-            wrap_text(desc, body_font, card_w - 120, d)[:3]
+            wrap_text_fit(desc, body_font, card_w - 120, 3, d, label=f"03 页 {title}")
         ):
             d.text((x + 96, y + 77 + line_no * 27), line, fill=GRAY, font=body_font)
     d.rounded_rectangle(
-        [BORDER + 40, 850, W - BORDER - 40, 932],
+        [BORDER + 40, suit_y, W - BORDER - 40, suit_y + OUTCOME_SUIT_H],
         radius=18,
         fill=(239, 246, 255),
     )
-    d.text((BORDER + 60, 875), "适合：宣传片、广告片、企业片、校园片、城市片、旅游片等", fill=DARK, font=get_font(21, True))
+    d.text((BORDER + 60, suit_y + 25), "适合：宣传片、广告片、企业片、校园片、城市片、旅游片等", fill=DARK, font=get_font(21, True))
     footer(d, f"{CATEGORY_COUNT} · {TOTAL_LABEL} · 按需选曲")
     save_png(im, out / "03.png")
 
@@ -251,10 +293,23 @@ def render_guide(out: Path) -> None:
         ("3", "使用方式", "先确定宣传片场景，再按分类挑选适合的音乐"),
         ("4", "交付方式", "拍下后发送夸克网盘链接与提取码"),
     ]
+    # 步骤卡与提醒框按可用高度分配，不写死 190/735。早先两块各用固定 y 且高度
+    # 写死，步骤结束后到提醒框之间留下大片空白。步骤区作为单个可伸缩块参与
+    # 布局，再把分配到的高度均分给各步，避免卡片被拉长后压到提醒框上。
+    step_gap, warn_h = 16, 133
+    tops, sizes = stack_layout(
+        [len(steps) * 110 + (len(steps) - 1) * step_gap, warn_h],
+        190,
+        FOOTER_TOP - 30,
+        grow=[0],
+        max_grow=40,
+    )
+    step_h = int((sizes[0] - (len(steps) - 1) * step_gap) / len(steps))
+    warn_y = tops[1]
     y = 190
     for number, title, desc in steps:
         d.rounded_rectangle(
-            [BORDER + 40, y, W - BORDER - 40, y + 110],
+            [BORDER + 40, y, W - BORDER - 40, y + step_h],
             radius=18,
             fill=PALE,
             outline=(226, 232, 240),
@@ -267,7 +322,7 @@ def render_guide(out: Path) -> None:
         d.text((BORDER + 130, y + 22), title, fill=DARK, font=get_font(24, True))
         desc_font = get_font(18)
         for line_no, line in enumerate(
-            wrap_text(desc, desc_font, W - BORDER * 2 - 155, d)[:2]
+            wrap_text_fit(desc, desc_font, W - BORDER * 2 - 155, 2, d, label=f"04 页 {title}")
         ):
             d.text(
                 (BORDER + 130, y + 59 + line_no * 24),
@@ -275,19 +330,21 @@ def render_guide(out: Path) -> None:
                 fill=GRAY,
                 font=desc_font,
             )
-        y += 128
+        y += step_h + step_gap
     d.rounded_rectangle(
-        [BORDER + 40, 735, W - BORDER - 40, 868],
+        [BORDER + 40, warn_y, W - BORDER - 40, warn_y + warn_h],
         radius=18,
         fill=(255, 251, 235),
         outline=(253, 230, 138),
         width=1,
     )
-    d.text((BORDER + 62, 760), "温馨提示", fill=(146, 64, 14), font=get_font(23, True))
+    d.text((BORDER + 62, warn_y + 25), "温馨提示", fill=(146, 64, 14), font=get_font(23, True))
     tip = "音乐素材适合宣传片、广告片、企业片等视频创作使用，建议结合画面主题、剪辑节奏和授权要求合理选择。"
     tip_font = get_font(18)
-    for i, line in enumerate(wrap_text(tip, tip_font, W - BORDER * 2 - 130, d)[:3]):
-        d.text((BORDER + 62, 804 + i * 25), line, fill=(120, 113, 108), font=tip_font)
+    for i, line in enumerate(
+        wrap_text_fit(tip, tip_font, W - BORDER * 2 - 130, 3, d, label="04 页提示")
+    ):
+        d.text((BORDER + 62, warn_y + 69 + i * 25), line, fill=(120, 113, 108), font=tip_font)
     footer(d, f"{TOTAL_LABEL} · 宣传片背景音乐合集")
     save_png(im, out / "04.png")
 

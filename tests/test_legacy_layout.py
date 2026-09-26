@@ -5,6 +5,7 @@
 """
 
 import re
+import sys
 import unittest
 from pathlib import Path
 
@@ -96,6 +97,73 @@ class CodexGuideLayoutTests(unittest.TestCase):
         arrow = re.search(r'draw\.text\(\((W-BORDER[^,]+),\s*yy\+\d+\),\s*"→"', source)
         self.assertIsNotNone(arrow, "应使用卡片内侧的箭头坐标")
         self.assertNotIn("W-BORDER-60,", arrow.group(1))
+
+
+class CodexCoverLayoutTests(unittest.TestCase):
+    """封面特色块的版式回归。
+
+    早先特色块的 y 和高度都是手写常量：内容在 540px 就结束，底部标语在
+    920px，中间空出约 380px 死区。修法不是把卡片拉高（试过，卡片长到
+    460px 而内容只有 180px，底部又空一片），而是补上实质内容再让
+    stack_layout 居中。这里锁住两个几何不变量。
+    """
+
+    @staticmethod
+    def _load(module_name: str):
+        import importlib
+        import os
+        import tempfile
+
+        tmp = tempfile.TemporaryDirectory()
+        old = os.environ.get("XIANYU_LEGACY_OUT")
+        os.environ["XIANYU_LEGACY_OUT"] = tmp.name
+        sys.path.insert(0, str(LEGACY))
+        try:
+            module = importlib.import_module(module_name)
+        finally:
+            os.environ["XIANYU_LEGACY_OUT"] = old or ""
+            sys.path.remove(str(LEGACY))
+        return module, tmp
+
+    def setUp(self):
+        self.module, self._tmp = self._load("render_codex55_legacy")
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def test_feature_block_sits_between_divider_and_bottom_tag(self):
+        """特色卡必须落在分隔线下方、底栏上方，中间不能留大洞。"""
+        top, card_h = self.module.features_layout(3)
+        bottom = top + card_h
+        self.assertGreaterEqual(top, 330, "特色卡不能压到标题分隔线上方")
+        self.assertLessEqual(bottom, self.module.FOOTER_TOP - 20, "不能压到底栏")
+        # 上下留白都要有，但都不该超过 170px，否则又变成死区
+        self.assertLessEqual(top - 300, 170, "分隔线到特色卡之间空得太多")
+        self.assertLessEqual(
+            self.module.FOOTER_TOP - 36 - bottom, 170, "特色卡到底栏之间空得太多"
+        )
+
+    def test_card_is_tall_enough_for_its_content(self):
+        """卡片高度必须容得下图标、标题、副标题和细节三行。"""
+        _, card_h = self.module.features_layout(3)
+        self.assertGreaterEqual(
+            card_h,
+            self.module.FEATURE_CONTENT_H,
+            "卡片比内容还矮，卡内文字会溢出边框",
+        )
+
+    def test_features_layout_rejects_bad_count(self):
+        for bad in (0, -1, True, 1.5, "3", None):
+            with self.subTest(count=bad):
+                with self.assertRaises(ValueError):
+                    self.module.features_layout(bad)
+
+
+class WorkBuddyCoverLayoutTests(CodexCoverLayoutTests):
+    """workbuddy 封面和 codex55 是同一套版式，同样锁住几何不变量。"""
+
+    def setUp(self):
+        self.module, self._tmp = self._load("render_workbuddy_legacy")
 
 
 if __name__ == "__main__":

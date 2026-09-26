@@ -2,7 +2,7 @@ from PIL import Image, ImageDraw, ImageFont
 import os
 import pathlib
 
-from xianyu_common import stack_layout
+from xianyu_common import assert_text_above, stack_layout, wrap_text_fit
 
 W=H=1080
 BORDER=38
@@ -59,6 +59,51 @@ out = pathlib.Path(
 out.mkdir(parents=True, exist_ok=True)
 
 # --- 01 Cover ---
+# 封面下半部分的常量：特色卡可伸展区域，以及卡片自身的留白。
+FEATURE_TOP = 330
+FOOTER_H = 86
+FOOTER_TOP = H - BORDER - FOOTER_H
+TAG_GAP = 36
+FEATURE_CARD_PAD = 28
+
+def features_layout(count: int) -> tuple[int, int]:
+    """返回封面特色卡的 (顶部 y, 单卡高度)。
+
+    早先特色块的 y 和高度都写死：内容在 540px 就结束，底部标语在 920px，
+    中间留下约 380px 死区，封面看起来头重脚轻。
+
+    光把卡片拉高填满是没用的（试过：卡片长到 460px 而内容只有 180px，
+    底部又空出一片，反而更难看）。真正的解法是往卡里补实质内容 ——
+    每张卡加一段"跟着课能做出什么"的细节，封面信息量上去了，留白自然
+    变成内容间距。卡片高度贴合内容（不拉伸），剩余空间由 stack_layout
+    均分到上下各约 117px。
+
+    注意 stack_layout 返回 ``(tops, sizes)``，sizes[0] 才是特色卡高度。
+    """
+    if not isinstance(count, int) or isinstance(count, bool) or count < 1:
+        raise ValueError("count must be a positive integer")
+    base_h = 318
+    tops, sizes = stack_layout(
+        [base_h],
+        FEATURE_TOP,
+        FOOTER_TOP - TAG_GAP,
+    )
+    card_h = int(sizes[0])
+    if card_h < base_h:
+        raise ValueError(f"封面特色卡高度 {card_h} 小于基准 {base_h}，布局计算有误")
+    return tops[0], card_h
+
+# 卡内内容（图标 + 标题 + 副标题 + 细节）的高度，用于在卡里垂直居中
+FEATURE_ICON_H = 76
+FEATURE_TITLE_H = 46
+FEATURE_SUB_H = 44
+FEATURE_DETAIL_LINES = 3
+FEATURE_DETAIL_H = 30
+FEATURE_CONTENT_H = (
+    FEATURE_ICON_H + FEATURE_TITLE_H + FEATURE_SUB_H
+    + 26 + 1 + 24 + FEATURE_DETAIL_H * FEATURE_DETAIL_LINES
+)
+
 im, draw = draw_board()
 # top badge
 badge_font=get_font(26, bold=True)
@@ -83,43 +128,97 @@ draw.text(((W-sw)//2, by+bh+46+82), subtitle, fill=GRAY, font=sfont)
 # divider
 draw.line([(W-200)//2, by+bh+46+82+56, (W+200)//2, by+bh+46+82+56], fill=BLUE, width=4)
 # features 3 points
-feat_font=get_font(28, bold=True)
-feat_sub=get_font(18)
+feat_font=get_font(31, bold=True)
+feat_sub=get_font(20)
 features=[
-    ("多模型一站式", "国产/第三方/API自由切换"),
-    ("音视频全覆盖", "图片·视频·语音·剪辑"),
-    ("飞书+知识库", "自动化办公到企业沉淀"),
+    (
+        "多模型一站式",
+        "国产/第三方/API自由切换",
+        "DeepSeek / 智谱 / 通义 随用随切",
+    ),
+    (
+        "音视频全覆盖",
+        "图片·视频·语音·剪辑",
+        "生图、生视频、配音、剪辑一条龙",
+    ),
+    (
+        "飞书+知识库",
+        "自动化办公到企业沉淀",
+        "多维表格、云文档、知识库沉淀",
+    ),
 ]
-y0= by+bh+46+82+76+40
-for i,(a,b) in enumerate(features):
-    x = BORDER+60 + i* ( (W-2*BORDER-120)//3 )
+feat_top, feat_h = features_layout(len(features))
+slot_w = (W - 2 * BORDER - 120) // 3
+for i,(a,b,c) in enumerate(features):
+    x = BORDER+60 + i*slot_w
+    # 卡片底：让整块特色有实体边框，避免大片纯白死区
+    card_x = x - 8
+    card_w = slot_w - 8
+    draw.rounded_rectangle(
+        [card_x, feat_top, card_x + card_w, feat_top + feat_h],
+        radius=20,
+        fill=(248, 250, 252),
+        outline=(226, 232, 240),
+        width=2,
+    )
+    # 卡内垂直居中：内容整体居中，不贴卡片顶部
+    inner_y = feat_top + (feat_h - FEATURE_CONTENT_H) // 2
     # icon circle
     cx=x+70
-    cy=y0+30
-    draw.ellipse([cx-32, cy-32, cx+32, cy+32], fill=(239,246,255), outline=BLUE, width=2)
-    icon_font=get_font(28, bold=True)
-    icons=["◉","◆","▣"]
+    cy=inner_y+FEATURE_ICON_H//2
+    draw.ellipse([cx-38, cy-38, cx+38, cy+38], fill=(239,246,255), outline=BLUE, width=2)
+    icon_font=get_font(32, bold=True)
+    # msyh 字体里没有 ◉ 和 ▣ 的字形，早先渲染成两个豆腐块（□），
+    # 中间的 ◆ 反而正常。这里只挑实测存在的字形：● ◆ ▲。
+    icons=["●","◆","▲"]
     iw=draw.textlength(icons[i], font=icon_font)
-    draw.text((cx-iw//2, cy-16), icons[i], fill=BLUE, font=icon_font)
+    draw.text((cx-iw//2, cy-19), icons[i], fill=BLUE, font=icon_font)
     # text
     aw=draw.textlength(a, font=feat_font)
-    ax= x+70 - aw//2
-    draw.text((ax, cy+44), a, fill=DARK, font=feat_font)
-    bw2=draw.textlength(b, font=feat_sub)
-    bx2= max(BORDER+20, min(W-BORDER-20-bw2, x+70 - bw2//2))
-    # wrap if still wide
-    if bw2 > (W-2*BORDER-120)//3 -20:
-        lines2=wrap_text(b, feat_sub, (W-2*BORDER-120)//3 -20, draw)
-        bx2a = x+70 - draw.textlength(lines2[0], font=feat_sub)//2
-        draw.text((max(BORDER+10, bx2a), cy+78), lines2[0], fill=GRAY, font=feat_sub)
-        if len(lines2)>1:
-            bx2b = x+70 - draw.textlength(lines2[1], font=feat_sub)//2
-            draw.text((max(BORDER+10, bx2b), cy+98), lines2[1], fill=GRAY, font=feat_sub)
-    else:
-        draw.text((bx2, cy+78), b, fill=GRAY, font=feat_sub)
+    ax= max(x-8+20, min(x-8+slot_w-8-20-aw, x+70 - aw//2))
+    title_y=cy+44
+    draw.text((ax, title_y), a, fill=DARK, font=feat_font)
+    # 文字一律按卡片自身内边距裁剪，不能按画布边界：
+    # 居中后向左溢出时会跑到卡片边框外面。
+    text_left = card_x + 20
+    text_right = card_x + card_w - 20
+    sub_w = text_right - text_left
+    lines2=wrap_text_fit(b, feat_sub, sub_w, 2, draw, label=f"封面特色 {a}")
+    sub_top=title_y+44
+    detail_y=sub_top+len(lines2)*30
+    assert_text_above(
+        draw, lines2[-1], feat_sub, sub_top + (len(lines2) - 1) * 30,
+        detail_y, f"封面特色 {a}",
+    )
+    for line_index, line in enumerate(lines2):
+        line_w=draw.textlength(line, font=feat_sub)
+        line_x= max(text_left, min(text_right - line_w, x+70 - line_w//2))
+        draw.text((line_x, sub_top+line_index*30), line, fill=GRAY, font=feat_sub)
+    # 细分割线 + 细节说明：把"跟着课能做出什么"写清楚，填满卡片
+    rule_y=detail_y+10
+    draw.line(
+        [(text_left, rule_y), (text_right, rule_y)],
+        fill=(203,213,225), width=1,
+    )
+    detail_font=get_font(19)
+    detail_lines=wrap_text_fit(
+        c, detail_font, sub_w, FEATURE_DETAIL_LINES,
+        draw, label=f"封面特色细节 {a}",
+    )
+    detail_top=rule_y+24
+    assert_text_above(
+        draw, detail_lines[-1], detail_font,
+        detail_top + (len(detail_lines) - 1) * FEATURE_DETAIL_H,
+        feat_top + feat_h - FEATURE_CARD_PAD // 2, f"封面特色细节 {a}",
+    )
+    for line_index, line in enumerate(detail_lines):
+        draw.text(
+            (text_left, detail_top + line_index * FEATURE_DETAIL_H),
+            line, fill=(71,85,105), font=detail_font,
+        )
 
 # bottom bar
-bar_h=86
+bar_h=FOOTER_H
 draw.rounded_rectangle([BORDER, H-BORDER-bar_h, W-BORDER, H-BORDER], radius=22, fill=(30,41,59))
 bar_font=get_font(24, bold=True)
 bar_font2=get_font(22)
@@ -135,7 +234,7 @@ tag=f"Codex · {LESSON_FULL} · 办公自动化"
 tw3=draw.textlength(tag, font=tag_font)
 draw.text(((W-tw3)//2, H-BORDER-34), tag, fill=(148,163,184), font=tag_font) if False else None
 # actually draw inside white area
-draw.text((BORDER+40, H-BORDER-bar_h-36), f"Codex · {LESSON_FULL} · 办公自动化 · 即学即用", fill=GRAY, font=get_font(22))
+draw.text((BORDER+40, FOOTER_TOP-TAG_GAP+8), f"Codex · {LESSON_FULL} · 办公自动化 · 即学即用", fill=GRAY, font=get_font(22))
 
 im.save(out/"01.png", "PNG")
 print("01 saved", (out/"01.png").stat().st_size)
@@ -237,7 +336,7 @@ PT_GAP_MAX=56
 PT_GAP=20
 pt_w=(W-2*BORDER-80-PT_GAP)//PT_COLS
 pt_desc_font=get_font(16)
-pt_lines={t:wrap_text(d, pt_desc_font, pt_w-32, draw)[:2] for t,d in points}
+pt_lines={t:wrap_text_fit(d, pt_desc_font, pt_w-32, 2, draw, label=f"收获 {t}") for t,d in points}
 max_block=max(44+len(v)*22 for v in pt_lines.values())
 PT_H=max_block+PT_PAD*2
 PT_GAP=min(PT_GAP_MAX, (PT_FOOT-PT_TOP-PT_ROWS*PT_H)//(PT_ROWS-1))
@@ -329,7 +428,7 @@ draw.rounded_rectangle([BORDER+40, warn_y, W-BORDER-40, warn_y+WARN_H], radius=1
 draw.text((BORDER+60, warn_y+12), "提醒", fill=(146,64,14), font=get_font(22, bold=True))
 wf=get_font(16)
 warn_text="虚拟资料一经发货不退不换，请确认是 Codex 职场办公需要再拍"
-for idx, wl in enumerate(wrap_text(warn_text, wf, W-2*BORDER-120, draw)[:2]):
+for idx, wl in enumerate(wrap_text_fit(warn_text, wf, W-2*BORDER-120, 2, draw, label="提醒")):
     draw.text((BORDER+60, warn_y+44+ idx*20), wl, fill=(120,113,108), font=wf)
 
 draw.rounded_rectangle([BORDER, BAR_TOP, W-BORDER, H-BORDER], radius=22, fill=(30,41,59))

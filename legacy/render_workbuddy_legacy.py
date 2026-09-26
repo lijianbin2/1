@@ -1,6 +1,7 @@
 from PIL import Image, ImageDraw, ImageFont
 import os
 import pathlib
+from xianyu_common import assert_text_above, stack_layout, wrap_text_fit
 
 W=H=1080
 BORDER=38
@@ -57,6 +58,41 @@ out = pathlib.Path(
 out.mkdir(parents=True, exist_ok=True)
 
 # --- 01 Cover ---
+# 封面下半部分常量：特色卡可伸展区域与卡内留白。
+FEATURE_TOP = 330
+FOOTER_H = 86
+FOOTER_TOP = H - BORDER - FOOTER_H
+TAG_GAP = 36
+FEATURE_ICON_H = 76
+FEATURE_TITLE_H = 46
+FEATURE_SUB_H = 44
+FEATURE_DETAIL_LINES = 3
+FEATURE_DETAIL_H = 30
+FEATURE_CONTENT_H = (
+    FEATURE_ICON_H + FEATURE_TITLE_H + FEATURE_SUB_H
+    + 26 + 1 + 24 + FEATURE_DETAIL_H * FEATURE_DETAIL_LINES
+)
+
+def features_layout(count: int) -> tuple[int, int]:
+    """返回封面特色卡的 (顶部 y, 单卡高度)。
+
+    早先卡片高度写死 196px，内容只有图标加两行字，撑不满；特色区虽然
+    做了居中，但卡片本身和底栏之间仍空出约 200px。和 codex55 一样，
+    补上"跟着课能做出什么"的细节，再让 stack_layout 居中整块。
+    """
+    if not isinstance(count, int) or isinstance(count, bool) or count < 1:
+        raise ValueError("count must be a positive integer")
+    base_h = 318
+    tops, sizes = stack_layout(
+        [base_h],
+        FEATURE_TOP,
+        FOOTER_TOP - TAG_GAP,
+    )
+    card_h = int(sizes[0])
+    if card_h < base_h:
+        raise ValueError(f"封面特色卡高度 {card_h} 小于基准 {base_h}，布局计算有误")
+    return tops[0], card_h
+
 im, draw = draw_board()
 # top badge
 badge_font=get_font(26, bold=True)
@@ -81,47 +117,70 @@ draw.text(((W-sw)//2, by+bh+46+82), subtitle, fill=GRAY, font=sfont)
 # divider
 draw.line([(W-200)//2, by+bh+46+82+56, (W+200)//2, by+bh+46+82+56], fill=BLUE, width=4)
 # features 3 points
-bar_h=86
-feat_font=get_font(28, bold=True)
-feat_sub=get_font(18)
+bar_h=FOOTER_H
+feat_font=get_font(31, bold=True)
+feat_sub=get_font(20)
 features=[
-    ('智能体一站式', 'Skill知识库自动化'),
-    ('数字人全流程', '形象声音口播视频'),
-    ('办公全场景', 'PPT数据剪辑飞书'),
+    ('智能体一站式', 'Skill知识库自动化', '沉淀可复用技能，下次回直接调用'),
+    ('数字人全流程', '形象声音口播视频', '形象、声音、口播、成片一次做完'),
+    ('办公全场景', 'PPT数据剪辑飞书', '汇报、数据分析、剪辑、协作全覆盖'),
 ];
-y0= by+bh+46+82+76+40
-FEAT_CARD_H=196
-FEAT_FOOT=H-BORDER-bar_h-64
-# 特色区在分隔线与底栏之间垂直居中，底栏上方不留大片空白
-y0=max(y0, y0+(FEAT_FOOT-y0-FEAT_CARD_H)//2)
+feat_top, feat_h = features_layout(len(features))
+FEAT_CARD_H=feat_h
 feat_w=(W-2*BORDER-120-2*24)//3
-for i,(a,b) in enumerate(features):
+for i,(a,b,c) in enumerate(features):
     x = BORDER+60 + i* (feat_w+24)
-    draw.rounded_rectangle([x, y0, x+feat_w, y0+FEAT_CARD_H], radius=18, fill=(248,250,252), outline=(226,232,240), width=1)
+    draw.rounded_rectangle([x, feat_top, x+feat_w, feat_top+FEAT_CARD_H], radius=20, fill=(248,250,252), outline=(226,232,240), width=2)
+    # 卡内垂直居中，不贴卡片顶部
+    inner_y=feat_top+(FEAT_CARD_H-FEATURE_CONTENT_H)//2
     # icon circle
     cx=x+feat_w//2
-    cy=y0+34
-    draw.ellipse([cx-32, cy-32, cx+32, cy+32], fill=(239,246,255), outline=BLUE, width=2)
-    icon_font=get_font(28, bold=True)
+    cy=inner_y+FEATURE_ICON_H//2
+    draw.ellipse([cx-38, cy-38, cx+38, cy+38], fill=(239,246,255), outline=BLUE, width=2)
+    icon_font=get_font(32, bold=True)
     icons=["1","2","3"]
     iw=draw.textlength(icons[i], font=icon_font)
-    draw.text((cx-iw//2, cy-16), icons[i], fill=BLUE, font=icon_font)
+    draw.text((cx-iw//2, cy-19), icons[i], fill=BLUE, font=icon_font)
     # text
     aw=draw.textlength(a, font=feat_font)
-    ax= cx - aw//2
-    draw.text((ax, cy+50), a, fill=DARK, font=feat_font)
-    bw2=draw.textlength(b, font=feat_sub)
-    bx2= max(x+10, min(x+feat_w-10-bw2, cx - bw2//2))
-    # wrap if still wide
-    if bw2 > feat_w-20:
-        lines2=wrap_text(b, feat_sub, feat_w-20, draw)
-        bx2a = cx - draw.textlength(lines2[0], font=feat_sub)//2
-        draw.text((max(x+10, bx2a), cy+88), lines2[0], fill=GRAY, font=feat_sub)
-        if len(lines2)>1:
-            bx2b = x+70 - draw.textlength(lines2[1], font=feat_sub)//2
-            draw.text((max(x+10, bx2b), cy+110), lines2[1], fill=GRAY, font=feat_sub)
-    else:
-        draw.text((bx2, cy+88), b, fill=GRAY, font=feat_sub)
+    title_y=cy+44
+    # 文字按卡片自身内边距裁剪，居中后向左溢出会跑到卡片边框外面
+    text_left=x+20
+    text_right=x+feat_w-20
+    ax= max(text_left, min(text_right-aw, cx - aw//2))
+    draw.text((ax, title_y), a, fill=DARK, font=feat_font)
+    lines2=wrap_text_fit(b, feat_sub, text_right-text_left, 2, draw, label=f"封面特色 {a}")
+    sub_top=title_y+44
+    detail_y=sub_top+len(lines2)*30
+    assert_text_above(
+        draw, lines2[-1], feat_sub, sub_top+(len(lines2)-1)*30,
+        detail_y, f"封面特色 {a}",
+    )
+    for line_index, line in enumerate(lines2):
+        line_w=draw.textlength(line, font=feat_sub)
+        draw.text(
+            (max(text_left, min(text_right-line_w, cx - line_w//2)), sub_top+line_index*30),
+            line, fill=GRAY, font=feat_sub,
+        )
+    # 细分割线 + 细节说明
+    rule_y=detail_y+10
+    draw.line([(text_left, rule_y), (text_right, rule_y)], fill=(203,213,225), width=1)
+    detail_font=get_font(19)
+    detail_lines=wrap_text_fit(
+        c, detail_font, text_right-text_left, FEATURE_DETAIL_LINES,
+        draw, label=f"封面特色细节 {a}",
+    )
+    detail_top=rule_y+24
+    assert_text_above(
+        draw, detail_lines[-1], detail_font,
+        detail_top+(len(detail_lines)-1)*FEATURE_DETAIL_H,
+        feat_top+FEAT_CARD_H-14, f"封面特色细节 {a}",
+    )
+    for line_index, line in enumerate(detail_lines):
+        draw.text(
+            (text_left, detail_top+line_index*FEATURE_DETAIL_H),
+            line, fill=(71,85,105), font=detail_font,
+        )
 
 # bottom bar
 draw.rounded_rectangle([BORDER, H-BORDER-bar_h, W-BORDER, H-BORDER], radius=22, fill=(30,41,59))
@@ -134,7 +193,7 @@ draw.text((BORDER+40, H-BORDER-bar_h+18), bar_text, fill="white", font=bar_font)
 w2=draw.textlength(bar_text2, font=bar_font2)
 draw.text((W-BORDER-40-w2, H-BORDER-bar_h+48), bar_text2, fill=(203,213,225), font=bar_font2)
 # bottom tag, drawn inside the white area above the bar
-draw.text((BORDER+40, H-BORDER-bar_h-36), f'WorkBuddy · {LESSON_FULL} · 智能体实战 · 即学即用', fill=GRAY, font=get_font(22))
+draw.text((BORDER+40, FOOTER_TOP-TAG_GAP+8), f'WorkBuddy · {LESSON_FULL} · 智能体实战 · 即学即用', fill=GRAY, font=get_font(22))
 
 im.save(out/"01.png", "PNG")
 print("01 saved", (out/"01.png").stat().st_size)
@@ -232,7 +291,7 @@ PT_GAP_MAX=56
 PT_GAP=24
 pt_w=(W-2*BORDER-80-PT_GAP)//PT_COLS
 pt_desc_font=get_font(16)
-pt_lines={t:wrap_text(d, pt_desc_font, pt_w-32, draw)[:2] for t,d in points}
+pt_lines={t:wrap_text_fit(d, pt_desc_font, pt_w-32, 2, draw, label=f"收获 {t}") for t,d in points}
 max_block=max(44+len(v)*22 for v in pt_lines.values())
 pt_h=max_block+PT_PAD*2
 PT_GAP=min(PT_GAP_MAX, (PT_FOOT-PT_TOP-PT_ROWS*pt_h)//(PT_ROWS-1))
@@ -319,7 +378,7 @@ draw.rounded_rectangle([BORDER+40, warn_y, W-BORDER-40, warn_y+86], radius=14, f
 draw.text((BORDER+60, warn_y+12), "提醒", fill=(146,64,14), font=get_font(22, bold=True))
 wf=get_font(16)
 warn_text='虚拟资料一经发货不退不换，请确认是WorkBuddy智能体需要再拍'
-for idx, wl in enumerate(wrap_text(warn_text, wf, W-2*BORDER-120, draw)[:2]):
+for idx, wl in enumerate(wrap_text_fit(warn_text, wf, W-2*BORDER-120, 2, draw, label="提醒")):
     draw.text((BORDER+60, warn_y+44+ idx*20), wl, fill=(120,113,108), font=wf)
 
 # 底栏两行用 BAR_TOP 相对定位并留足行距。早先按 H-BORDER-68/-38 硬写，

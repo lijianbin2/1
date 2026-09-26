@@ -58,3 +58,43 @@ class RenderMapCollectionTests(unittest.TestCase):
         """数量和体积必须由实测统计推导，不能手打。"""
         stats = SourceStats(root=Path("any"), total_files=468, total_bytes=int(7.24 * 1024**3))
         self.assertEqual(stats_labels(stats), ("468个文件", "约7.24GB"))
+
+    def test_catalog_cards_fill_the_gap_above_the_footer(self):
+        """02 页四张卡必须撑到接近底栏，不能在下方留大片空白。
+
+        早先卡片只有 120px 高、两行字，两行排完停在 750px，底栏在 956px，
+        中间空出约 200px。这里直接量卡片区几何，不用逐像素扫描。
+        """
+        import render_map_collection as maps
+
+        rows = 2
+        grid_bottom = (
+            maps.CAT_CARD_TOP
+            + rows * maps.CAT_CARD_H
+            + (rows - 1) * maps.CAT_CARD_GAP
+        )
+        # 卡片区底部离底栏的间距在合理呼吸范围内（不超过 90px）
+        self.assertLessEqual(
+            maps.FOOTER_TOP - grid_bottom,
+            90,
+            "02 页分类区到底栏之间空得太多",
+        )
+        # 卡片本身要容得下序号、标题、描述、分割线和细节两行
+        self.assertGreaterEqual(maps.CAT_CARD_H, 180)
+
+    def test_catalog_detail_text_fits_inside_its_card(self):
+        """细节说明不能溢出卡片底边，用真实墨迹范围判定。"""
+        import render_map_collection as maps
+        from xianyu_common import get_font, text_extent
+
+        from PIL import ImageDraw
+
+        draw = ImageDraw.Draw(Image.new("RGB", (W, H), "white"))
+        card_h = maps.CAT_CARD_H
+        card_top = maps.CAT_CARD_TOP
+        detail = "一亿像素原图，放大到印刷级也不糊"
+        detail_font = get_font(17)
+        top = card_top + 65 + 30 + 16
+        _, bottom = text_extent(draw, detail, detail_font, top)
+        self.assertLessEqual(bottom, card_top + card_h - 14)
+        self.assertEqual(maps.FOOTER_TOP, H - 38 - 86)

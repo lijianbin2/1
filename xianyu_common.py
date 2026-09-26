@@ -88,6 +88,34 @@ def wrap_text(text: str, font, max_w: float, draw) -> list[str]:
     return lines
 
 
+def wrap_text_fit(
+    text: str,
+    font,
+    max_w: float,
+    max_lines: int,
+    draw,
+    *,
+    label: str = "",
+) -> list[str]:
+    """换行并断言不超过 ``max_lines`` 行，超出直接报错。
+
+    直接写 ``wrap_text(...)[:2]`` 会在文案变长时静默丢掉末行：图还是能
+    渲染成功，只是少了半句话，既不会报错也没人能从成品里看出来。实测
+    地图合集 03 页的前两张卡片已经正好占满 2 行，稍微改几个字就会触发。
+    所以截断在这里显式化，放不下就抛错，让文案改动在渲染阶段暴露。
+    """
+    if not isinstance(max_lines, int) or isinstance(max_lines, bool) or max_lines < 1:
+        raise ValueError("max_lines must be greater than zero")
+    lines = wrap_text(text, font, max_w, draw)
+    if len(lines) > max_lines:
+        where = f"{label} " if label else ""
+        raise ValueError(
+            f"{where}文案超出 {max_lines} 行（实际 {len(lines)} 行），"
+            f"请缩短文案或调整字号：{text!r}"
+        )
+    return lines
+
+
 def stack_blocks(
     heights: Iterable[float],
     top: float,

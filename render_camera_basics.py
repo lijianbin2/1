@@ -10,7 +10,7 @@ from xianyu_common import (
     save_png,
     stack_blocks,
     stack_layout,
-    wrap_text,
+    wrap_text_fit,
 )
 
 
@@ -190,8 +190,11 @@ def render_catalog(out: Path) -> None:
         d.rounded_rectangle([x, y, x + cw, y + 7], radius=6, fill=color)
         d.text((x + 16, y + 20), name, fill=DARK, font=get_font(22, True))
         d.text((x + 16, y + 60), rng, fill=color, font=get_font(20, True))
-        for line_no, line in enumerate(wrap_text(desc, get_font(18), cw - 32, d)[:2]):
-            d.text((x + 16, y + 91 + line_no * 22), line, fill=INK, font=get_font(18))
+        body_font = get_font(18)
+        for line_no, line in enumerate(
+            wrap_text_fit(desc, body_font, cw - 32, 2, d, label=f"02 页 {name}")
+        ):
+            d.text((x + 16, y + 91 + line_no * 22), line, fill=INK, font=body_font)
     footer(d, f"{CHAPTER_LABEL} · {LESSON_LABEL}视频")
     save_png(im, out / "02.png")
 
@@ -226,7 +229,9 @@ def render_outcomes(out: Path) -> None:
         x = BORDER + 40 + col * (cw2 + GAP)
         y = grid_y + row * (card_h + GAP)
         # 编号、标题和描述在卡片内垂直居中，卡片被拉高时不会挤在顶部
-        body = "\n".join(wrap_text(desc, get_font(18), cw2 - 36, d)[:2])
+        body = "\n".join(
+            wrap_text_fit(desc, get_font(18), cw2 - 36, 2, d, label=f"03 页 {title}")
+        )
         content_h = 36 + 8 + 8 + 22 * body.count("\n") + 22
         top = y + (card_h - content_h) / 2
         d.rounded_rectangle([x, y, x + cw2, y + card_h], radius=18, fill=PALE, outline=(226, 232, 240), width=1)
@@ -290,8 +295,18 @@ def render_guide(out: Path) -> None:
 
     d.rounded_rectangle([BORDER + 40, warn_y, W - BORDER - 40, warn_y + warn_h], radius=18, fill=(255, 251, 235), outline=(253, 230, 138), width=1)
     d.text((BORDER + 62, warn_y + 18), "提醒", fill=(146, 64, 14), font=get_font(22, True))
-    for i, line in enumerate(wrap_text("本资料为摄影基础知识课程，适合自学与实操练习；请根据自身设备和拍摄需求选择使用。", get_font(18), W - 2 * BORDER - 130, d)[:3]):
-        d.text((BORDER + 62, warn_y + 58 + i * 23), line, fill=(120, 113, 108), font=get_font(18))
+    warn_font = get_font(18)
+    for i, line in enumerate(
+        wrap_text_fit(
+            "本资料为摄影基础知识课程，适合自学与实操练习；请根据自身设备和拍摄需求选择使用。",
+            warn_font,
+            W - 2 * BORDER - 130,
+            3,
+            d,
+            label="04 页提醒",
+        )
+    ):
+        d.text((BORDER + 62, warn_y + 58 + i * 23), line, fill=(120, 113, 108), font=warn_font)
     footer(d, f"相机基础 · {LESSON_LABEL}视频 · 即学即练")
     save_png(im, out / "04.png")
 

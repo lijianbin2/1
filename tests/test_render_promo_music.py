@@ -60,6 +60,43 @@ class PromoMusicTests(unittest.TestCase):
             self.assertIn(name, promo.SHORT_NAMES)
         self.assertEqual(len(promo.SUMMARY_LINE.split("·")), len(promo.CATEGORIES))
 
+    def test_outcomes_layout_keeps_cards_tall_enough_and_above_the_band(self):
+        """03 页卡片不能被压扁，也不能和"适合"横条重叠。
+
+        早先卡片高度写死、横条写死在中下部，两者之间空出约 250px 死区；
+        改用 stack_layout 时曾误取 sizes[1]（横条高度）当卡片高度，卡片被
+        压成 29px 全部叠在一起。这里直接校验几何，渲染前就能发现。
+        """
+        count = 4
+        grid_y, suit_y, card_h = promo.outcomes_layout(count)
+        self.assertGreaterEqual(card_h, promo.OUTCOME_CARD_H)
+        rows = -(-count // 2)
+        grid_bottom = grid_y + rows * card_h + (rows - 1) * promo.OUTCOME_GAP
+        self.assertLess(grid_bottom, suit_y, "卡片区不能压到适合横条")
+        self.assertLess(
+            suit_y + promo.OUTCOME_SUIT_H,
+            promo.FOOTER_TOP,
+            "适合横条不能压到底栏",
+        )
+
+    def test_outcomes_layout_grows_with_card_count(self):
+        """卡片变多时整块往下延伸，横条跟着下移而不是压住卡片。"""
+        previous_bottom = 0
+        for count in (2, 4, 6):
+            grid_y, suit_y, card_h = promo.outcomes_layout(count)
+            rows = -(-count // 2)
+            bottom = grid_y + rows * card_h + (rows - 1) * promo.OUTCOME_GAP
+            with self.subTest(count=count):
+                self.assertGreater(bottom, previous_bottom)
+                self.assertLess(bottom, suit_y)
+            previous_bottom = bottom
+
+    def test_outcomes_layout_rejects_bad_count(self):
+        for bad in (0, -1, True, 1.5, "4"):
+            with self.subTest(count=bad):
+                with self.assertRaises(ValueError):
+                    promo.outcomes_layout(bad)
+
 
 if __name__ == "__main__":
     unittest.main()
