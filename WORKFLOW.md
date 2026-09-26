@@ -88,6 +88,11 @@ render_winrar_unified.py   WinRAR 工具
 cover_v2.py                WorkBuddy 双封面
 ```
 
+新增出图脚本时，把它登记进 `tests/test_entrypoints.py` 的 `CLI_ENTRYPOINTS`，
+并在 `scan_zones.py` 的 `ENTRYPOINTS`（参与扫描）或 `SKIPPED`（写明跳过原因）
+里二选一。漏登记会被测试直接拦下：早先这两份清单纯手写，实测放一个不做产物
+校验、也不参与死区扫描的脚本进根目录，相关测试全部照样通过。
+
 ```powershell
 python render_map_collection.py --root "M:\WebDAV\夸克\软件\项目名" --out "D:\闲鱼\项目名"
 python render_promo_music.py --out "D:\闲鱼\项目名"

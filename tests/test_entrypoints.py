@@ -25,7 +25,58 @@ LIBRARY_MODULES = (
     "xianyu_common",
 )
 
+# 根目录下不是出图入口的模块：文案生成、素材核验、几何工具和扫描器本身。
+# 判定方向是"除了这些，其余根目录模块都必须是入口"——新增出图脚本忘了登记，
+# 就会在这里失败，而不是安静地绕过产物校验和死区扫描。
+TOOLING_MODULES = frozenset(
+    {
+        "legacy_runner",
+        "make_desc",
+        "scan_zones",
+        "verify_source",
+        "xianyu_common",
+    }
+)
+
+
+def _root_entrypoints() -> set[str]:
+    root = Path(__file__).resolve().parent.parent
+    return {
+        path.stem
+        for path in root.glob("*.py")
+        if not path.name.startswith(".")
+    } - TOOLING_MODULES
+
+
 class EntrypointTests(unittest.TestCase):
+    def test_every_root_module_is_a_registered_entrypoint(self):
+        """根目录里每个出图脚本都必须登记在 CLI_ENTRYPOINTS 里。
+
+        这份清单早先是手写的，新增脚本漏登记时没有任何东西会拦：实测放一个
+        什么都不校验的 render_zzz_probe.py 进根目录，产物校验测试和死区扫描
+        测试全绿。少一次 require_valid_pngs、少一轮版式扫描，都是事后才看得出来。
+        """
+        self.assertEqual(_root_entrypoints(), set(CLI_ENTRYPOINTS))
+
+    def test_every_entrypoint_is_covered_by_the_zone_scanner(self):
+        """每个入口都要么参与死区扫描，要么在 SKIPPED 里写明跳过原因。
+
+        两份清单都手写：加了一个新入口却只登记进 CLI_ENTRYPOINTS，它就既不会被
+        扫描，也不会有人注意到它被漏掉了。
+        """
+        from scan_zones import ENTRYPOINTS, SKIPPED
+
+        scanned = {name.removesuffix(".py") for name in ENTRYPOINTS}
+        skipped = {name.removesuffix(".py") for name in SKIPPED}
+        self.assertEqual(
+            scanned | skipped,
+            set(CLI_ENTRYPOINTS),
+            "入口未被死区扫描覆盖，也没有写明跳过原因",
+        )
+        self.assertEqual(
+            scanned & skipped, set(), "同一个入口不能既扫描又跳过"
+        )
+
     def test_importing_entrypoints_has_no_output_side_effect(self):
         with tempfile.TemporaryDirectory() as directory:
             with patch.dict(os.environ, {"XIANYU_LEGACY_OUT": directory}):
