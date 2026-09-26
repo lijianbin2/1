@@ -1,6 +1,6 @@
 from PIL import Image, ImageDraw, ImageFont
 import os
-from xianyu_common import wrap_text_fit
+from xianyu_common import chip_positions, wrap_text_fit
 
 VER = os.environ.get("XIANYU_LEGACY_VERSION", "v7.23").strip()
 VER_PREFIX = (VER + " ") if VER else ""
@@ -30,20 +30,6 @@ def draw_board():
     d = ImageDraw.Draw(im)
     d.rounded_rectangle([BORDER, BORDER, W - BORDER, H - BORDER], radius=32, fill="white")
     return im, d
-
-def wrap_text(text, font, max_w, d):
-    lines = []
-    line = ""
-    for ch in text:
-        t = line + ch
-        if d.textlength(t, font=font) > max_w:
-            lines.append(line)
-            line = ch
-        else:
-            line = t
-    if line:
-        lines.append(line)
-    return lines
 
 def bottom_bar(d, left, right):
     d.rounded_rectangle([BORDER, BAR_TOP, W - BORDER, H - BORDER], radius=22, fill=(30, 41, 59))
@@ -136,13 +122,13 @@ for i, (n, a, b) in enumerate(feats):
     d.text((cx - bw2 // 2, cy + 78), b, fill=GRAY, font=sf)
 d.rounded_rectangle([BORDER + 40, fmt_y, W - BORDER - 40, fmt_y + 110], radius=18, fill=(239, 246, 255))
 d.text((BORDER + 60, fmt_y + 14), "全格式通吃", fill=DARK, font=get_font(22, bold=True))
-sx = BORDER + 60
 ff = get_font(20)
-for s in ["RAR", "ZIP", "7Z", "CAB", "ISO"]:
-    w = d.textlength(s, font=ff) + 28
+for s, sx, w in chip_positions(
+    d, ["RAR", "ZIP", "7Z", "CAB", "ISO"], font=ff,
+    left=BORDER + 60, right=W - BORDER - 60, gap=12, label="01 页格式标签",
+):
     d.rounded_rectangle([sx, fmt_y + 48, sx + w, fmt_y + 82], radius=14, fill="white", outline=BLUE, width=1)
     d.text((sx + 14, fmt_y + 52), s, fill=BLUE, font=ff)
-    sx += w + 12
 d.rounded_rectangle([BORDER + 40, info_y, W - BORDER - 40, info_y + INFO_H], radius=18, fill=(248, 250, 252), outline=(226, 232, 240), width=1)
 cols = [("拍后提供链接", "拍后发夸克链接"), ("即装即用", "双击安装右键即用"), ("小白友好", "下载就会用")]
 for j, (h, s) in enumerate(cols):
@@ -186,13 +172,13 @@ for i, (k, v) in enumerate(cards):
         d.text((x + 16, y + 46 + j * 28), ln, fill=DARK, font=info_font)
 d.rounded_rectangle([BORDER + 40, fmt_y, W - BORDER - 40, fmt_y + 124], radius=18, fill=(239, 246, 255))
 d.text((BORDER + 60, fmt_y + 14), "解压全支持", fill=DARK, font=get_font(22, bold=True))
-sx = BORDER + 60
 ff = get_font(20)
-for s in ["RAR", "ZIP", "7Z", "CAB", "ISO", "TAR", "GZ"]:
-    w = d.textlength(s, font=ff) + 28
+for s, sx, w in chip_positions(
+    d, ["RAR", "ZIP", "7Z", "CAB", "ISO", "TAR", "GZ"], font=ff,
+    left=BORDER + 60, right=W - BORDER - 60, gap=12, label="02 页格式标签",
+):
     d.rounded_rectangle([sx, fmt_y + 50, sx + w, fmt_y + 84], radius=14, fill="white", outline=BLUE, width=1)
     d.text((sx + 14, fmt_y + 54), s, fill=BLUE, font=ff)
-    sx += w + 12
 d.rounded_rectangle([BORDER + 40, step_y, W - BORDER - 40, step_y + BOX_H], radius=18, fill=(248, 250, 252), outline=(226, 232, 240), width=1)
 # 步数从列表长度派生。写死"3步"时增删一条动作，副标题会与下面那句不符，
 # 而图上两行都是正常文字，肉眼看不出数字对不上。
@@ -236,15 +222,12 @@ center_text(d, line_y, "右键菜单集成 选中文件即压即解 办公传文
 d.rounded_rectangle([BORDER + 40, suit_y, W - BORDER - 40, suit_y + SUIT_H], radius=18, fill=(239, 246, 255))
 d.text((BORDER + 60, suit_y + 18), "适合谁", fill=DARK, font=get_font(22, bold=True))
 scs = ["办公白领", "学生党", "装机必备", "常收发压缩包的你"]
-sx = BORDER + 60
 sf = get_font(20)
-for s in scs:
-    w = d.textlength(s, font=sf) + 28
-    if sx + w > W - BORDER - 60:
-        sx = BORDER + 60
+for s, sx, w in chip_positions(
+    d, scs, font=sf, left=BORDER + 60, right=W - BORDER - 60, label="03 页适合谁",
+):
     d.rounded_rectangle([sx, suit_y + 60, sx + w, suit_y + 94], radius=14, fill="white", outline=BLUE, width=1)
     d.text((sx + 14, suit_y + 64), s, fill=BLUE, font=sf)
-    sx += w + 14
 bottom_bar(d, "只发夸克", "虚拟资料 无需物流 即装即用")
 im.save(out / "03.png", "PNG")
 print("03 saved", (out / "03.png").stat().st_size)

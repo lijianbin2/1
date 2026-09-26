@@ -66,6 +66,41 @@ def draw_board(
     return im, draw
 
 
+def chip_positions(
+    draw,
+    labels: Iterable[str],
+    *,
+    font,
+    left: float,
+    right: float,
+    pad: float = 28,
+    gap: float = 14,
+    label: str = "标签行",
+) -> list[tuple[str, float, float]]:
+    """算一行圆角标签的坐标，放不下就抛错。
+
+    早先各处是手写 `sx += w + gap` 一路排下去，越界了也不报错，图照常生成，
+    只是最后一个标签被画到卡片外面。winrar 03 页的换行守卫更糟：溢出时只把
+    `sx` 重置回起点，不改 y，新标签就压在同一个位置，两块圆角框叠在一起。
+    两者都是"渲染成功但成品是错的"，所以这里在坐标阶段就拒绝。
+    """
+    if right <= left:
+        raise ValueError("chip row must have positive width")
+
+    positions: list[tuple[str, float, float]] = []
+    x = left
+    for text in labels:
+        width = draw.textlength(text, font=font) + pad
+        if x + width > right:
+            raise ValueError(
+                f"{label}放不下：{text!r} 需要到 {x + width:.0f}，右边界是 {right:.0f}；"
+                "请减少标签、缩短文案或加大容器"
+            )
+        positions.append((text, x, width))
+        x += width + gap
+    return positions
+
+
 def wrap_text(text: str, font, max_w: float, draw) -> list[str]:
     """按像素宽度逐字换行，空文本返回空列表。"""
     if not text:

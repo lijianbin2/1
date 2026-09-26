@@ -231,7 +231,7 @@ python make_desc.py --out "D:\闲鱼\项目名" --core "项目名称" --count "1
 ## 4. 代码结构
 
 ```text
-xianyu_common.py     版式与校验公共库：字体、画板、文本换行、区块排布、真实文字占位、PNG 校验、控制台 UTF-8
+xianyu_common.py     版式与校验公共库：字体、画板、文本换行、标签行排布、区块排布、真实文字占位、PNG 校验、控制台 UTF-8
 verify_source.py     素材统计与数量声明校验，唯一统计入口
 make_desc.py         正文生成、校验、写入、剪贴板复制（库 + CLI）
 legacy_runner.py     以显式环境变量执行 legacy 脚本，恢复环境并返回其全局命名空间
@@ -250,14 +250,14 @@ requirements.txt     Pillow、numpy
 
 ```text
 test_entrypoints.py            七个入口导入无副作用、legacy 环境变量能恢复、缺图时报错
-test_xianyu_common.py          版式工具、区块不重叠、PNG 校验、真实文字占位、控制台编码、底栏行距测量工具
+test_xianyu_common.py          版式工具、区块不重叠、标签行越界报错、PNG 校验、真实文字占位、控制台编码、底栏行距测量工具
 test_verify_source.py          统计扫描、数量声明违规能被抓到、根下散文件不算一级分类
 test_make_desc.py              正文生成、build_body 组装规则、链接/提取码拦截、剪贴板
 test_render_map_collection.py  地图统计标签来自实测；底栏两行不粘连
 test_render_promo_music.py     分类数据表等于实测 970 首；底栏两行不粘连
 test_render_camera_basics.py   课时/章节等于实测 41/12，源码无手打数量
 test_legacy_constants.py       legacy 数量只在常量处声明，可被环境变量覆盖
-test_legacy_layout.py          legacy 版式回归：底栏行距、提醒框高度、箭头不出框
+test_legacy_layout.py          legacy 版式回归：底栏行距、提醒框高度、codex55/workbuddy 箭头都不出框
 test_layout_zones.py           六个入口每一页都不能有 >170px 死区；扫描器自检 + 跨目录可运行
 ```
 
@@ -421,6 +421,27 @@ winrar 早先两个都叫 `FOOTER`，改一个不动另一个。信息条用 `NO
 
 **修空洞的办法是往卡里补实质内容，然后让 `stack_layout` 居中整块；把卡片拉高
 只会把洞做大。**
+
+### 标签行用 chip_positions，不要手写 `sx += 宽度 + 间距`
+
+各页那排圆角标签（"RAR ZIP 7Z…"、"适合谁"后面的几个）统一走
+`chip_positions()`，它在坐标阶段就算完并校验，放不下直接抛错：
+
+```python
+for text, x, width in chip_positions(
+    d, labels, font=font, left=BORDER + 60, right=W - BORDER - 60, label="03 页适合谁"
+):
+    ...
+```
+
+早先各脚本是手写 `sx += w + 14` 一路排下去，越界不报错，图照常生成，只是最后
+一个标签被画到卡片外面。winrar 03 页的换行守卫更糟：溢出时只把 `sx` 重置回起点、
+**不改 y**，新标签就压在同一个位置，两块圆角框叠在一起。两种都是"渲染成功、
+成品是错的"，肉眼在缩略图上还看不出来。`test_no_renderer_accumulates_chip_x_by_hand`
+扫源码禁掉手写累加，`test_chip_row_rejects_overflow_instead_of_wrapping` 守住报错行为。
+
+改标签文案时如果报"放不下"，正确做法是删一项、缩短文案或加大容器，不是把 `right`
+改大硬塞。
 
 ### 文案不要被静默截断
 

@@ -3,6 +3,7 @@ from pathlib import Path
 
 from xianyu_common import (
     assert_no_overlap,
+    chip_positions,
     draw_board,
     enable_utf8_stdout,
     get_font,
@@ -248,13 +249,13 @@ def render_outcomes(out: Path) -> None:
     suit_top = suit_y + (suit_h - 70) / 2
     d.text((BORDER + 60, suit_top), "适合谁", fill=DARK, font=get_font(22, True))
     scenes = ["摄影新手", "相机入门", "旅行拍摄", "人像与风光"]
-    sx = BORDER + 60
-    for scene in scenes:
-        sf = get_font(19)
-        sw2 = d.textlength(scene, font=sf) + 28
+    sf = get_font(19)
+    for scene, sx, sw2 in chip_positions(
+        d, scenes, font=sf,
+        left=BORDER + 60, right=W - BORDER - 60, label="03 页适合谁",
+    ):
         d.rounded_rectangle([sx, suit_top + 40, sx + sw2, suit_top + 70], radius=15, fill="white", outline=BLUE, width=1)
         d.text((sx + 14, suit_top + 45), scene, fill=BLUE, font=sf)
-        sx += sw2 + 14
     assert_no_overlap(
         [(grid_y, grid_y + grid_h), (suit_y, suit_y + suit_h)],
         "收获",

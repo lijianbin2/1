@@ -1,7 +1,7 @@
 from PIL import Image, ImageDraw, ImageFont
 import os
 import pathlib
-from xianyu_common import assert_text_above, stack_layout, wrap_text_fit
+from xianyu_common import assert_text_above, chip_positions, stack_layout, wrap_text_fit
 
 W=H=1080
 BORDER=38
@@ -32,22 +32,6 @@ def draw_board():
     radius=32
     draw.rounded_rectangle([BORDER, BORDER, W-BORDER, H-BORDER], radius=radius, fill="white")
     return im, draw
-
-def wrap_text(text, font, max_w, draw):
-    # simple wrap
-    chars=[]
-    line=""
-    for ch in text:
-        test=line+ch
-        w=draw.textlength(test, font=font)
-        if w>max_w:
-            chars.append(line)
-            line=ch
-        else:
-            line=test
-    if line:
-        chars.append(line)
-    return chars
 
 out = pathlib.Path(
     os.environ.get(
@@ -326,12 +310,12 @@ st_font=get_font(22, bold=True)
 draw.text((BORDER+60, H-BORDER-86-120), "适合谁", fill=DARK, font=st_font)
 scenes=['职场办公党', '新媒体运营', '知识付费创作者', '想用AI提效的所有人']
 sf=get_font(20)
-sx=BORDER+60
-for s in scenes:
-    w=draw.textlength(s, font=sf)+28
+for s, sx, w in chip_positions(
+    draw, scenes, font=sf,
+    left=BORDER+60, right=W-BORDER-60, label="03 页适合谁",
+):
     draw.rounded_rectangle([sx, H-BORDER-86-82, sx+w, H-BORDER-86-52], radius=14, fill="white", outline=BLUE, width=1)
     draw.text((sx+14, H-BORDER-86-78), s, fill=BLUE, font=sf)
-    sx+=w+14
 
 draw.rounded_rectangle([BORDER, H-BORDER-86, W-BORDER, H-BORDER], radius=22, fill=(30,41,59))
 draw.text((BORDER+40, H-BORDER-68), "只发夸克", fill="white", font=get_font(24, bold=True))

@@ -10,6 +10,7 @@ from xianyu_common import (
     FONT_BOLD,
     assert_no_overlap,
     assert_text_above,
+    chip_positions,
     draw_board,
     enable_utf8_stdout,
     fit_font,
@@ -145,6 +146,68 @@ class XianyuCommonTests(unittest.TestCase):
                 if pattern.search(line):
                     offenders.append(f"{path.name}:{number} {line.strip()}")
         self.assertEqual(offenders, [], "改用 wrap_text_fit 以便超行时报警")
+
+    def test_chip_row_rejects_overflow_instead_of_wrapping(self):
+        """标签行放不下必须报错，不能换行也不能画出框。
+
+        早先 winrar 03 页的换行守卫溢出时只把 x 重置回起点、不改 y，新标签
+        就压在同一个位置上，两块圆角框叠在一起；workbuddy、codex55、相机课
+        那几处连守卫都没有，加一项标签就直接画到卡片外面。两种情况都能
+        "渲染成功"，所以必须在坐标阶段就拒绝。
+        """
+        draw = ImageDraw.Draw(Image.new("RGB", (1080, 1080)))
+        font = get_font(20)
+        with self.assertRaises(ValueError):
+            chip_positions(
+                draw, ["办公白领", "学生党", "装机必备", "常收发压缩包的你",
+                       "再多加一项就放不下了", "再塞一个就一定越界"],
+                font=font, left=98, right=982, label="测试标签",
+            )
+
+    def test_chip_row_advances_left_to_right_without_overlap(self):
+        """正常情况下标签依次右移，互不重叠，且都在右边界内。"""
+        draw = ImageDraw.Draw(Image.new("RGB", (1080, 1080)))
+        font = get_font(20)
+        labels = ["职场办公党", "新媒体运营", "知识付费创作者", "想用AI提效的所有人"]
+        placed = chip_positions(
+            draw, labels, font=font, left=98, right=982, label="03 页适合谁"
+        )
+        self.assertEqual([text for text, _, _ in placed], labels)
+        for (_, x, width), (next_text, next_x, _) in zip(placed, placed[1:]):
+            self.assertGreater(next_x, x, f"{next_text} 没有右移，会和上一个重叠")
+        self.assertLessEqual(placed[-1][1] + placed[-1][2], 982)
+
+    def test_chip_row_rejects_degenerate_bounds(self):
+        draw = ImageDraw.Draw(Image.new("RGB", (1080, 1080)))
+        font = get_font(20)
+        for left, right in ((500, 500), (600, 400)):
+            with self.subTest(left=left, right=right):
+                with self.assertRaises(ValueError):
+                    chip_positions(draw, ["标签"], font=font, left=left, right=right)
+
+    def test_no_renderer_accumulates_chip_x_by_hand(self):
+        """渲染器里不该再出现手写的 `sx += 宽度 + 间距`。
+
+        那种循环越界不报错，图照常出，只是最后一个标签跑到卡片外面。
+        统一走 chip_positions，超界会在渲染阶段抛错。
+        """
+        root = Path(__file__).resolve().parent.parent
+        targets = sorted(
+            [*(root / "legacy").glob("*.py"), *root.glob("*.py")]
+        )
+        pattern = re.compile(r"\bsx\s*\+=\s*\w+\s*\+\s*\d+")
+        offenders = []
+        for path in targets:
+            if path.name == "xianyu_common.py":
+                continue
+            for number, line in enumerate(
+                path.read_text(encoding="utf-8").splitlines(), 1
+            ):
+                if line.lstrip().startswith("#"):
+                    continue
+                if pattern.search(line):
+                    offenders.append(f"{path.name}:{number} {line.strip()}")
+        self.assertEqual(offenders, [], f"改用 chip_positions：{offenders}")
 
     def test_symbols_in_source_exist_in_font(self):
         """源码里的符号必须在 msyh 里有字形，否则图上会出现豆腐块。
