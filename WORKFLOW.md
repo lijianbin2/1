@@ -196,6 +196,7 @@ python make_desc.py --out "D:\闲鱼\项目名" --core "项目名称" --count "1
 | 源素材不存在 | 停止生成，回到 ① |
 | `verify_source.py` 退出码非 0 | 按报告改正文或素材，改完重跑 |
 | 目录名标注与实际不符 | 以实际文件数为准，不虚报 |
+| 核验报 `folder-count-mismatch` 但素材看着完全正常 | 多半是源目录根下有以 `-5张`、`-12首` 命名的**散文件**，旧版扫描会把它当一级分类目录、读出目录名声明。先看报告里的一级分类名里有没有文件名 |
 | 图片缺失、损坏、尺寸错 | 修脚本或重新生成 |
 | 文字重叠或出框 | 按第 5 节重排，重新生成并目视检查 |
 | 死区扫描报 >170px | 往卡里补实质内容，别拉高卡片 |
@@ -232,7 +233,7 @@ requirements.txt     Pillow、numpy
 ```text
 test_entrypoints.py            七个入口导入无副作用、legacy 环境变量能恢复、缺图时报错
 test_xianyu_common.py          版式工具、区块不重叠、PNG 校验、真实文字占位、控制台编码、底栏行距测量工具
-test_verify_source.py          统计扫描、数量声明违规能被抓到
+test_verify_source.py          统计扫描、数量声明违规能被抓到、根下散文件不算一级分类
 test_make_desc.py              正文生成、build_body 组装规则、链接/提取码拦截、剪贴板
 test_render_map_collection.py  地图统计标签来自实测；底栏两行不粘连
 test_render_promo_music.py     分类数据表等于实测 970 首；底栏两行不粘连
@@ -263,6 +264,13 @@ test_layout_zones.py           六个入口每一页都不能有 >170px 死区�
 
 Codex 办公课的源目录当前不在素材盘上，55 这个数字暂时无法复核，用
 `XIANYU_CODEX_LESSONS` 覆盖前请先跑一次 `verify_source.py`。
+
+相机课和 AI 表格课的源目录是**一节一个散 mp4、根本没有分类文件夹**，所以实测
+一级分类为 0。`verify_source.py` 只把真正的子目录算一级分类，根下散文件只计入
+文件总数、体积和扩展名分布。旧版把散文件当成分类，会让每个文件报一行假的
+"一级分类"，文件名里带 `-5张` 这类标注时还会凭空判出一处
+`folder-count-mismatch`，让素材完全正常的目录以退出码 1 卡住发布流程。
+`tests/test_verify_source.py` 里有三条用例守住这个行为。
 
 ### 数量只能派生，不能手打
 

@@ -79,7 +79,15 @@ def scan_source(root: str | Path) -> SourceStats:
         stats.total_bytes += size
         ext = path.suffix.lower() or "<无扩展名>"
         stats.extensions[ext] = stats.extensions.get(ext, 0) + 1
-        top = path.relative_to(root).parts[0]
+        # 只有真正的子目录才算"一级分类"。直接躺在源目录根下的散文件
+        # （课程合集很常见：一个 mp4 一节课，没有分类文件夹）如果也当成
+        # 分类，就会每个文件报一行"一级分类"，而且文件名里带"-5张"这种
+        # 标注会被 _declared_count 读成目录名声明，凭空判出一处不一致，
+        # 让整个核验以退出码 1 失败。这类散文件只计入总数和扩展名分布。
+        parts = path.relative_to(root).parts
+        if len(parts) == 1:
+            continue
+        top = parts[0]
         folder = next((f for f in stats.folders if f.name == top), None)
         if folder is None:
             folder = FolderStat(name=top, files=0, declared=_declared_count(top))

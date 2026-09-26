@@ -77,6 +77,42 @@ class VerifySourceTests(unittest.TestCase):
         with self.assertRaises(NotADirectoryError):
             scan_source(Path("no-such-source-dir"))
 
+    def test_loose_files_at_source_root_are_not_top_level_categories(self):
+        """课程合集常常一个 mp4 一节课、没有分类文件夹。
+
+        这些散文件如果也算"一级分类"，报告里会每个文件多出一行；更要命的是
+        文件名里带"-5首"这种标注时会被 _declared_count 读成目录名声明，凭空
+        判出一处不一致，让核验以退出码 1 失败——而素材其实完全正常。
+        """
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "001、基础入门.mp4").write_bytes(b"0")
+            (root / "002、进阶技巧.mp4").write_bytes(b"0")
+            stats = scan_source(root)
+            self.assertEqual(stats.total_files, 2)
+            self.assertEqual(stats.extensions, {".mp4": 2})
+            self.assertEqual(stats.folders, [])
+            self.assertEqual(stats.declared_mismatches, [])
+
+    def test_loose_file_named_like_a_counted_folder_does_not_fail_verification(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "素材包-5张").write_bytes(b"0")
+            stats = scan_source(root)
+            self.assertEqual(stats.declared_mismatches, [])
+            self.assertNotIn("不一致", format_report(stats))
+
+    def test_root_level_files_still_count_toward_subfolder_totals(self):
+        """散文件不参与分类，但总数和体积必须照算，不能被顺手漏掉。"""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._make_source(root, {"01、汽车-3首": 3})
+            (root / "封面.jpg").write_bytes(b"0" * 2048)
+            stats = scan_source(root)
+            self.assertEqual(stats.total_files, 4)
+            self.assertEqual([f.files for f in stats.folders], [3])
+            self.assertEqual(stats.extensions, {".mp3": 3, ".jpg": 1})
+
     def test_check_claims_catches_every_project_count_unit(self):
         """目录名和正文用同一套单位，漏一个单位就等于少测一种错数。"""
         with tempfile.TemporaryDirectory() as directory:
