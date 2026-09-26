@@ -260,9 +260,11 @@ d.rounded_rectangle([BORDER + 40, wy, W - BORDER - 40, wy + 86], radius=14, fill
 d.text((BORDER + 60, wy + 12), "提醒", fill=(146, 64, 14), font=get_font(22, bold=True))
 for j, ln in enumerate(wrap_text("虚拟资料一经发货不退不换 请确认需要WinRAR再拍", get_font(16), W - 2 * BORDER - 120, d)[:2]):
     d.text((BORDER + 60, wy + 44 + j * 20), ln, fill=(120, 113, 108), font=get_font(16))
-d.rounded_rectangle([BORDER, H - BORDER - 86, W - BORDER, H - BORDER], radius=22, fill=(30, 41, 59))
-d.text((BORDER + 40, H - BORDER - 68), "只发夸克网盘", fill="white", font=get_font(24, bold=True))
-d.text((BORDER + 40, H - BORDER - 38), "不发其他盘 不发实物", fill=(203, 213, 225), font=get_font(18))
+# 底栏两行用 BAR_TOP 相对定位并留足行距。早先按 H-BORDER-68/-38 硬写，
+# 24px 与 18px 两行的真实墨迹只差 3px，几乎连成一片。
+d.rounded_rectangle([BORDER, BAR_TOP, W - BORDER, H - BORDER], radius=22, fill=(30, 41, 59))
+d.text((BORDER + 40, BAR_TOP + 12), "只发夸克网盘", fill="white", font=get_font(24, bold=True))
+d.text((BORDER + 40, BAR_TOP + 48), "不发其他盘 不发实物", fill=(203, 213, 225), font=get_font(18))
 im.save(out / "04.png", "PNG")
 print("04 saved", (out / "04.png").stat().st_size)
 print("done", str(out))

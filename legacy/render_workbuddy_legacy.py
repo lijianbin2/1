@@ -321,9 +321,12 @@ warn_text='虚拟资料一经发货不退不换，请确认是WorkBuddy智能体
 for idx, wl in enumerate(wrap_text(warn_text, wf, W-2*BORDER-120, draw)[:2]):
     draw.text((BORDER+60, warn_y+44+ idx*20), wl, fill=(120,113,108), font=wf)
 
-draw.rounded_rectangle([BORDER, H-BORDER-86, W-BORDER, H-BORDER], radius=22, fill=(30,41,59))
-draw.text((BORDER+40, H-BORDER-68), "只发夸克网盘", fill="white", font=get_font(24, bold=True))
-draw.text((BORDER+40, H-BORDER-38), "不发百度 · 不发实物 · 不包变现", fill=(203,213,225), font=get_font(18))
+# 底栏两行用 BAR_TOP 相对定位并留足行距。早先按 H-BORDER-68/-38 硬写，
+# 24px 与 18px 两行的真实墨迹只差 3px，几乎连成一片。
+BAR_TOP=H-BORDER-86
+draw.rounded_rectangle([BORDER, BAR_TOP, W-BORDER, H-BORDER], radius=22, fill=(30,41,59))
+draw.text((BORDER+40, BAR_TOP+12), "只发夸克网盘", fill="white", font=get_font(24, bold=True))
+draw.text((BORDER+40, BAR_TOP+48), "不发百度 · 不发实物 · 不包变现", fill=(203,213,225), font=get_font(18))
 
 im.save(out/"04.png", "PNG")
 print("04 saved", (out/"04.png").stat().st_size)

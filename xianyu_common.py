@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from typing import Iterable
+from typing import Any, Iterable
 
 from PIL import Image, ImageDraw, ImageFont
 
@@ -199,6 +199,37 @@ def assert_text_above(
     _, bottom = text_extent(draw, text, font, y)
     if bottom > limit:
         raise ValueError(f"{label} 文字底部 {bottom:.0f} 超出可用范围 {limit:.0f}")
+
+
+def fit_font(
+    draw,
+    text: str,
+    max_w: float,
+    size: int,
+    *,
+    bold: bool = False,
+    min_size: int = 14,
+    step: int = 2,
+) -> tuple[Any, float]:
+    """返回能把 ``text`` 塞进 ``max_w`` 的最大字体，放不下就报错。
+
+    手写 "while 太宽就缩小" 容易漏掉下限：缩到最小仍放不下时会静默溢出，
+    文字直接压出卡片。这里缩到 ``min_size`` 仍不满足就直接抛错，让版式
+    问题在渲染时暴露，而不是靠目视发现。
+    """
+    current = size
+    font = get_font(current, bold)
+    width = draw.textlength(text, font=font)
+    while width > max_w and current > min_size:
+        current -= step
+        font = get_font(current, bold)
+        width = draw.textlength(text, font=font)
+    if width > max_w:
+        raise ValueError(
+            f"文字放不下：{text!r} 在 {min_size}px 下仍需 {width:.0f}px，"
+            f"可用宽度只有 {max_w:.0f}px"
+        )
+    return font, width
 
 
 def save_png(im, path: str | Path):

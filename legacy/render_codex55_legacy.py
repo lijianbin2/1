@@ -2,6 +2,8 @@ from PIL import Image, ImageDraw, ImageFont
 import os
 import pathlib
 
+from xianyu_common import stack_layout
+
 W=H=1080
 BORDER=38
 BLUE=(47,93,255)
@@ -290,9 +292,23 @@ steps=[
     ("3","即学即用","55个实战视频，按顺序学习即可复刻"),
     ("4","售后说明","虚拟资料不包变现承诺，按需拍"),
 ]
-yy=BORDER+120
+# 这一页原先是手写坐标，副标题、提醒框和卡片互相压字。改成用公共库的
+# stack_layout 自适应排布：顶部从副标题墨迹下方起，底部停在底栏上方，
+# 剩余空间均分到间距，内容增减不用再调坐标。
+STEP_H=110
+STEP_GAP=20
+WARN_H=86
+BAR_TOP=H-BORDER-86
+tops, _ = stack_layout(
+    [STEP_H]*len(steps) + [WARN_H],
+    BORDER+28+56+30+20,
+    BAR_TOP-30,
+    min_gap=STEP_GAP,
+    max_gap=36,
+)
+yy=tops[0]
 for num, ttitle, tdesc in steps:
-    draw.rounded_rectangle([BORDER+40, yy, W-BORDER-40, yy+110], radius=18, fill=(248,250,252), outline=(226,232,240), width=1)
+    draw.rounded_rectangle([BORDER+40, yy, W-BORDER-40, yy+STEP_H], radius=18, fill=(248,250,252), outline=(226,232,240), width=1)
     # left num
     draw.ellipse([BORDER+60, yy+32, BORDER+60+48, yy+32+48], fill=BLUE)
     nf=get_font(28, bold=True)
@@ -300,23 +316,23 @@ for num, ttitle, tdesc in steps:
     draw.text((BORDER+60+24-tw//2, yy+38), num, fill="white", font=nf)
     draw.text((BORDER+130, yy+22), ttitle, fill=DARK, font=get_font(26, bold=True))
     draw.text((BORDER+130, yy+58), tdesc, fill=GRAY, font=get_font(22))
-    # arrow
+    # 箭头放在卡片右缘内侧，早先画在 W-BORDER-60 会溢出到卡片外面
     if num!="4":
-        draw.text((W-BORDER-60, yy+40), "→", fill=(226,232,240), font=get_font(28))
-    yy+=130
+        draw.text((W-BORDER-92, yy+40), "→", fill=(226,232,240), font=get_font(28))
+    yy+=STEP_H+STEP_GAP
 
 # warning box
-warn_y=yy+10
-draw.rounded_rectangle([BORDER+40, warn_y, W-BORDER-40, warn_y+70], radius=14, fill=(255,251,235), outline=(253,230,138), width=1)
-draw.text((BORDER+60, warn_y+16), "提醒", fill=(146,64,14), font=get_font(22, bold=True))
+warn_y=tops[-1]
+draw.rounded_rectangle([BORDER+40, warn_y, W-BORDER-40, warn_y+WARN_H], radius=14, fill=(255,251,235), outline=(253,230,138), width=1)
+draw.text((BORDER+60, warn_y+12), "提醒", fill=(146,64,14), font=get_font(22, bold=True))
 wf=get_font(16)
 warn_text="虚拟资料一经发货不退不换，请确认是 Codex 职场办公需要再拍"
 for idx, wl in enumerate(wrap_text(warn_text, wf, W-2*BORDER-120, draw)[:2]):
-    draw.text((BORDER+60, warn_y+38+ idx*18), wl, fill=(120,113,108), font=wf)
+    draw.text((BORDER+60, warn_y+44+ idx*20), wl, fill=(120,113,108), font=wf)
 
-draw.rounded_rectangle([BORDER, H-BORDER-86, W-BORDER, H-BORDER], radius=22, fill=(30,41,59))
-draw.text((BORDER+40, H-BORDER-68), "只发夸克网盘", fill="white", font=get_font(24, bold=True))
-draw.text((BORDER+40, H-BORDER-38), "不发百度 · 不发实物 · 不包变现", fill=(203,213,225), font=get_font(18))
+draw.rounded_rectangle([BORDER, BAR_TOP, W-BORDER, H-BORDER], radius=22, fill=(30,41,59))
+draw.text((BORDER+40, BAR_TOP+12), "只发夸克网盘", fill="white", font=get_font(24, bold=True))
+draw.text((BORDER+40, BAR_TOP+48), "不发百度 · 不发实物 · 不包变现", fill=(203,213,225), font=get_font(18))
 
 im.save(out/"04.png", "PNG")
 print("04 saved", (out/"04.png").stat().st_size)

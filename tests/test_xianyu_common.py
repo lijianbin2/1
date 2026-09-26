@@ -10,6 +10,7 @@ from xianyu_common import (
     assert_text_above,
     draw_board,
     enable_utf8_stdout,
+    fit_font,
     require_valid_pngs,
     stack_blocks,
     stack_layout,
@@ -166,3 +167,31 @@ class XianyuCommonTests(unittest.TestCase):
         with self.assertRaises(ValueError) as caught:
             assert_text_above(draw, "超精细地理素材合集", font, 214, 250, "封面副标题")
         self.assertIn("封面副标题", str(caught.exception))
+
+    def test_fit_font_keeps_size_when_text_already_fits(self):
+        """本来就放得下就不该缩字号。"""
+        im = Image.new("RGB", (600, 400), "white")
+        draw = ImageDraw.Draw(im)
+        font, width = fit_font(draw, "Skill知识库自动化", 262, 30, bold=True)
+        self.assertEqual(font.size, 30)
+        self.assertLessEqual(width, 262)
+
+    def test_fit_font_shrinks_only_as_needed(self):
+        """放不下时缩到刚好放下，不该无脑缩到最小。"""
+        im = Image.new("RGB", (600, 400), "white")
+        draw = ImageDraw.Draw(im)
+        font, width = fit_font(draw, "Skill知识库自动化", 170, 30, bold=True, min_size=16)
+        self.assertLess(font.size, 30)
+        self.assertLessEqual(width, 170)
+
+    def test_fit_font_raises_instead_of_overflowing(self):
+        """缩到下限仍放不下必须报错，不能静默把字压出卡片。
+
+        这正是 cover_v2_legacy 里那个 while 的成因：break 写在循环体里，
+        只试一次 20px 就退出，剩下放不下的部分直接溢出卡片右缘。
+        """
+        im = Image.new("RGB", (600, 400), "white")
+        draw = ImageDraw.Draw(im)
+        with self.assertRaises(ValueError) as caught:
+            fit_font(draw, "这是一段无论如何都放不下的超长文字", 40, 30, min_size=16)
+        self.assertIn("放不下", str(caught.exception))

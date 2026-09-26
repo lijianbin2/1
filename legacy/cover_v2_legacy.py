@@ -2,6 +2,8 @@ from PIL import Image, ImageDraw, ImageFont
 import os
 import pathlib
 
+from xianyu_common import fit_font
+
 W=H=1080
 BLUE=(37,80,255); DEEP=(18,32,120); DARK=(24,32,54); GRAY=(95,110,135); WHITE=(255,255,255)
 
@@ -67,15 +69,12 @@ def make(style, path):
         d.rounded_rectangle([x,y0,x+cw,y0+230],radius=22,fill=fill,outline=(37,80,255) if style=="A" else (205,218,250),width=3)
         nf=get_font(30,True); nw=d.textlength(n,font=nf)
         d.text((x+(cw-nw)//2,y0+22),n,fill=BLUE,font=nf)
-        af=get_font(30,True); aw=d.textlength(a,font=af)
-        # shrink if overflow
-        fsz=30
-        while aw>cw-24 and fsz>20:
-            fsz-=2; af=get_font(fsz,True); aw=d.textlength(a,font=af)
+        # 副标题和说明都用 fit_font：缩到下限仍放不下就直接报错。
+        # 早先这里是手写 while，且 b 那段的 break 写在循环体里，
+        # 只试一次 20px 就退出，放不下会静默溢出卡片。
+        af,aw=fit_font(d,a,cw-24,30,bold=True,min_size=20)
         d.text((x+(cw-aw)//2,y0+66),a,fill=DARK,font=af)
-        bs=get_font(22); bw2=d.textlength(b,font=bs)
-        while bw2>cw-24:
-            bs=get_font(20); bw2=d.textlength(b,font=bs); break
+        bs,bw2=fit_font(d,b,cw-24,22,min_size=16)
         d.text((x+(cw-bw2)//2,y0+120),b,fill=GRAY,font=bs)
         d.rounded_rectangle([x+24,y0+164,x+cw-24,y0+200],radius=18,fill=BLUE)
         mf=get_font(20,True); mt="一看就会" if i==0 else ("即学即用" if i==1 else "覆盖办公")

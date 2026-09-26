@@ -1,5 +1,6 @@
 import importlib
 import os
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -70,3 +71,18 @@ class EntrypointTests(unittest.TestCase):
             with self.subTest(name=name):
                 source = Path(importlib.import_module(name).__file__).read_text(encoding="utf-8")
                 self.assertIn("require_valid_pngs", source)
+
+    def test_legacy_can_import_common_from_any_working_directory(self):
+        """legacy 脚本会从项目根导入 xianyu_common，不能依赖调用方的 cwd。"""
+        project_root = Path(__file__).resolve().parent.parent
+        with tempfile.TemporaryDirectory() as directory:
+            out = Path(directory) / "out"
+            with patch.dict(os.environ, {"XIANYU_LEGACY_OUT": str(out)}):
+                cwd = os.getcwd()
+                try:
+                    os.chdir(directory)
+                    run_legacy("render_codex55_legacy.py", out)
+                finally:
+                    os.chdir(cwd)
+            self.assertTrue((out / "01.png").is_file())
+            self.assertIn(str(project_root), sys.path)

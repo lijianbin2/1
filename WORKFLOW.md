@@ -163,6 +163,19 @@ problems = validate_png_files(r"D:\闲鱼\项目名", size=(1080, 1080))
 并把字压到下一个图框上。改版式时用 `text_extent()` 量真实范围，或直接
 `assert_text_above()` 让越界在渲染时抛错。
 
+文字宽度同理，不要自己手写"while 太宽就缩小"的循环：漏掉下限时会静默
+溢出卡片，而溢出在渲染时看不出、在买家手里才暴露。统一用 `fit_font()`，
+它缩到 `min_size` 仍放不下就直接抛 `ValueError`：
+
+```python
+from xianyu_common import fit_font
+
+font, width = fit_font(draw, subtitle, card_w - 24, 30, bold=True, min_size=20)
+```
+
+多行区块用 `stack_layout()` 分配位置，不要手写 `yy = BORDER + 120` 这类
+固定起点：上游标题或卡片一变高度，下游就会压字。
+
 除程序校验外，**每张图都要目视看过**：文字不出框、不重叠、不被裁切，
 预览图不拉伸变形。
 
@@ -336,6 +349,7 @@ test_render_map_collection.py  地图统计标签来自实测
 test_render_promo_music.py     分类数据表等于实测 970 首
 test_render_camera_basics.py   课时/章节等于实测 41/12，源码无手打数量
 test_legacy_constants.py       legacy 数量只在常量处声明，可被环境变量覆盖
+test_legacy_layout.py          legacy 版式回归：底栏行距、提醒框高度、箭头不出框
 ```
 
 渲染类测试会真的往临时目录出图，字体缺失会直接失败，这是有意的。
