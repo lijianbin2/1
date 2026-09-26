@@ -120,6 +120,26 @@ $env:XIANYU_WINRAR_MB          = "4.1"
 `tests/test_legacy_constants.py` 会扫描源码，发现常量和数据表之外的手打数量就让
 测试失败；前两个还把实测值钉死，数据表过期会立刻红。
 
+**同一个数量在图上出现几次，就得有几次派生。** 历史踩过的坑：徽章已经走
+`LESSONS` 了，课程目录末行还写着 `"29-37"`、正文还写着"37个实战视频"、副标题
+还写着"6步"。改一次课时数，四处数字会互相打架，而买家一眼就能看出目录止于
+第 37 课、商品却卖 55 课。
+
+所以这三种写法都必须派生，不能抄字面量：
+
+```python
+# 课程目录末个模块：结束课时跟 LESSONS 走
+('模块6 办公实战', f'29-{LESSONS}', [...], (225, 29, 72)),
+# 正文说明：数量跟 LESSONS 走
+("3", "即学即用", f"{LESSONS}个实战视频，按顺序学习即可复刻"),
+# 副标题步数：跟列表长度走（要把 points 定义挪到副标题之前）
+draw.text((BORDER + 40, BORDER + 28 + 56), f'从入门到实战，{len(points)}步...', ...)
+```
+
+`test_legacy_constants.py` 里的 `test_codex_module_ranges_chain_to_lesson_count`
+会解析模块区间，断言它们从第 1 课首尾相接排到 `LESSONS`；区间断档或止于旧数字
+都会失败。`test_step_counts_are_derived_from_lists` 拦截手打的"N步"。
+
 ### 版式怎么调
 
 纵向区块用 `xianyu_common` 里的版式工具，不要写死坐标：

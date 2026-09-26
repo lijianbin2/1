@@ -70,9 +70,8 @@ def scan_source(root: str | Path) -> SourceStats:
         size = path.stat().st_size
         stats.total_files += 1
         stats.total_bytes += size
-        stats.extensions[path.suffix.lower() or "<无扩展名>"] = (
-            stats.extensions.get(path.suffix.lower() or "<无扩展名>", 0) + 1
-        )
+        ext = path.suffix.lower() or "<无扩展名>"
+        stats.extensions[ext] = stats.extensions.get(ext, 0) + 1
         top = path.relative_to(root).parts[0]
         folder = next((f for f in stats.folders if f.name == top), None)
         if folder is None:
@@ -87,8 +86,7 @@ def scan_source(root: str | Path) -> SourceStats:
 def _size_tolerance(displayed: str, unit: str) -> float:
     """允许文案体积存在末位四舍五入误差。"""
     actual_unit = _SIZE_UNITS[unit.upper()]
-    last = displayed.rsplit(".", 1)[-1]
-    digits = len(last) if "." in displayed else 0
+    digits = len(displayed.rsplit(".", 1)[1]) if "." in displayed else 0
     step = 0.5 * 10 ** (-digits) * actual_unit
     return max(step, actual_unit * 0.005)
 
