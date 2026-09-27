@@ -13,6 +13,7 @@ from __future__ import annotations
 import subprocess
 import sys
 import tempfile
+import importlib
 from pathlib import Path
 from typing import Any
 
@@ -34,6 +35,7 @@ ABOVE_FOOTER = 20
 ENTRYPOINTS = (
     "render_camera_basics.py",
     "render_codex55.py",
+    "render_jianying_templates.py",
     "render_map_collection.py",
     "render_promo_music.py",
     "render_winrar_unified.py",
@@ -45,6 +47,26 @@ SKIPPED = {
     "cover_v2.py": "整幅渐变全出血封面，没有白卡也没有底栏，"
     "逐行问有没有墨必然每行都有，扫描恒为 0px，属于空跑。",
 }
+
+# legacy 三个入口的几何常量在 legacy 脚本的全局命名空间里，
+# 只能从 run_legacy 的返回值取，不在下面的库模块里。
+LEGACY_OF = {
+    "render_codex55.py": "render_codex55_legacy.py",
+    "render_winrar_unified.py": "render_winrar_unified_legacy.py",
+    "render_workbuddy.py": "render_workbuddy_legacy.py",
+}
+
+
+def geometry_module(entry: str) -> Any:
+    """返回库渲染器模块，几何常量直接读它的全局变量。
+
+    提到模块级是为了让 tests/test_layout_zones.py 能直接断言"每个登记进
+    ENTRYPOINTS 的入口都取得到几何"：早先这张表写在 main() 里，只把新入口
+    加进 ENTRYPOINTS 忘了加进字典，扫描器要白渲染前面几个入口才抛 KeyError。
+    """
+    if entry in LEGACY_OF:
+        raise ValueError(f"{entry} 是 legacy 入口，几何来自 run_legacy 的返回值")
+    return importlib.import_module(Path(entry).stem)
 
 
 def geometry(source: Any) -> tuple[int, int, int, int]:
@@ -127,33 +149,12 @@ def scan_page(page: Path, geo: tuple[int, int, int, int]) -> list[str]:
 def main() -> int:
     enable_utf8_stdout()
     import legacy_runner
-    import render_camera_basics as camera
-    import render_codex55 as codex55
-    import render_map_collection as maps
-    import render_promo_music as promo
-    import render_winrar_unified as winrar
-    import render_workbuddy as workbuddy
-
-    # legacy 三个入口的几何常量在 legacy 脚本里，只能从 run_legacy 的返回值取
-    legacy_of = {
-        "render_codex55.py": "render_codex55_legacy.py",
-        "render_winrar_unified.py": "render_winrar_unified_legacy.py",
-        "render_workbuddy.py": "render_workbuddy_legacy.py",
-    }
-    modules = {
-        "render_camera_basics.py": camera,
-        "render_codex55.py": codex55,
-        "render_map_collection.py": maps,
-        "render_promo_music.py": promo,
-        "render_winrar_unified.py": winrar,
-        "render_workbuddy.py": workbuddy,
-    }
 
     def render(entry: str, out: Path) -> Any:
         """渲染一个入口，返回它的几何来源（模块或 legacy 命名空间）。"""
         out.mkdir(parents=True, exist_ok=True)
-        if entry in legacy_of:
-            return legacy_runner.run_legacy(legacy_of[entry], out)
+        if entry in LEGACY_OF:
+            return legacy_runner.run_legacy(LEGACY_OF[entry], out)
         # 库渲染器走 CLI 入口，和用户实际发布的路径保持一致
         # 脚本路径必须绝对：用相对文件名时从项目根以外运行会直接报
         # "can't open file ... exit status 2"，扫描器就成了只能在特定目录下
@@ -163,7 +164,7 @@ def main() -> int:
             check=True,
             capture_output=True,
         )
-        return modules[entry]
+        return geometry_module(entry)
 
     problems: list[str] = []
     with tempfile.TemporaryDirectory() as root:

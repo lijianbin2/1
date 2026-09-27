@@ -18,10 +18,49 @@ import numpy as np
 from PIL import Image
 
 from legacy_runner import run_legacy
-from scan_zones import ABOVE_FOOTER, geometry, ink_bands, scan_page
+from scan_zones import (
+    ABOVE_FOOTER,
+    ENTRYPOINTS,
+    LEGACY_OF,
+    ROOT,
+    geometry,
+    geometry_module,
+    ink_bands,
+    scan_page,
+)
 
 
 class LayoutZoneTests(unittest.TestCase):
+    def test_every_scanned_entrypoint_has_geometry_available(self):
+        """登记进 ENTRYPOINTS 的入口必须能从模块或 legacy 命名空间取到几何。
+
+        ``scan_zones.main`` 里那张模块表早先是手写的：只把新入口加进
+        ENTRYPOINTS 而忘了登记模块，扫描器要跑到那个入口才抛 ``KeyError``，
+        前面的入口全白渲染一遍。实跑一遍要三十多秒，这个错误会一直留到
+        发布前才暴露。表提到模块级后按名字 import，漏项在这里就红。
+        """
+        for name in ENTRYPOINTS:
+            with self.subTest(entry=name):
+                if name in LEGACY_OF:
+                    # legacy 入口的几何在脚本全局命名空间里，main 通过
+                    # run_legacy 拿，这里只确认它登记了对应的 legacy 脚本。
+                    self.assertTrue(
+                        (ROOT / "legacy" / LEGACY_OF[name]).is_file(),
+                        f"{name} 登记的 legacy 脚本不存在：{LEGACY_OF[name]}",
+                    )
+                    continue
+                # 漏登记或脚本名拼错都会在这里失败，而不是渲染到一半才炸
+                self.assertEqual(
+                    len(geometry(geometry_module(name))), 4, f"{name} 取不到几何常量"
+                )
+
+    def test_geometry_module_rejects_legacy_entries(self):
+        """legacy 入口的几何不在模块里，误当库模块用要明确报错。"""
+        for name in LEGACY_OF:
+            with self.subTest(entry=name):
+                with self.assertRaises(ValueError):
+                    geometry_module(name)
+
     def _scan(self, out: Path, label: str, geo: tuple[int, int, int, int]) -> list[str]:
         problems: list[str] = []
         for page in sorted(out.glob("*.png")):
@@ -31,7 +70,7 @@ class LayoutZoneTests(unittest.TestCase):
     def test_scanner_runs_from_any_directory_with_readable_chinese(self):
         """从任意目录运行，且中文提示不能变成乱码。
 
-        两件事合成一次子进程：``scan_zones.py`` 要渲染六个入口，
+        两件事合成一次子进程：``scan_zones.py`` 要渲染七个入口，
         每跑一次二十多秒，拆成两个用例会把这个测试文件拖慢一倍。
 
         早先渲染子进程用的是相对文件名 ``render_camera_basics.py``，

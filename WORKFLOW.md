@@ -92,6 +92,7 @@ python verify_source.py --root "M:\WebDAV\夸克\软件\项目名" --copy "D:\�
 ```text
 render_map_collection.py   地图素材（自动读取源目录统计文件数和体积）
 render_promo_music.py      宣传片背景音乐
+render_jianying_templates.py 剪映企业宣传片模板（分类数量按文件名关键词实测派生）
 render_camera_basics.py    相机基础课程
 render_codex55.py          Codex 办公课程
 render_workbuddy.py        WorkBuddy 智能体课程
@@ -107,6 +108,7 @@ cover_v2.py                WorkBuddy 双封面
 ```powershell
 python render_map_collection.py --root "M:\WebDAV\夸克\软件\项目名" --out "D:\闲鱼\项目名"
 python render_promo_music.py --out "D:\闲鱼\项目名"
+python render_jianying_templates.py --root "M:\WebDAV\夸克\软件\项目名" --out "D:\闲鱼\项目名"
 python render_camera_basics.py --out "D:\闲鱼\项目名"
 python render_winrar_unified.py --version "v7.23" --out "D:\闲鱼\项目名"
 ```
@@ -124,7 +126,7 @@ python scan_zones.py
 ```
 
 连续空白超过 170px 是要修的死区。**这一步不要跳过**：空洞不会让程序报错，
-只让图看起来没排完。当前六个入口最差的一页是 163px（`codex55/01` 与
+只让图看起来没排完。当前七个入口最差的一页是 163px（`codex55/01` 与
 `workbuddy/01`），都在阈值内。
 
 图上数量怎么来、版式怎么调，见第 5 节。
@@ -266,10 +268,11 @@ test_verify_source.py          统计扫描、数量声明违规能被抓到、�
 test_make_desc.py              正文生成、build_body 组装规则、链接/提取码拦截、剪贴板
 test_render_map_collection.py  地图统计标签来自实测；底栏两行不粘连；04 页提示框由步数推导，放不下报错
 test_render_promo_music.py     分类数据表等于实测 970 首；底栏两行不粘连
+test_render_jianying_templates.py  七个分类数量等于实测 8/6/5/5/7/3/7，合计 41 无遗漏；四页网格由条目数推导，放不下报错
 test_render_camera_basics.py   课时/章节等于实测 41/12，源码无手打数量
 test_legacy_constants.py       legacy 数量只在常量处声明，可被环境变量覆盖
 test_legacy_layout.py          legacy 版式回归：底栏行距、提醒框高度、codex55/workbuddy 箭头都不出框
-test_layout_zones.py           六个入口每一页都不能有 >170px 死区；扫描器自检 + 跨目录可运行
+test_layout_zones.py           七个入口每一页都不能有 >170px 死区；扫描器自检 + 跨目录可运行
 ```
 
 渲染类测试会真的往临时目录出图，字体缺失会直接失败，这是有意的。
@@ -287,6 +290,7 @@ test_layout_zones.py           六个入口每一页都不能有 >170px 死区�
 | --- | --- | --- |
 | 高清一亿像素地图矢量图 | 468 个文件 / 7.24GB | 自动读取，无需改代码 |
 | 宣传片背景音乐合集 | 970 首，7 类 37/67/69/88/111/111/487 | `render_promo_music.py` `CATEGORIES` |
+| 剪映企业宣传片模板 | 41 个 zip，3.74GB，7 类 8/6/5/5/7/3/7 | `render_jianying_templates.py` `CATEGORY_RULES` |
 | 相机基础入门课 | 41 个视频，12 个章节 | `render_camera_basics.py` `LESSONS` / `CHAPTERS` |
 | WorkBuddy 智能体实战 | 37 个视频 | `legacy/render_workbuddy_legacy.py` `LESSONS` |
 | WinRAR 单文件安装包 | 4,102,490 字节 ≈ 4.1MB | `legacy/render_winrar_unified_legacy.py` `PACKAGE_MB` |
@@ -313,6 +317,8 @@ Codex 办公课的源目录当前不在素材盘上，55 这个数字暂时无�
 - 实测：`render_map_collection.py` 调 `scan_source()` 扫源目录。
 - 数据表：`render_promo_music.py` 的 `CATEGORIES`，总数由它求和。
 - 常量：`render_camera_basics.py` 的 `LESSONS` / `CHAPTERS`。
+- 关键词实测：`render_jianying_templates.py` 的 `CATEGORY_RULES`，扫源目录时
+  按文件名归类，数量由 `category_table()` 统计，不手打。
 
 `legacy/` 下的四个脚本同样遵守：数量集中在 `LESSONS` / `MODULES` /
 `PACKAGE_MB`，并且能用环境变量覆盖，换课不用改代码：
@@ -326,6 +332,23 @@ $env:XIANYU_WINRAR_MB          = "4.1"
 `test_render_promo_music.py`、`test_render_camera_basics.py`、
 `test_legacy_constants.py` 会扫描源码，发现常量和数据表之外的手打数量就让测试
 失败；前两个还把实测值钉死，数据表过期会立刻红。
+
+**关键词规则是有序的，调换顺序等于改分类。** 剪映模板的源目录是一堆散 zip，
+分类完全靠文件名里的主题词，命中即归类不再往下看。同一个文件名经常同时命中
+两组词，此时归到先命中的那一组：
+
+```text
+"13-70秒红底金边企业励志文化"  含"励志"+"文化"  → 表彰励志年会（励志在前）
+"25-企业活动宣传高级卡点视频"  含"高级"+"卡点"  → 卡点快闪电商（卡点在前）
+"29-46秒高级感企业文化介绍"    含"高级"+"文化"  → 企业文化介绍（文化在前）
+"41-15秒竖屏动画黑黄促销电商"  含"促销"+"电商"  → 卡点快闪电商（同组内）
+```
+
+`test_classify_matches_the_real_source_directory` 会实跑源目录把 8/6/5/5/7/3/7
+七个数字钉死，`test_every_source_file_lands_in_exactly_one_category` 断言合计
+等于实测文件数。所以调换规则顺序、往里加词，都会立刻因为数字对不上而变红，
+不会悄悄出一份分类错了的图。`categorize()` 认不出关键词时直接抛错并带上文件名，
+不允许静默丢文件。
 
 **同一个数量在图上出现几次，就得有几次派生。** 历史踩过的坑：徽章已经走
 `LESSONS` 了，课程目录末行还写着 `"29-37"`、正文还写着"37个实战视频"、副标题
@@ -406,7 +429,7 @@ winrar 早先两个都叫 `FOOTER`，改一个不动另一个。信息条用 `NO
 `cover_v2.py` 会被显式跳过并在输出里说明原因：它是整幅渐变的全出血封面，没有
 白卡也没有底栏，逐行问"有没有墨"必然每行都有，扫描恒为 0px，属于空跑。
 
-这条规则已经固化进 `tests/test_layout_zones.py`，六个入口的每一页都会被扫。
+这条规则已经固化进 `tests/test_layout_zones.py`，七个入口的每一页都会被扫。
 三处细节别绕过：
 
 - **几何常量从渲染器读，不在扫描侧抄一份。** 扫描区域用 `scan_zones.geometry()`
