@@ -13,6 +13,7 @@ CLI_ENTRYPOINTS = (
     "cover_v2",
     "render_camera_basics",
     "render_codex55",
+    "render_jianying_templates",
     "render_map_collection",
     "render_promo_music",
     "render_winrar_unified",
