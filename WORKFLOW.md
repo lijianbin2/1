@@ -608,5 +608,17 @@ rg -n "提取码[:：]\s*[0-9a-zA-Z]{4}" --glob "*.py" --glob "!tests/**" --glob
 ```powershell
 git add <本次修改的源码和测试> WORKFLOW.md requirements.txt
 git commit -m "refactor: audit project and rewrite workflow"
-git push origin xianyu
+git push newrepo xianyu:main
 ```
+
+**推的是 `newrepo`，不是 `origin`。** 这个仓库配了两个远端：
+
+```text
+newrepo   https://github.com/lijianbin2/xianyu-tuwen-fabu.git   正式仓库，推这里
+origin    https://github.com/lijianbin2/1.git                   另一个远端，别推
+```
+
+早先文档里写的是 `git push origin xianyu`，照着做会把成果推进 `1.git`，
+而 `xianyu-tuwen-fabu` 上的 `main` 一直停在旧提交。改用 `newrepo` 后，
+`main` 与 `xianyu` 保持同一位置（快进推送，`main` 原本是 `xianyu` 的祖先，
+不存在只在一侧有的提交）。提交前用 `git remote -v` 确认远端名字。
