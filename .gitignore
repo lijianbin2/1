@@ -7,3 +7,4 @@ __pycache__/
 .playwright-mcp/
 *.log
 outputs/
+quark-links.txt

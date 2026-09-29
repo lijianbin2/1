@@ -18,15 +18,19 @@ CLI_ENTRYPOINTS = (
     "render_promo_music",
     "render_winrar_unified",
     "render_workbuddy",
+    "render_workbuddy_office",
 )
 
 LIBRARY_MODULES = (
     "make_desc",
     "verify_source",
     "xianyu_common",
+    "ydisk_delivery",
+    "ydisk_publish",
 )
 
-# 根目录下不是出图入口的模块：文案生成、素材核验、几何工具和扫描器本身。
+# 根目录下不是出图入口的模块：文案生成、素材核验、几何工具、扫描器和
+# ydisk 自动发货脚本本身。
 # 判定方向是"除了这些，其余根目录模块都必须是入口"——新增出图脚本忘了登记，
 # 就会在这里失败，而不是安静地绕过产物校验和死区扫描。
 TOOLING_MODULES = frozenset(
@@ -36,6 +40,8 @@ TOOLING_MODULES = frozenset(
         "scan_zones",
         "verify_source",
         "xianyu_common",
+        "ydisk_delivery",
+        "ydisk_publish",
     }
 )
 

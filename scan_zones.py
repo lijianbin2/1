@@ -40,6 +40,7 @@ ENTRYPOINTS = (
     "render_promo_music.py",
     "render_winrar_unified.py",
     "render_workbuddy.py",
+    "render_workbuddy_office.py",
 )
 
 # 明确说明为什么不扫，比悄悄漏掉强。
@@ -54,6 +55,7 @@ LEGACY_OF = {
     "render_codex55.py": "render_codex55_legacy.py",
     "render_winrar_unified.py": "render_winrar_unified_legacy.py",
     "render_workbuddy.py": "render_workbuddy_legacy.py",
+    "render_workbuddy_office.py": "render_workbuddy_office_legacy.py",
 }
 
 
