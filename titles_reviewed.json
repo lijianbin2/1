@@ -1,0 +1,409 @@
+{
+  "_comment": "教程目录 28 个资源的审核后标题。core+count 经 make_desc.build_title 拼成 'core count 只发夸克'，整串必须 <=30 字。目录名仅作对照，不要直接拿去当标题。",
+  "_marker": "只发夸克",
+  "_max_title_len": 30,
+  "items": [
+    {
+      "dir": "【课程】AI视频制作全攻略 （豆包+即梦+剪映）从入门到精通实战课程 mp4 [8.7GB]",
+      "core": "AI视频制作全攻略（豆包+即梦+剪映）",
+      "count": "79集",
+      "online_item_id": "1086433493202",
+      "measured": {
+        "files": 80,
+        "videos": 79,
+        "subdirs": 1,
+        "size": "8.72 GB"
+      },
+      "dir_len": 46,
+      "issue": "超限16字、含mp4格式与[8.7GB]体积后缀"
+    },
+    {
+      "dir": "15天进阶CAD高手（126节课程）",
+      "core": "CAD进阶高手课程，从入门到精通",
+      "count": "126节",
+      "online_item_id": "1073283257411",
+      "measured": {
+        "files": 126,
+        "videos": 126,
+        "subdirs": 1,
+        "size": "4.53 GB"
+      },
+      "dir_len": 18,
+      "issue": "126节实测为真；15天属效果承诺"
+    },
+    {
+      "dir": "2026AI短剧漫剧学习营：即梦Seedance2.0+九宫格分镜，150+行业宣传片案例全掌握",
+      "core": "AI短剧漫剧学习营，即梦与九宫格分镜",
+      "count": "414节",
+      "online_item_id": "1077538597531",
+      "measured": {
+        "files": 414,
+        "videos": 414,
+        "subdirs": 0,
+        "size": "8.89 GB"
+      },
+      "dir_len": 48,
+      "issue": "超限18字、150+案例未实测"
+    },
+    {
+      "dir": "即梦Seedance2.0动漫短剧视频教程大合集",
+      "core": "即梦Seedance2.0动漫短剧教程",
+      "count": "1790节",
+      "online_item_id": "1079697958331",
+      "measured": {
+        "files": 6381,
+        "videos": 1790,
+        "subdirs": 10,
+        "size": "287.15 GB"
+      },
+      "dir_len": 24,
+      "issue": "大/合集堆料后缀"
+    },
+    {
+      "dir": "零基础掌握主流AI工具，快速落地工作与生活场景",
+      "core": "零基础掌握主流AI工具全场景实战",
+      "count": "116集",
+      "online_item_id": "1077898771367",
+      "measured": {
+        "files": 116,
+        "videos": 116,
+        "subdirs": 10,
+        "size": "1.23 GB"
+      },
+      "dir_len": 23,
+      "issue": "基本合规，仅去掉落地承诺"
+    },
+    {
+      "dir": "上百款剪映高级感封面字幕排版预设，一键提升短视频质感",
+      "core": "剪映高级感封面字幕排版预设",
+      "count": "合集",
+      "online_item_id": "1077886150143",
+      "measured": {
+        "files": 1,
+        "videos": 0,
+        "subdirs": 0,
+        "size": "30 MB"
+      },
+      "dir_len": 26,
+      "issue": "上百款未实测、一键提升属效果承诺"
+    },
+    {
+      "dir": "少儿编程课程集合【48(1).8GB】",
+      "core": "少儿编程Scratch到Python合集",
+      "count": "884节",
+      "online_item_id": "1082128048488",
+      "measured": {
+        "files": 1890,
+        "videos": 884,
+        "subdirs": 20,
+        "size": "51.75 GB"
+      },
+      "dir_len": 19,
+      "issue": "体积标注错28倍(1.8GB→51.75GB)、(1)为副本后缀"
+    },
+    {
+      "dir": "相机基础入门课，光圈快门曝光度一次搞懂",
+      "core": "相机基础入门课，光圈快门曝光一次搞懂",
+      "count": "41集",
+      "online_item_id": "1087743400092",
+      "measured": {
+        "files": 41,
+        "videos": 41,
+        "subdirs": 0,
+        "size": "3.13 GB"
+      },
+      "dir_len": 19,
+      "issue": "合规"
+    },
+    {
+      "dir": "小白从零上手 WorkBuddy，AI 办公新范式实战，全自动提高效率",
+      "core": "从零上手WorkBuddy，AI办公自动化",
+      "count": "38集",
+      "online_item_id": "1086220239494",
+      "measured": {
+        "files": 38,
+        "videos": 38,
+        "subdirs": 0,
+        "size": "2.39 GB"
+      },
+      "dir_len": 35,
+      "issue": "超限5字、英文名两侧空格占字符"
+    },
+    {
+      "dir": "亚马逊全流程体系课，掌握亚马逊运营全程实战技能",
+      "core": "亚马逊运营全流程，选品到广告投放",
+      "count": "48集",
+      "online_item_id": "1077883548301",
+      "measured": {
+        "files": 48,
+        "videos": 48,
+        "subdirs": 0,
+        "size": "1.35 GB"
+      },
+      "dir_len": 23,
+      "issue": "全程实战技能语义重复"
+    },
+    {
+      "dir": "影视解说零基础教程套装合集",
+      "core": "影视解说零基础教程，剪辑配音到过审",
+      "count": "969文件",
+      "online_item_id": "1086340095973",
+      "measured": {
+        "files": 969,
+        "videos": 136,
+        "subdirs": 8,
+        "size": "12.93 GB"
+      },
+      "dir_len": 13,
+      "issue": "套装合集重复、缺内容信息"
+    },
+    {
+      "dir": "最全家电维修大全视频教程",
+      "core": "家电维修视频教程，彩电冰箱洗衣机",
+      "count": "25大类",
+      "online_item_id": "1087235362610",
+      "measured": {
+        "files": 92,
+        "videos": 3,
+        "subdirs": 25,
+        "size": "38.43 GB"
+      },
+      "dir_len": 12,
+      "issue": "最全+大全双绝对化用语"
+    },
+    {
+      "dir": "AI+自媒体工业化实战课，终结低效创作模式",
+      "core": "AI自媒体工业化实战课，批量产出内容",
+      "count": "21集",
+      "online_item_id": "1081135248514",
+      "measured": {
+        "files": 156,
+        "videos": 21,
+        "subdirs": 3,
+        "size": "1.86 GB"
+      },
+      "dir_len": 21,
+      "issue": "终结属绝对化用语"
+    },
+    {
+      "dir": "AI标书方案写作课程，用AI产出高质量投标文件",
+      "core": "AI商业方案写作课程，产出高质量方案文档",
+      "count": "39集",
+      "online_item_id": "1073429144673",
+      "note": "标书/投标/招标属政务关联词，与踩过的'公文'同类，标题正文均需中性化",
+      "measured": {
+        "files": 39,
+        "videos": 39,
+        "subdirs": 0,
+        "size": "1.48 GB"
+      },
+      "dir_len": 23,
+      "issue": "标书/投标属政务关联词，与踩过的公文同类"
+    },
+    {
+      "dir": "AI处理制作表格技巧，小白都能学会的智能办公术",
+      "core": "AI处理表格技巧，零基础智能办公实战",
+      "count": "30集",
+      "online_item_id": "1086973605321",
+      "measured": {
+        "files": 30,
+        "videos": 30,
+        "subdirs": 0,
+        "size": "1.11 GB"
+      },
+      "dir_len": 23,
+      "issue": "小白都能学会属学习效果承诺"
+    },
+    {
+      "dir": "AI漫剧古风人物素材包，200套古代言情三视图+专属提示词",
+      "core": "AI漫剧古风人物素材包，三视图加提示词",
+      "count": "224张",
+      "online_item_id": "1073256138756",
+      "measured": {
+        "files": 224,
+        "videos": 0,
+        "subdirs": 3,
+        "size": "470 MB"
+      },
+      "dir_len": 29,
+      "issue": "200套未实测(实测224文件)"
+    },
+    {
+      "dir": "AI漫剧全流程实操，零基础掌握漫剧创作与变现",
+      "core": "AI漫剧全流程实操，零基础做出自己的漫剧",
+      "count": "36集",
+      "online_item_id": "1087235326864",
+      "note": "去掉'变现'，收益承诺是虚拟资料类目高发违规点",
+      "measured": {
+        "files": 36,
+        "videos": 36,
+        "subdirs": 0,
+        "size": "564 MB"
+      },
+      "dir_len": 22,
+      "issue": "变现属收益承诺"
+    },
+    {
+      "dir": "AI漫剧制作全流程，剧本分镜+AI生成+剪辑发布+模板化量产",
+      "core": "AI漫剧制作全流程，剧本分镜到剪辑发布",
+      "count": "60集",
+      "online_item_id": "1081975253958",
+      "measured": {
+        "files": 61,
+        "videos": 60,
+        "subdirs": 0,
+        "size": "1.7 GB"
+      },
+      "dir_len": 30,
+      "issue": "刚好卡30字无余量、模板化量产偏灰产观感"
+    },
+    {
+      "dir": "AI全场景创作实战汇总课｜电商带货+自媒体内容+办公增效+视觉设计全覆盖，一套掌握AI作图、做视频、做文档、数字人全套落地技能",
+      "core": "AI全场景创作实战课，作图视频文档数字人",
+      "count": "24集",
+      "online_item_id": "1076529893006",
+      "measured": {
+        "files": 43,
+        "videos": 24,
+        "subdirs": 1,
+        "size": "1.56 GB"
+      },
+      "dir_len": 63,
+      "issue": "超限33字、关键词堆砌"
+    },
+    {
+      "dir": "AI人工智能2.0：每个人的人工智能课：从现在开始学习AI",
+      "core": "AI人工智能2.0基础课，零基础也能上手",
+      "count": "12集",
+      "online_item_id": "1073788412201",
+      "measured": {
+        "files": 16,
+        "videos": 12,
+        "subdirs": 1,
+        "size": "487 MB"
+      },
+      "dir_len": 29,
+      "issue": "每个人属普适性承诺"
+    },
+    {
+      "dir": "AI入门大白话教程，零基础玩转人工智能",
+      "core": "AI入门大白话教程，零基础玩转人工智能",
+      "count": "19集",
+      "online_item_id": "1079028030252",
+      "measured": {
+        "files": 20,
+        "videos": 19,
+        "subdirs": 0,
+        "size": "12.59 GB"
+      },
+      "dir_len": 19,
+      "issue": "合规"
+    },
+    {
+      "dir": "AI小说搞钱项目教程，从AI生成到多渠道变现",
+      "core": "AI小说写作项目，从生成到多渠道发布",
+      "count": "7集",
+      "online_item_id": null,
+      "note": "去掉'搞钱'和'变现'",
+      "measured": {
+        "files": 10,
+        "videos": 7,
+        "subdirs": 0,
+        "size": "1.7 GB"
+      },
+      "dir_len": 22,
+      "issue": "搞钱+变现双重收益承诺"
+    },
+    {
+      "dir": "AI小说漫画3.0项目，零基础一键洗稿原创，轻松开启赚钱新模式",
+      "core": "AI小说漫画3.0项目实操，从原创到成片",
+      "count": "3集",
+      "online_item_id": null,
+      "note": "去掉'洗稿'（抄袭引导词）和'赚钱新模式'",
+      "measured": {
+        "files": 3,
+        "videos": 3,
+        "subdirs": 0,
+        "size": "118 MB"
+      },
+      "dir_len": 31,
+      "issue": "洗稿属抄袭引导词、赚钱新模式属收益承诺、超限1字"
+    },
+    {
+      "dir": "AI智能体实战课，零基础做出专属智能体",
+      "core": "AI智能体实战课，零基础搭出智能体",
+      "count": "31集",
+      "online_item_id": null,
+      "measured": {
+        "files": 31,
+        "videos": 31,
+        "subdirs": 1,
+        "size": "1.54 GB"
+      },
+      "dir_len": 19,
+      "issue": "合规",
+      "note": "未上线过，_online.txt 无此商品，属新增"
+    },
+    {
+      "dir": "AI智能体提效实战课，零基础打造自动化工作助手",
+      "core": "AI智能体提效实战课，自动化办公助手",
+      "count": "61集",
+      "online_item_id": "1081042450608",
+      "measured": {
+        "files": 63,
+        "videos": 61,
+        "subdirs": 0,
+        "size": "2.33 GB"
+      },
+      "dir_len": 23,
+      "issue": "合规"
+    },
+    {
+      "dir": "DeepSeek短视频制作教程提示词即梦AI可灵动画剪映豆包动画教程3d(178GB)",
+      "core": "DeepSeek短视频动画教程全集",
+      "count": "24类",
+      "online_item_id": null,
+      "measured": {
+        "files": 4327,
+        "videos": 1549,
+        "subdirs": 24,
+        "size": "178.18 GB"
+      },
+      "dir_len": 43,
+      "issue": "超限13字、七个关键词堆砌无标点、(178GB)体积后缀",
+      "note": "未上线过，_online.txt 无此商品，属新增"
+    },
+    {
+      "dir": "PLC编程入门精通73节全套教程(1)",
+      "core": "PLC编程入门到精通全套教程",
+      "count": "74节",
+      "online_item_id": "1081344564586",
+      "note": "去掉'(1)'批次后缀；实测74个视频，不是73",
+      "measured": {
+        "files": 81,
+        "videos": 74,
+        "subdirs": 5,
+        "size": "4.81 GB"
+      },
+      "dir_len": 19,
+      "issue": "(1)为副本后缀、73与实测74不符"
+    },
+    {
+      "dir": "Seedance2.0保姆级教程5套合集，从入门到精通的最全攻略",
+      "core": "Seedance2.0保姆级教程5套合集",
+      "count": "56节",
+      "online_item_id": null,
+      "note": "未上线过。注意与 1079697958331（即梦Seedance2.0动漫短剧大合集）是不同资源，别发重",
+      "measured": {
+        "files": 73,
+        "videos": 56,
+        "subdirs": 5,
+        "size": "4.04 GB"
+      },
+      "dir_len": 32,
+      "issue": "超限2字、最全属绝对化用语"
+    }
+  ],
+  "_measured_source": "Get-ChildItem -LiteralPath -Recurse 逐目录统计，2026-09-30",
+  "_provenance": "online_item_id 来自 _online_folders.tsv；没有 id 的已逐条在 _online.txt 里查证确实未上线"
+}

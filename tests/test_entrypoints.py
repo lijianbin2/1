@@ -36,6 +36,7 @@ LIBRARY_MODULES = (
 # 就会在这里失败，而不是安静地绕过产物校验和死区扫描。
 TOOLING_MODULES = frozenset(
     {
+        "audit_titles",
         "legacy_runner",
         "make_desc",
         "scan_zones",

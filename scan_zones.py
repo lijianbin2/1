@@ -36,10 +36,6 @@ ENTRYPOINTS = (
     "render_camera_basics.py",
     "render_codex55.py",
     "render_collection_course.py",
-    "render_jianying_templates.py",
-    "render_map_collection.py",
-    "render_promo_music.py",
-    "render_winrar_unified.py",
     "render_workbuddy.py",
     "render_workbuddy_office.py",
 )
@@ -48,6 +44,11 @@ ENTRYPOINTS = (
 SKIPPED = {
     "cover_v2.py": "整幅渐变全出血封面，没有白卡也没有底栏，"
     "逐行问有没有墨必然每行都有，扫描恒为 0px，属于空跑。",
+    "render_jianying_templates.py": "源目录在 M:\\WebDAV\\夸克\\软件 下，"
+    "2026-09-30 随软件目录整体停用后已移到夸克网盘归档目录，素材不再可见。",
+    "render_map_collection.py": "同上，地图素材已随软件目录归档。",
+    "render_promo_music.py": "同上，宣传片配乐已随软件目录归档。",
+    "render_winrar_unified.py": "同上，WinRAR 安装包已随软件目录归档。",
 }
 
 # legacy 三个入口的几何常量在 legacy 脚本的全局命名空间里，
