@@ -53,11 +53,14 @@ def check_body(body: str) -> list[str]:
 
 
 def load_body(path: Path) -> tuple[str, str]:
-    """Split the copy file into (title, body) on its first line.
+    """Read the copy file as (title, description) with the title kept inline.
 
-    Xianyu has no separate title field on the web form: the title *is* the
-    first line of the description. Ydisks wants them apart, so the split has
-    to happen here and the title must not be reworded on the way through.
+    Xianyu has no separate title field: the listing title *is* the first line
+    of the description. Splitting them and posting the title on its own makes
+    the platform promote the second line (the subtitle) to the title instead,
+    which is how two listings ended up titled "从零搭建个人AI效率系统…".
+    So the description keeps the title as its first line and ``title`` is only
+    a local copy for the delivery rule, which does need them apart.
     """
     text = path.read_text(encoding="utf-8")
     if not text.strip():
@@ -69,7 +72,7 @@ def load_body(path: Path) -> tuple[str, str]:
         raise DeliveryError(f"文案第一行（标题）为空：{path}")
     if len(title) > 30:
         raise DeliveryError(f"标题超过 30 字（{len(title)}）：{title}")
-    return title, body
+    return title, text.strip()
 
 
 def load_images(folder: Path, names: list[str]) -> list[Path]:
@@ -188,8 +191,9 @@ def main() -> int:
         raise DeliveryError("价格必须大于 0")
     price = f"{price_value:g}"
 
-    title, body = load_body(args.desc)
-    problems = check_body(body)
+    title, description = load_body(args.desc)
+    # 校验整段文案：标题也是会被平台显示的文字，链接或价格藏在首行同样违规
+    problems = check_body(description)
     if problems:
         raise DeliveryError("正文触发了拦截规则：" + "、".join(problems))
     images = load_images(
@@ -200,7 +204,7 @@ def main() -> int:
     print(f"类目：{args.category_name}（{args.category_id}）")
     print(f"价格：{price} 元　发货：无需邮寄　数量：1")
     print(f"主图：{'、'.join(p.name for p in images)}")
-    print(f"正文：{len(body)} 字，拦截规则 0 命中")
+    print(f"正文：{len(description)} 字（含标题首行），拦截规则 0 命中")
     if args.dry_run:
         print("dry-run：未提交")
         return 0
@@ -211,7 +215,7 @@ def main() -> int:
         client,
         cookie_id=args.cookie_id,
         title=title,
-        body=body,
+        body=description,
         price=price,
         images=images,
         category_id=args.category_id,

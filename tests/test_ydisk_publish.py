@@ -35,9 +35,27 @@ class LoadBodyTests(unittest.TestCase):
     def test_first_line_becomes_the_title(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = self._write(tmp, "WorkBuddy 智能体实战\n\n第一行正文\n第二行")
-            title, body = load_body(path)
+            title, description = load_body(path)
         self.assertEqual(title, "WorkBuddy 智能体实战")
-        self.assertEqual(body, "第一行正文\n第二行")
+        # 描述里必须保留标题首行，否则平台会把副标题当成标题
+        self.assertEqual(description, "WorkBuddy 智能体实战\n\n第一行正文\n第二行")
+        self.assertTrue(description.startswith(title))
+
+    def test_description_keeps_title_so_platform_title_is_correct(self):
+        """闲鱼没有独立标题栏：标题就是正文第一行。
+
+        实测两个商品把标题拆出去单独提交后，平台把副标题提升成了标题，
+        搜索结果里显示成"从零搭建个人AI效率系统…"。所以这里断言描述首行
+        就是标题，防止以后有人为了"字段对齐"再拆一次。
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._write(
+                tmp, "WorkBuddy 智能体实战 37集视频课\n从零搭建个人AI效率系统\n\n正文"
+            )
+            title, description = load_body(path)
+        self.assertEqual(title, "WorkBuddy 智能体实战 37集视频课")
+        self.assertEqual(description.split("\n")[0], title)
+        self.assertIn("从零搭建个人AI效率系统", description)
 
     def test_title_over_thirty_characters_is_rejected(self):
         """闲鱼标题上限 30 字，超长会被平台截断，而 ydisk 这里直接报错更早。"""
