@@ -85,9 +85,27 @@ python verify_source.py --root "M:\WebDAV\夸克\软件\项目名" --copy "D:\�
 `test_detail_block_is_scoped_to_its_own_heading` 三条分别守住不误报、仍能拦错数、
 以及不越界吞掉正文。
 
+**明细行里不能出现 `个文件`，也不能用 `第N-M集` 这类集号区间。** 这两条不是
+校验器的 bug，是它按设计工作的必然结果，写文案时要绕开：
+
+- `个文件` 是**总数声明**。明细写"基础教学 11个文件"，那个 11 会被拿去和
+  整个目录的文件总数比。影视解说那份文案 969 个文件，明细里 6 行各带一个
+  `11个文件`/`32个文件`……于是报出 6 条 `total-files-mismatch`，数量本身全是对的。
+  总数只在标题出现一次，明细改用 `｜` 分隔且不带数字：
+  `基础教学｜电影解说入门与完整流程讲解`。
+- 集号区间会被 `_COUNT_CLAIM` 拆出来累加。AI 漫剧 36 个 mp4，明细按
+  `第1-2集`/`第3-9集`/…分成 6 段，累加成 99，报 `item-sum-mismatch`。
+  集号 1-36 本来是连续的，分段只是为了排版好看，不是目录的划分。
+  改成不带单位的 `01-02｜漫剧发展定位与AI的变现全部方式`。
+
+同理，**正文（非明细）里任何 `7套`/`238集` 都会和文件总数比**。合集课说
+"7套课程"是课程套数，不是文件数，会报 `body-count-mismatch`；换成
+`7门课程`（`门` 不在受检单位里）就过了。合法做法是把这类数量改写成非受检
+单位，或者干脆让标题里的总数独当一面。
+
 ### ② 生成四张图
 
-七个公开入口都支持 `--out`，导入时不产生任何副作用：
+八个公开入口都支持 `--out`，导入时不产生任何副作用：
 
 ```text
 render_map_collection.py   地图素材（自动读取源目录统计文件数和体积）
@@ -97,6 +115,7 @@ render_camera_basics.py    相机基础课程
 render_codex55.py          Codex 办公课程
 render_workbuddy.py        WorkBuddy 智能体课程
 render_winrar_unified.py   WinRAR 工具
+render_collection_course.py 合集课程（读 specs/*.json，通用四页）
 cover_v2.py                WorkBuddy 双封面
 ```
 
@@ -111,6 +130,7 @@ python render_promo_music.py --out "D:\闲鱼\项目名"
 python render_jianying_templates.py --root "M:\WebDAV\夸克\软件\项目名" --out "D:\闲鱼\项目名"
 python render_camera_basics.py --out "D:\闲鱼\项目名"
 python render_winrar_unified.py --version "v7.23" --out "D:\闲鱼\项目名"
+python render_collection_course.py --spec specs\keep_fitness.json
 ```
 
 输出固定为 `01.png` 封面卖点、`02.png` 目录详情、`03.png` 使用收获、
@@ -236,8 +256,57 @@ python make_desc.py --out "D:\闲鱼\项目名" --core "项目名称" --count "1
 3. 上一轮发过、被用户手动删掉、或源目录已不存在的都算"已处理"，跳过不再重发。
 4. 用户单独点名某个资源时按点名的来，不受 5 个限制。
 
-已经跑完的记录（`1086220239494` 商品 2 在架；`1088181725474` 商品 1 被用户
-删源、不再重发）不要重新发布。
+已经跑完的记录不要重新发布。`_online.txt` 是从 ydisk 拉下来的线上清单
+（`item_id<TAB>标题`），它不算源码也不进版本库，选资源时拿它和
+`M:\WebDAV\夸克` 的目录名做差集。
+
+```text
+1077538597531  2026AI漫剧短剧全流程教学
+1073788412201  AI 人工智能 2.0：人工智能课
+1076529893006  AI 全场景创作实战汇总课
+1081135248514  AI+自媒体工业化实战课｜21集视频课 终结低效创作模式
+1074654958339  AI创作全赛道｜小说、短剧、漫剧剧本
+1073256138756  AI古风人物设计素材包
+1086973605321  AI处理制作表格技巧，小白都能学会的智能办公术
+1081042450608  AI智能体提效实战课，零基础打造自动化工作助手 61集 只发
+1073429144673  AI标书写作实战课程
+1081975253958  AI漫剧制作全流程60集｜剧本分镜+AI生成+剪映发布+模板
+1075005868053  AI短视频创作实战课
+1086433493202  AI视频制作全攻略 （豆包+即梦+剪映）从入门到精通实战课程
+1082549793713  Adobe+达芬奇官方音效库合集 影视级音效素材包 27大类
+1073283257411  CAD零基础126节精讲教程
+1081120061300  Internet Download Manager (IDM
+1081344564586  PLC编程入门精通73节全套教程｜从电工基础到人机精通
+1084918353725  WinRAR解压工具64位分享
+1077898771367  主流 AI 工具全解实战合集
+1077883548301  亚马逊全流程体系课
+1086220239494  从安装WorkBuddy到定时简报周报自动推送，文件文档数据
+1086347310437  企业宣传视频剪映模板合集 41套 只发夸克剪映专业版企业宣传
+1077886150143  剪映高级感封面预设
+1075709168926  即梦 Seedance 动漫短剧教程
+1079697958331  即梦Seedance2.0动漫短剧视频教程大合集｜10合集1
+1079028030252  大白话带你入门AI｜19集视频课 零基础玩转人工智能
+1085782690886  宣传片背景音乐合集1072首
+1082128048488  少儿编程课程集合 | Scratch3.0全套214节 +
+1087743400092  相机基础入门课，光圈快门曝光度一次搞懂 41集 只发夸克
+1081199169816  达芬奇调色剪辑软件资源分享
+1071630263884  闲鱼运营指南实操技巧
+1076142525102  零基础 AI 视频变现全套课程
+1088015828158  高清一亿像素地图矢量图合集，超精细地理素材
+1088303341686  keep健身课程合集 238集 只发夸克
+1086340095973  影视解说零基础教程套装合集 969个文件 只发夸克
+1087235362610  最全家电维修大全视频教程 22大类 只发夸克
+1089348944231  40组AI高质量指令合集 40组 只发夸克
+1087235326864  AI漫剧全流程实操 36集 只发夸克
+```
+
+`1088181725474`（WorkBuddy 智能体实战）违规下架且源文件已被用户删除，不重发。
+`Blackmagic Design DaVinci Resolve Studio 21` 含盗版 patcher，明确不发布。
+`[TikTok]玩法教程全攻略[27套课]` 源目录同步不全只剩 1 个 mp4，暂缓。
+
+链接归档在 `C:\Users\1\Documents\Codex\xianyu-quark-archive\quark-links.txt`，
+格式 `title|code|link`。这个路径在仓库外，且每次跑都用同一个，
+不要按会话目录另起新文件——之前每轮换目录，链接归档早就断链了。
 
 #### 一轮的动作顺序
 
@@ -593,7 +662,7 @@ font, width = fit_font(draw, subtitle, card_w - 24, 30, bold=True, min_size=20)
 `step` 时（比如 21 和 20）照直减会交出 19px，调用方就拿到了一个它从没要求过
 的字号。放不下时报错信息里的字号是真量过的那个，不是名义下限。
 
-七个公开入口结束时都会自己调用 `require_valid_pngs()`，产物缺失、尺寸不对或
+八个公开入口结束时都会自己调用 `require_valid_pngs()`，产物缺失、尺寸不对或
 打不开就抛 `RuntimeError` 并非 0 退出。"打印了 generated" 不等于"图能用"——
 校验不过就不算生成成功，别手动绕过。`names=` 不接受空列表：`count` 拒绝小于 1，
 空 `names` 却能校验零个文件后报"通过"，比不校验更糟。传空就抛 `ValueError`。
@@ -646,13 +715,31 @@ git diff --check
 
 ```powershell
 git ls-files | Select-String "chrome-profile|Cookie|playwright"
-rg -n -i "pan\.quark\.cn/s/[0-9a-zA-Z]{10,}" --glob "*.py" --glob "*.md" .
-rg -n "提取码[:：]\s*[0-9a-zA-Z]{4}" --glob "*.py" --glob "!tests/**" --glob "!WORKFLOW.md" .
+rg -n -i "pan\.quark\.cn/s/[0-9a-zA-Z]{10,}" --glob "*.py" --glob "*.md" --glob "!tests/**" --glob "!WORKFLOW.md" .
+rg -n "提取码[:：]\s*[0-9a-zA-Z]{4}" --glob "*.py" --glob "*.md" --glob "!tests/**" --glob "!WORKFLOW.md" .
 ```
 
-第三条刻意排除了 `tests/` 和本文件：`tests/` 里的假提取码是校验用例的输入，
-本文件第 ④ 节的示例值是占位符，两者都不是真实凭据。之前就出过凭据扫描看着干净、
-实际有输出的情况，所以这三条也要真跑。
+后两条刻意排除了 `tests/` 和本文件：`tests/` 里的假链接、假提取码是校验用例的
+输入（比如 `check_body` 就是靠它们证明能拦住 URL），本文件第 ④ 节的示例值是
+占位符，两者都不是真实凭据。**不要为了让扫描干净去改测试里的假数据**，那会把
+拦截规则的用例改成空转。之前就出过凭据扫描看着干净、实际有输出的情况，所以这三条
+也要真跑。
+
+行尾也要查。`git diff --check` 报出一整份文件"trailing whitespace"时，先看是不是
+行尾被整份改写了：
+
+```powershell
+git diff --stat        # 明明只加了一行，却显示几百行改动 = 行尾变了
+```
+
+本仓库除 `scan_zones.py` 外统一是 LF。Windows 上编辑 `.py` 容易被写成 CRLF，
+`git diff` 会把整份文件重写，`git diff --check` 于是逐行报 trailing whitespace。
+按下面还原，再确认 `--stat` 回到几行：
+
+```powershell
+$text = [System.IO.File]::ReadAllText("scan_zones.py") -replace "`r`n", "`n"
+[System.IO.File]::WriteAllText("scan_zones.py", $text, (New-Object System.Text.UTF8Encoding($false)))
+```
 
 提交只加源码、测试、`requirements.txt` 和 `WORKFLOW.md`；不加真实链接、提取码、
 商品图、浏览器 profile、Cookie、日志和本地输出目录。

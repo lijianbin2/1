@@ -35,6 +35,7 @@ ABOVE_FOOTER = 20
 ENTRYPOINTS = (
     "render_camera_basics.py",
     "render_codex55.py",
+    "render_collection_course.py",
     "render_jianying_templates.py",
     "render_map_collection.py",
     "render_promo_music.py",
