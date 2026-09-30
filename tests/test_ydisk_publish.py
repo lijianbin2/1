@@ -1,9 +1,10 @@
 import tempfile
 import unittest
+import unittest.mock
 from pathlib import Path
 
 from ydisk_delivery import DeliveryError
-from ydisk_publish import check_body, encode_multipart, load_body, load_images
+from ydisk_publish import check_body, encode_multipart, load_body, load_images, publish
 
 
 class CheckBodyTests(unittest.TestCase):
@@ -112,6 +113,59 @@ class EncodeMultipartTests(unittest.TestCase):
         self.assertIn(b'filename="01.png"', payload)
         self.assertIn(b"Content-Type: image/png", payload)
         self.assertIn(b"\x89PNG-bytes", payload)
+
+
+class PublishQuantityTests(unittest.TestCase):
+    """库存只能在下单那一刻设进去，发布后就再也改不动了。
+
+    早先的结论是"ydisk 没有库存字段，只能手改"。实测是错的：
+    ``POST /api/v1/items/publish`` 的 multipart 里有 ``quantity`` 字段，
+    前端"库存数量"输入框绑的就是它。错在 ``publish()`` 有这个参数，
+    而 ``main()`` 从来没往下传，恒为默认的 1。
+    """
+
+    def _captured_fields(self, quantity):
+        with tempfile.TemporaryDirectory() as tmp:
+            image = Path(tmp) / "01.png"
+            image.write_bytes(b"\x89PNG-bytes")
+            captured = {}
+
+            def fake_encode(fields, images):
+                captured.update(fields)
+                return b"payload", "multipart/form-data; boundary=x"
+
+            response = unittest.mock.MagicMock()
+            response.read.return_value = b'{"success": true}'
+            response.__enter__.return_value = response
+
+            client = unittest.mock.Mock()
+            client.base_url = "https://example.invalid"
+            client.user_agent = "UA"
+            client.cookies.return_value = []
+            client.opener.open.return_value = response
+
+            with unittest.mock.patch(
+                "ydisk_publish.encode_multipart", side_effect=fake_encode
+            ):
+                publish(
+                    client,
+                    cookie_id="123",
+                    title="标题",
+                    body="正文",
+                    price="1",
+                    images=[image],
+                    category_id="50023914",
+                    category_name="电子资料",
+                    channel_category_id="202036301",
+                    quantity=quantity,
+                )
+        return captured
+
+    def test_requested_stock_reaches_the_publish_payload(self):
+        self.assertEqual(self._captured_fields(1111)["quantity"], "1111")
+
+    def test_stock_defaults_to_one(self):
+        self.assertEqual(self._captured_fields(1)["quantity"], "1")
 
 
 if __name__ == "__main__":

@@ -180,6 +180,12 @@ def main() -> int:
     parser.add_argument("--category-id", default="50023914", help="闲鱼类目 id")
     parser.add_argument("--category-name", default="电子资料", help="闲鱼类目名")
     parser.add_argument("--channel-category-id", default="202036301", help="闲鱼渠道类目 id")
+    parser.add_argument(
+        "--quantity",
+        type=int,
+        default=1,
+        help="库存数量，ydisk 发布接口唯一能设库存的地方",
+    )
     parser.add_argument("--dry-run", action="store_true", help="只校验文案与图片，不提交")
     args = parser.parse_args()
 
@@ -190,6 +196,8 @@ def main() -> int:
     if price_value <= 0:
         raise DeliveryError("价格必须大于 0")
     price = f"{price_value:g}"
+    if args.quantity < 1:
+        raise DeliveryError("库存必须大于 0")
 
     title, description = load_body(args.desc)
     # 校验整段文案：标题也是会被平台显示的文字，链接或价格藏在首行同样违规
@@ -202,7 +210,7 @@ def main() -> int:
 
     print(f"标题：{title}")
     print(f"类目：{args.category_name}（{args.category_id}）")
-    print(f"价格：{price} 元　发货：无需邮寄　数量：1")
+    print(f"价格：{price} 元　发货：无需邮寄　库存：{args.quantity}")
     print(f"主图：{'、'.join(p.name for p in images)}")
     print(f"正文：{len(description)} 字（含标题首行），拦截规则 0 命中")
     if args.dry_run:
@@ -221,6 +229,7 @@ def main() -> int:
         category_id=args.category_id,
         category_name=args.category_name,
         channel_category_id=args.channel_category_id,
+        quantity=args.quantity,
     )
     print(json.dumps(result, ensure_ascii=False))
     if not result.get("success"):

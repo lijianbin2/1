@@ -315,7 +315,7 @@ python make_desc.py --out "D:\闲鱼\项目名" --core "项目名称" --count "1
 ```powershell
 $env:YDISK_BASE_URL="https://44.81938193.xyz"; $env:YDISK_USER="<user>"; $env:YDISK_PASSWORD="<pass>"
 
-python ydisk_publish.py --desc "D:\闲鱼\项目名\闲鱼发布文案_直接复制.txt" --images "01.png,02.png,04.png" --image-dir "D:\闲鱼\项目名" --price 1 --dry-run
+python ydisk_publish.py --desc "D:\闲鱼\项目名\闲鱼发布文案_直接复制.txt" --images "01.png,02.png,04.png" --image-dir "D:\闲鱼\项目名" --price 1 --quantity 1111 --dry-run
 
 python ydisk_delivery.py --title "<确认后的标题>" --link "<链接>" --code "<提取码>" --archive "<归档文件>"
 ```
@@ -333,9 +333,23 @@ python ydisk_delivery.py --title "<确认后的标题>" --link "<链接>" --code
 1. **标题就是正文第一行，不要拆开传。** ydisk 的 `description` 必须保留标题在
    首行。拆成独立的 `title` 字段，平台会把正文里的第二行当成标题——已发过的
    2 个商品标题都因此错成副标题。
-2. **库存改不了，别试。** `PUT /api/v1/items/{cookie_id}/{item_id}` 不接受
-   `quantity`，`item_detail` 里也没有 stock 字段。写进 `publish_raw.quantity`
-   会在下次同步被覆盖。库存只能用户在闲鱼端手设，发完要提醒用户。
+2. **库存只能在发布那一刻设，发布后改不了。** 发布接口
+   `POST /api/v1/items/publish` 的 multipart 里**有** `quantity` 字段，前端发布
+   弹窗那个"库存数量"输入框绑的就是它（扒 `ItemList-*.js` 确认）。所以
+   `ydisk_publish.py --quantity 1111` 直接生效，别再让用户手设。
+
+   但 `PUT /api/v1/items/{cookie_id}/{item_id}` 的 body 里**没有** `quantity`——
+   同一个文件里那个更新函数只传 `item_title`/`item_description`/`item_category`/
+   `item_price`/`item_detail`。往里加 `quantity` 会被**静默忽略**：返回
+   `{"success":true}`，库存纹丝不动。实测两次（quantity 放 `item_detail` 里、
+   放 PUT body 顶层）都是 HTTP 200 但库存仍为 1。
+
+   写进 `publish_raw` 也没用：商品 2 被用户手设 1111 之后，ydisk 同步回来的
+   `item_detail` 已被闲鱼真实响应替换成 `detail_params`，里面只有
+   `imageInfos`/`itemId`/`picUrl`/`soldPrice`/`title`，压根没有数量。
+
+   结论：**数量必须在发布前定好**。已经上线的商品只能用户在闲鱼端手改，
+   发完要提醒用户去改。
 3. **`PUT` 改单会整块回传 `item_detail`，会覆盖用户手改的数据**（比如小刀后的
    0.80 价、1111 库存）。对线上商品做任何写入前，先跟用户确认。
 
