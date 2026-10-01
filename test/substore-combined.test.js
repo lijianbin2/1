@@ -126,6 +126,81 @@ test("fetch 失败时尝试 Sub-Store HTTP 客户端", async () => {
   assert.ok(findGroup(config, "香港节点"));
 });
 
+test("fetch 返回非 2xx 时降级到 Sub-Store HTTP 客户端", async () => {
+  const runtime = createRuntime({
+    fetch: async () => ({ ok: false, status: 404 }),
+    $substore: {
+      http: {
+        get: async () => ({ body: runtime.__test.snapshot })
+      }
+    }
+  });
+  runtime.$arguments = { threshold: 0 };
+
+  const config = await runtime.__test.main(makeConfig());
+
+  assert.ok(findGroup(config, "香港节点"));
+  assert.ok(runtime.logs.some(({ message }) => message.includes("已加载最新版")));
+});
+
+test("两条传输都失败时回退快照并记录合并错误", async () => {
+  const runtime = createRuntime({
+    fetch: async () => {
+      throw new Error("fetch boom");
+    },
+    $substore: {
+      http: {
+        get: async () => {
+          throw new Error("substore boom");
+        }
+      }
+    }
+  });
+  runtime.$arguments = { threshold: 0 };
+
+  const config = await runtime.__test.main(makeConfig());
+
+  assert.ok(findGroup(config, "香港节点"));
+  const failure = runtime.logs.find(({ message }) => message.includes("拉取最新 convert.min.js 失败"));
+  assert.ok(failure);
+  assert.ok(failure.message.includes("fetch boom"));
+  assert.ok(failure.message.includes("substore boom"));
+});
+
+test("fetch 耗尽总预算后不再启动第二条传输", async () => {
+  let substoreCalls = 0;
+  let clockCalls = 0;
+  const runtime = createRuntime({
+    fetch: () => new Promise(() => {}),
+    setTimeout: (callback) => {
+      queueMicrotask(callback);
+      return 1;
+    },
+    clearTimeout: () => {},
+    Date: class extends Date {
+      static now() {
+        clockCalls += 1;
+        return clockCalls <= 2 ? 0 : 20000;
+      }
+    },
+    $substore: {
+      http: {
+        get: async () => {
+          substoreCalls += 1;
+          return { body: runtime.__test.snapshot };
+        }
+      }
+    }
+  });
+  runtime.$arguments = { threshold: 0 };
+
+  const config = await runtime.__test.main(makeConfig());
+
+  assert.equal(substoreCalls, 0);
+  assert.ok(findGroup(config, "香港节点"));
+  assert.ok(runtime.logs.some(({ message }) => message.includes("总预算")));
+});
+
 test("fetch 响应正文悬挂时也触发硬超时", async () => {
   const runtime = createRuntime({
     fetch: async () => ({ ok: true, text: () => new Promise(() => {}) }),

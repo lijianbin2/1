@@ -63,17 +63,22 @@ function __buildConvert(code, args) {
   return fn;
 }
 
-function __withTimeout(request, message) {
+// 硬超时包装：timeoutMs 是「剩余预算」，让多条传输共享同一份总预算，
+// 避免逐条串行等待导致最坏耗时成倍增长。
+function __withTimeout(request, message, timeoutMs) {
   let timer;
   const timeout = new Promise((_, reject) => {
-    timer = setTimeout(() => reject(new Error(message)), CONVERT_FETCH_TIMEOUT);
+    timer = setTimeout(() => reject(new Error(message)), timeoutMs);
   });
   return Promise.race([request, timeout]).finally(() => clearTimeout(timer));
 }
 
 // 下载文本：优先全局 fetch（Node 18+ 的 Sub-Store 后端自带），
-// 失败后使用 Sub-Store 注入的 $substore.http。两条路径都使用硬超时，避免 CDN 挂起。
+// 失败后使用 Sub-Store 注入的 $substore.http。两条传输共享同一个 15s 总预算，
+// 避免 CDN 挂起时最坏耗时翻倍。
 async function __fetchText(url) {
+  const deadline = Date.now() + CONVERT_FETCH_TIMEOUT;
+  const remaining = () => Math.max(0, deadline - Date.now());
   let fetchError;
   if (typeof fetch === "function") {
     const controller = typeof AbortController === "function" ? new AbortController() : null;
@@ -83,17 +88,25 @@ async function __fetchText(url) {
         if (res && res.ok) return await res.text();
         throw new Error("fetch 失败: HTTP " + (res && res.status));
       })();
-      return await __withTimeout(request, "fetch 超时（15000 ms）");
+      return await __withTimeout(request, "fetch 超时（15000 ms）", remaining());
     } catch (e) {
       fetchError = e;
     } finally {
       if (controller) controller.abort();
     }
   }
-  if (typeof $substore !== "undefined" && $substore && $substore.http && typeof $substore.http.get === "function") {
+  const hasSubstoreHttp = typeof $substore !== "undefined" && $substore && $substore.http && typeof $substore.http.get === "function";
+  if (hasSubstoreHttp) {
+    const budget = remaining();
+    if (budget === 0) {
+      throw new Error(
+        (fetchError ? "fetch 失败: " + (fetchError.message || fetchError) + "; " : "") +
+        "$substore.http 未尝试：HTTP 请求总预算（15000 ms）已耗尽"
+      );
+    }
     try {
-      const request = $substore.http.get({ url: url, timeout: CONVERT_FETCH_TIMEOUT });
-      const resp = await __withTimeout(request, "$substore.http 超时（15000 ms）");
+      const request = $substore.http.get({ url: url, timeout: budget });
+      const resp = await __withTimeout(request, "$substore.http 超时（15000 ms）", budget);
       const body = resp && (resp.body !== undefined ? resp.body : resp.rawBody);
       if (typeof body === "string" && body.length > 0) return body;
       throw new Error("$substore.http 返回为空");

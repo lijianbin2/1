@@ -35,7 +35,7 @@
 | 特性 | 说明 |
 |------|------|
 | 🔄 远程优先 | 运行时从 `cdn.jsdelivr.net/gh/powerfullz/override-rules/convert.min.js` 获取当前可用源码，运行期间缓存 6 h，避免每次生成配置都触发网络请求；缓存不会绑定首次调用参数；`fetch` 失败后继续尝试 `$substore.http.get` |
-| 🛡️ 兜底快照 | 远程拉取、编译或运行失败时回退到文件尾部的 `CONVERT_SNAPSHOT` 历史快照（快照日期：2026-08-26）；HTTP 两条路径均有 15 s 硬超时 |
+| 🛡️ 兜底快照 | 远程拉取、编译或运行失败时回退到文件尾部的 `CONVERT_SNAPSHOT` 历史快照（快照日期：2026-08-26）；两条传输共享 15 s 请求总预算 |
 | 🔒 入口隔离 | 通过 `new Function` 和独立 `globalThis` 取出上游 `main`，防止其覆盖本脚本入口；这不是安全沙箱 |
 | 💾 DNS / Hosts 保护 | 按字段是否存在完整备份并还原 `dns` / `hosts`，保留原始值、空值和缺失状态，中间脚本的重写不会污染用户配置 |
 | 🎯 精细后处理 | 剔除「选择代理」中的「自动选择」、删除旧的「非香港节点」组；将「AI服务」改为故障转移并摘除指定引用；将「AI服务」幂等插入「谷歌服务」；创建地区「javdb」手动选择组 |
@@ -79,7 +79,7 @@ flowchart LR
 ### 关键实现
 
 - **缓存键**：`globalThis.__SUBSTORE_COMBINED_CONVERT_V2__ = { code, time }`，TTL = `6 * 60 * 60 * 1000`；缓存源码而非已绑定 `$arguments` 的函数
-- **下载**：优先 `fetch`（Node 18+ Sub-Store 后端自带），失败后降级 `$substore.http.get`；两条路径均有 15 s 硬超时，脚本大小上限 2 MiB
+- **下载**：优先 `fetch`（Node 18+ Sub-Store 后端自带），失败后降级 `$substore.http.get`；两条传输共享 15 s 总预算（`fetch` 快速失败会给降级路径留出剩余时间），脚本大小上限 2 MiB
 - **隔离执行**：`new Function("globalThis","$arguments", code + ";return globalThis.main;")({}, args)`
 - **参数透传**：Sub-Store URL 上的 `#` 参数优先于默认值，见下表
 
@@ -209,7 +209,7 @@ https://cdn.jsdelivr.net/gh/lijianbin2/1@main/substore-combined.js#grouptype=1
 npm test
 ```
 
-测试直接加载部署脚本，覆盖不同 `grouptype` 的缓存隔离、远程运行/返回值异常回退、`fetch` 硬超时、DNS/Hosts 空值保留、后处理幂等以及 `threshold` 默认值。
+测试直接加载部署脚本，覆盖不同 `grouptype` 的缓存隔离、远程运行/返回值异常回退、`fetch` 硬超时、双传输降级与预算耗尽、DNS/Hosts 空值保留、后处理幂等以及 `threshold` 默认值。
 
 > 安全提示：远程优先策略会在 Sub-Store 运行时执行上游 JavaScript。这里的入口隔离不是安全沙箱；是否信任 `powerfullz/override-rules` 由使用者决定。
 
