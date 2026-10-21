@@ -34,7 +34,7 @@
 
 | 特性 | 说明 |
 |------|------|
-| 🔄 远程优先 | 运行时从 `cdn.jsdelivr.net/gh/powerfullz/override-rules/convert.min.js` 获取当前可用源码，运行期间缓存 6 h，避免每次生成配置都触发网络请求；缓存不会绑定首次调用参数；`fetch` 失败后继续尝试 `$substore.http.get` |
+| 🔄 远程优先 | 运行时从 `cdn.jsdelivr.net/gh/powerfullz/override-rules/convert.min.js` 获取当前可用源码，运行期间缓存 6 h，避免每次生成配置都触发网络请求；缓存的是**已编译工厂**而非源码，命中缓存时不再重复编译，且不会绑定首次调用参数；`fetch` 失败后继续尝试 `$substore.http.get` |
 | 🛡️ 兜底快照 | 远程拉取、编译或运行失败时回退到文件尾部的 `CONVERT_SNAPSHOT` 历史快照（快照日期：2026-08-26）；两条传输共享 15 s 请求总预算 |
 | 🔒 入口隔离 | 通过 `new Function` 和独立 `globalThis` 取出上游 `main`，防止其覆盖本脚本入口；这不是安全沙箱 |
 | 💾 DNS / Hosts 保护 | 按字段是否存在完整备份并还原 `dns` / `hosts`，保留原始值、空值和缺失状态，中间脚本的重写不会污染用户配置 |
@@ -62,10 +62,10 @@
 ```mermaid
 flowchart LR
   A["Sub-Store 调用 main(config)"] --> B["备份 dns/hosts"]
-  B --> C{"源码缓存命中且未超过 6 小时"}
-  C -->|是| D["按当前参数构建缓存源码入口"]
+  B --> C{"工厂缓存命中且未超过 6 小时"}
+  C -->|是| D["按当前参数调用缓存工厂"]
   C -->|否| E["拉取 CONVERT_URL"]
-  E -->|成功| F["隔离执行并缓存源码"]
+  E -->|成功| F["隔离执行并缓存已编译工厂"]
   E -->|失败| G["回退到 CONVERT_SNAPSHOT"]
   D --> H["执行 convertMain(config) 全量重写"]
   F --> H
@@ -78,9 +78,11 @@ flowchart LR
 
 ### 关键实现
 
-- **缓存键**：`globalThis.__SUBSTORE_COMBINED_CONVERT_V2__ = { code, time }`，TTL = `6 * 60 * 60 * 1000`；缓存源码而非已绑定 `$arguments` 的函数
+- **缓存键**：`globalThis.__SUBSTORE_COMBINED_CONVERT_V2__ = { factory, time }`，TTL = `6 * 60 * 60 * 1000`；缓存**已编译的工厂函数**而非源码字符串，因此缓存命中时省去一次约 20 KB 的重复编译
+- **不锁死参数**：上游在模块初始化时读取 `$arguments`，直接缓存 `factory({}, args)` 的结果会锁死首次参数；工厂函数每次调用都会重新执行上游模块，因此缓存工厂既能复用编译结果，又能让每次调用传入新的 `$arguments`
+- **快照工厂**：`CONVERT_SNAPSHOT` 是常量，其工厂在进程内只编译一次并复用
 - **下载**：优先 `fetch`（Node 18+ Sub-Store 后端自带），失败后降级 `$substore.http.get`；两条传输共享 15 s 总预算（`fetch` 快速失败会给降级路径留出剩余时间），脚本大小上限 2 MiB
-- **隔离执行**：`new Function("globalThis","$arguments", code + ";return globalThis.main;")({}, args)`
+- **隔离执行**：`new Function("globalThis","$arguments", code + ";return globalThis.main;")`，调用时传入独立的 `globalThis` 与本次的 `$arguments`
 - **参数透传**：Sub-Store URL 上的 `#` 参数优先于默认值，见下表
 
 ---
@@ -182,7 +184,7 @@ https://cdn.jsdelivr.net/gh/lijianbin2/1@main/substore-combined.js#grouptype=1
 npm test
 ```
 
-测试直接加载部署脚本，覆盖不同 `grouptype` 的缓存隔离、远程运行/返回值异常回退、`fetch` 硬超时、双传输降级与预算耗尽、DNS/Hosts 空值保留、后处理幂等以及 `threshold` 默认值。
+测试直接加载部署脚本，覆盖不同 `grouptype` 的缓存隔离、缓存工厂复用与参数重绑定、缓存工厂失效回退、远程运行/返回值异常回退、`fetch` 硬超时、双传输降级与预算耗尽、DNS/Hosts 空值保留、后处理幂等以及 `threshold` 默认值。
 
 > 安全提示：远程优先策略会在 Sub-Store 运行时执行上游 JavaScript。这里的入口隔离不是安全沙箱；是否信任 `powerfullz/override-rules` 由使用者决定。
 
@@ -202,4 +204,4 @@ npm test
 
 ---
 
-*README 重写于 2026-09-13；2026-09-24 完成缓存、超时、异常回退、DNS/Hosts、测试体系与版本说明审查优化；2026-10-21 移除 javdb 分流 · 内置回退快照 2026-08-26 · 仓库推送 `lijianbin2/1@main`*
+*README 重写于 2026-09-13；2026-09-24 完成缓存、超时、异常回退、DNS/Hosts、测试体系与版本说明审查优化；2026-10-21 移除 javdb 分流并改为缓存已编译工厂（命中缓存省去重复编译）· 内置回退快照 2026-08-26 · 仓库推送 `lijianbin2/1@main`*

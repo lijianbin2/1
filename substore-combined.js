@@ -11,6 +11,7 @@
 const CONVERT_URL = "https://cdn.jsdelivr.net/gh/powerfullz/override-rules/convert.min.js";
 const CONVERT_CACHE_TTL = 6 * 60 * 60 * 1000; // 6 小时
 const CONVERT_FETCH_TIMEOUT = 15 * 1000;
+const __CONVERT_MAX_BYTES = 2 * 1024 * 1024; // 2 MiB 安全上限
 const __CONVERT_CACHE_KEY = "__SUBSTORE_COMBINED_CONVERT_V2__";
 
 // ---------- 模块级常量：main() 多次调用时不重复分配 ----------
@@ -37,26 +38,47 @@ function __logErr(msg) {
 }
 
 // 中间脚本的参数：默认 grouptype=1；Sub-Store 里 URL 上的 # 参数优先
+// 显式 undefined 不覆盖默认值（否则上游会退回自己的默认阈值）
 function __convertArgs() {
   const userArgs = (typeof $arguments !== "undefined" && $arguments) || {};
-  return Object.assign({ grouptype: 1, threshold: 0 }, userArgs);
+  const args = { grouptype: 1, threshold: 0 };
+  if (userArgs && typeof userArgs === "object") {
+    for (const key of Object.keys(userArgs)) {
+      if (userArgs[key] !== undefined) args[key] = userArgs[key];
+    }
+  }
+  return args;
 }
 
-// 在隔离作用域中执行中间脚本源码，取出它暴露的 main
-// 传入一个假的 globalThis，防止它覆盖本脚本自己的 main
-function __buildConvert(code, args) {
+// 编译中间脚本源码，得到一个「工厂函数」。
+// 工厂函数的参数是 (globalThis, $arguments)：源码本身作为函数体，
+// 每次调用都会重新执行上游模块，因此缓存工厂即可复用编译结果，
+// 同时每次调用仍能传入不同的 $arguments（不会锁死首次参数）。
+function __buildFactory(code) {
   if (typeof code !== "string" || code.trim().length === 0) {
     throw new Error("convert 脚本内容为空");
   }
-  if (code.length > 2 * 1024 * 1024) {
+  if (code.length > __CONVERT_MAX_BYTES) {
     throw new Error("convert 脚本超过 2 MiB 安全上限");
   }
-  const factory = new Function("globalThis", "$arguments", code + "\n;return globalThis.main;");
+  return new Function("globalThis", "$arguments", code + "\n;return globalThis.main;");
+}
+
+// 调用工厂，取出上游暴露的 main。
+// 传入一个假的 globalThis，防止上游覆盖本脚本自己的 main。
+function __invokeConvert(factory, args) {
   const fn = factory({}, args);
   if (typeof fn !== "function") {
     throw new Error("convert 脚本未暴露 main 入口（上游可能更改了导出方式）");
   }
   return fn;
+}
+
+// 内联快照的工厂只编译一次：快照源码是常量，编译结果可长期复用
+let __SNAPSHOT_FACTORY = null;
+function __snapshotFactory() {
+  if (!__SNAPSHOT_FACTORY) __SNAPSHOT_FACTORY = __buildFactory(CONVERT_SNAPSHOT);
+  return __SNAPSHOT_FACTORY;
 }
 
 // 硬超时包装：timeoutMs 是「剩余预算」，让多条传输共享同一份总预算，
@@ -84,7 +106,7 @@ async function __fetchText(url) {
         if (res && res.ok) return await res.text();
         throw new Error("fetch 失败: HTTP " + (res && res.status));
       })();
-      return await __withTimeout(request, "fetch 超时（15000 ms）", remaining());
+      return await __withTimeout(request, "fetch 超时（" + CONVERT_FETCH_TIMEOUT + " ms）", remaining());
     } catch (e) {
       fetchError = e;
     } finally {
@@ -97,12 +119,12 @@ async function __fetchText(url) {
     if (budget === 0) {
       throw new Error(
         (fetchError ? "fetch 失败: " + (fetchError.message || fetchError) + "; " : "") +
-        "$substore.http 未尝试：HTTP 请求总预算（15000 ms）已耗尽"
+        "$substore.http 未尝试：HTTP 请求总预算（" + CONVERT_FETCH_TIMEOUT + " ms）已耗尽"
       );
     }
     try {
       const request = $substore.http.get({ url: url, timeout: budget });
-      const resp = await __withTimeout(request, "$substore.http 超时（15000 ms）", budget);
+      const resp = await __withTimeout(request, "$substore.http 超时（" + CONVERT_FETCH_TIMEOUT + " ms）", budget);
       const body = resp && (resp.body !== undefined ? resp.body : resp.rawBody);
       if (typeof body === "string" && body.length > 0) return body;
       throw new Error("$substore.http 返回为空");
@@ -117,26 +139,37 @@ async function __fetchText(url) {
   throw new Error("当前环境没有可用的 HTTP 客户端");
 }
 
-// 获取中间脚本入口：本地源码缓存 -> 远程最新 -> 内联快照。
-// 不能缓存 factory({}, args) 的结果：上游会在构建时读取 $arguments，缓存函数会锁死首次参数。
+// 获取中间脚本入口：本地工厂缓存 -> 远程最新 -> 内联快照。
+// 缓存的是「工厂函数」而不是 factory({}, args) 的结果：
+// 上游会在构建时读取 $arguments，直接缓存结果会锁死首次参数；
+// 而工厂每次调用都会重新执行上游模块，缓存工厂既能复用编译结果，又不锁死参数。
 async function __loadConvertMain(args) {
   const cache = globalThis[__CONVERT_CACHE_KEY] || (globalThis[__CONVERT_CACHE_KEY] = {});
   const now = Date.now();
 
-  if (cache.code && now - cache.time < CONVERT_CACHE_TTL) {
-    return { fn: __buildConvert(cache.code, args), isRemote: true };
+  if (cache.factory && now - cache.time < CONVERT_CACHE_TTL) {
+    try {
+      return { fn: __invokeConvert(cache.factory, args), isRemote: true };
+    } catch (e) {
+      // 缓存的工厂已失效（例如上游改了导出方式）：丢弃缓存并回退快照
+      __logErr("[substore-combined] 缓存的 convert 入口失效，使用内联快照: " + (e && e.message));
+      delete cache.factory;
+      delete cache.time;
+      return { fn: __invokeConvert(__snapshotFactory(), args), isRemote: false };
+    }
   }
 
   try {
     const code = await __fetchText(CONVERT_URL + "?t=" + now);
-    const fn = __buildConvert(code, args);
-    cache.code = code;
+    const factory = __buildFactory(code);
+    const fn = __invokeConvert(factory, args);
+    cache.factory = factory;
     cache.time = now;
     __log("[substore-combined] 已加载最新版 convert.min.js");
     return { fn, isRemote: true };
   } catch (e) {
     __logErr("[substore-combined] 拉取最新 convert.min.js 失败，使用内联快照: " + (e && e.message));
-    return { fn: __buildConvert(CONVERT_SNAPSHOT, args), isRemote: false };
+    return { fn: __invokeConvert(__snapshotFactory(), args), isRemote: false };
   }
 }
 
@@ -159,21 +192,22 @@ async function main(config) {
   } catch (e) {
     if (!loaded.isRemote) throw e;
     const cache = globalThis[__CONVERT_CACHE_KEY];
-    if (cache && cache.code) {
-      delete cache.code;
+    if (cache && cache.factory) {
+      delete cache.factory;
       delete cache.time;
     }
     __logErr("[substore-combined] 最新 convert.min.js 运行失败，使用内联快照: " + (e && e.message));
-    config = __buildConvert(CONVERT_SNAPSHOT, args)(source);
+    config = __invokeConvert(__snapshotFactory(), args)(source);
     if (!config || typeof config !== "object" || Array.isArray(config)) {
       throw new Error("内联 convert 快照返回了无效配置");
     }
   }
 
   // ================= 配置收尾：还原 DNS / Hosts =================
-  if (hasDns) config["dns"] = __clone(backupDns);
+  // backupDns / backupHosts 已是独立深拷贝，直接复用即可，无需二次克隆
+  if (hasDns) config["dns"] = backupDns;
   else delete config["dns"];
-  if (hasHosts) config["hosts"] = __clone(backupHosts);
+  if (hasHosts) config["hosts"] = backupHosts;
   else delete config["hosts"];
 
   // ================= 后处理：proxy-groups（单次遍历定位 + 单次过滤清理） =================
@@ -226,7 +260,7 @@ async function main(config) {
 
 
   // ================= 自定义后处理：分流规则（幂等，Set 去重） =================
-  const oldRules = config["rules"] || [];
+  const oldRules = Array.isArray(config["rules"]) ? config["rules"] : [];
   config["rules"] = __CUSTOM_RULES.concat(oldRules.filter(r => !__CUSTOM_RULE_SET.has(r)));
 
   return config;
