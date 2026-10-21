@@ -38,7 +38,7 @@
 | 🛡️ 兜底快照 | 远程拉取、编译或运行失败时回退到文件尾部的 `CONVERT_SNAPSHOT` 历史快照（快照日期：2026-08-26）；两条传输共享 15 s 请求总预算 |
 | 🔒 入口隔离 | 通过 `new Function` 和独立 `globalThis` 取出上游 `main`，防止其覆盖本脚本入口；这不是安全沙箱 |
 | 💾 DNS / Hosts 保护 | 按字段是否存在完整备份并还原 `dns` / `hosts`，保留原始值、空值和缺失状态，中间脚本的重写不会污染用户配置 |
-| 🎯 精细后处理 | 剔除「选择代理」中的「自动选择」、删除旧的「非香港节点」组；将「AI服务」改为故障转移并摘除指定引用；将「AI服务」幂等插入「谷歌服务」；创建地区「javdb」手动选择组 |
+| 🎯 精细后处理 | 剔除「选择代理」中的「自动选择」、删除旧的「非香港节点」组；将「AI服务」改为故障转移并摘除指定引用；将「AI服务」幂等插入「谷歌服务」 |
 | 📏 幂等规则插入 | 自定义分流规则去重插入，重复生成不堆积（`customRules + oldRules.filter`） |
 
 ---
@@ -122,23 +122,7 @@ if (Array.isArray(g.proxies) && g.proxies.includes("自动选择")) {
 }
 ```
 
-### 2. 收集地区节点组（动态，不硬编码）
-
-地区组统一命名为 `<国家/地区>节点`（如 `香港节点`、`台湾节点`、`美国节点`），以 `节点` 结尾。
-后处理先排除功能组（`自动选择 / 手动选择 / 落地节点 / 低倍率节点 / 前置代理 / 非香港节点 / javdb`），
-剩下的即为**每一个地区的节点组**，天然兼容 `grouptype=0/1/2` 与 `threshold` 过滤：
-
-```js
-// 模块级常量 + 单次遍历：一次循环同时收集地区组并定位 选择代理/AI服务/谷歌服务
-const __EXCLUDED_NODE_GROUPS = new Set(["自动选择", "手动选择", "落地节点", "低倍率节点", "前置代理", "非香港节点", "javdb", "javdb手动选择"]); // 旧名仅升级兼容
-const __NODE_SUFFIX = /节点$/;
-const regionGroups = [];
-for (const g of groups) {
-  if (__NODE_SUFFIX.test(g.name) && !__EXCLUDED_NODE_GROUPS.has(g.name)) regionGroups.push(g.name);
-}
-```
-
-### 3. 已删除「非香港节点」组
+### 2. 已删除「非香港节点」组
 
 不再创建该组；同时清理旧配置中的残留（幂等），并从 `AI服务` 的引用中摘除：
 
@@ -146,36 +130,25 @@ for (const g of groups) {
 config["proxy-groups"] = config["proxy-groups"].filter(g => g.name !== "非香港节点");
 ```
 
-### 4. 新增「javdb」手动选择组（包含每一个地区的节点组）
-
-javdb 专用 `select` 组，`proxies = __regionGroups`（**含香港节点在内的全量地区组**，动态取值）：
-
-```js
-{ name: "javdb", type: "select", proxies: __regionGroups }
-```
-
-同样幂等：已存在则只更新 `proxies`，重复生成不堆积。切换节点时在客户端手动点选即可，无需改规则。
-
-### 5. 注入服务链
+### 3. 注入服务链
 
 - `AI服务`：摘除 `选择代理` / `香港节点` / `非香港节点` 引用，类型由 `select` 改为 `fallback`（`url / interval / tolerance` 缺失时自动补齐）
 - `谷歌服务` 组保留原有成员并最前插入 `AI服务`（去重幂等）
 
-### 6. 自定义分流规则（幂等）
+### 4. 自定义分流规则（幂等）
 
 ```js
 const customRules = [
   "DOMAIN,cpa.wisdamsatan.de,DIRECT",
   "DOMAIN-SUFFIX,bingosoft.net,DIRECT",
   "DOMAIN-SUFFIX,opencode.ai,AI服务",               // opencode.ai 走 AI 服务
-  "DOMAIN-KEYWORD,javdb,javdb",         // 含 javdb 的域名走 javdb 组（含主站，已覆盖 SUFFIX 场景）
 ];
 const customRuleSet = new Set(customRules); // O(1) 去重，原 includes 版为 O(n*m)
 config.rules = customRules.concat(oldRules.filter(r => !customRuleSet.has(r)));
 ```
 
-> javdb 仅保留 `DOMAIN-KEYWORD,javdb` 一条：KEYWORD 已覆盖主站 `javdb.com`，无需再写 SUFFIX。
-> javdb 规则指向 `javdb` 组，组内再手动选择具体地区（香港/台湾/美国/日本…）。
+> javdb 分流已移除：不再创建 `javdb` 代理组，也不再写入 `DOMAIN-KEYWORD,javdb` 规则，
+> 相关域名按上游规则集正常分流。
 
 ---
 
@@ -229,4 +202,4 @@ npm test
 
 ---
 
-*README 重写于 2026-09-13；2026-09-24 完成缓存、超时、异常回退、DNS/Hosts、测试体系与版本说明审查优化 · 内置回退快照 2026-08-26 · 仓库推送 `lijianbin2/1@main`*
+*README 重写于 2026-09-13；2026-09-24 完成缓存、超时、异常回退、DNS/Hosts、测试体系与版本说明审查优化；2026-10-21 移除 javdb 分流 · 内置回退快照 2026-08-26 · 仓库推送 `lijianbin2/1@main`*

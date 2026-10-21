@@ -243,12 +243,28 @@ test("后处理保持幂等", async () => {
   const second = await runtime.__test.main(first);
 
   for (const config of [first, second]) {
-    assert.equal(config["proxy-groups"].filter((group) => group.name === "javdb").length, 1);
+    assert.equal(config["proxy-groups"].filter((group) => group.name === "javdb").length, 0);
     assert.equal(config["proxy-groups"].filter((group) => group.name === "非香港节点").length, 0);
-    assert.equal(config.rules.filter((rule) => rule === "DOMAIN-KEYWORD,javdb,javdb").length, 1);
+    assert.equal(config.rules.filter((rule) => rule === "DOMAIN-KEYWORD,javdb,javdb").length, 0);
     assert.equal(findGroup(config, "谷歌服务").proxies.filter((name) => name === "AI服务").length, 1);
     assert.equal(findGroup(config, "AI服务").type, "fallback");
   }
+});
+
+test("不再生成 javdb 分流：分组与规则都不存在", async () => {
+  const runtime = createRuntime({
+    fetch: async () => ({ ok: true, text: async () => runtime.__test.snapshot })
+  });
+  runtime.$arguments = { threshold: 0 };
+
+  const config = await runtime.__test.main(makeConfig());
+
+  assert.equal(findGroup(config, "javdb"), undefined);
+  assert.equal(findGroup(config, "javdb手动选择"), undefined);
+  assert.equal(config.rules.some((rule) => rule.includes("javdb")), false);
+  // 其余自定义分流规则保留
+  assert.equal(config.rules.filter((rule) => rule === "DOMAIN-SUFFIX,opencode.ai,AI服务").length, 1);
+  assert.equal(config.rules.filter((rule) => rule === "DOMAIN,cpa.wisdamsatan.de,DIRECT").length, 1);
 });
 
 test("threshold 未显式传入时采用文档约定的 0", async () => {

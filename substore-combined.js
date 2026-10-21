@@ -14,16 +14,12 @@ const CONVERT_FETCH_TIMEOUT = 15 * 1000;
 const __CONVERT_CACHE_KEY = "__SUBSTORE_COMBINED_CONVERT_V2__";
 
 // ---------- 模块级常量：main() 多次调用时不重复分配 ----------
-// 地区组统一以「节点」结尾；排除功能组后剩下的即为每一个地区的节点组
-const __EXCLUDED_NODE_GROUPS = new Set(["自动选择", "手动选择", "落地节点", "低倍率节点", "前置代理", "非香港节点", "javdb", "javdb手动选择"]); // 旧名仅升级兼容
-const __NODE_SUFFIX = /节点$/;
 const __AI_STRIP = new Set(["选择代理", "香港节点", "非香港节点"]);
 const __FALLBACK_URL = "https://www.gstatic.com/generate_204";
 const __CUSTOM_RULES = [
   "DOMAIN,cpa.wisdamsatan.de,DIRECT",
   "DOMAIN-SUFFIX,bingosoft.net,DIRECT",
-  "DOMAIN-SUFFIX,opencode.ai,AI服务", // opencode.ai 走 AI服务组
-  "DOMAIN-KEYWORD,javdb,javdb" // 含 javdb 的域名走 javdb 组（含主站 javdb.com，已覆盖 SUFFIX 场景）
+  "DOMAIN-SUFFIX,opencode.ai,AI服务" // opencode.ai 走 AI服务组
 ];
 const __CUSTOM_RULE_SET = new Set(__CUSTOM_RULES);
 
@@ -180,13 +176,10 @@ async function main(config) {
   if (hasHosts) config["hosts"] = __clone(backupHosts);
   else delete config["hosts"];
 
-  // ================= 后处理：proxy-groups（单次遍历收集 + 单次过滤清理） =================
-  // 地区组命名为 `<国家/地区>节点`；排除功能组后剩下的即为每一个地区的节点组
-  // （动态取值，兼容 grouptype=0/1/2 + threshold 过滤；javdb 组取含香港节点在内的全量地区组）
+  // ================= 后处理：proxy-groups（单次遍历定位 + 单次过滤清理） =================
   let groups = config["proxy-groups"];
   if (!Array.isArray(groups)) groups = config["proxy-groups"] = [];
 
-  const regionGroups = [];
   let aiGroup = null;
   let googleGroup = null;
   for (const g of groups) {
@@ -202,25 +195,10 @@ async function main(config) {
     } else if (name === "谷歌服务") {
       googleGroup = g;
     }
-    if (__NODE_SUFFIX.test(name) && !__EXCLUDED_NODE_GROUPS.has(name)) regionGroups.push(name);
   }
 
-  // 已删除「非香港节点」组：清理旧配置残留（幂等）；旧名「javdb手动选择」仅在 javdb 能重建时一并清理
-  // （与旧逻辑一致：regionGroups 为空时保留旧名孤儿组；原来要两趟 filter，现在一趟）
-  config["proxy-groups"] = groups = regionGroups.length > 0
-    ? groups.filter(g => g.name !== "非香港节点" && g.name !== "javdb手动选择")
-    : groups.filter(g => g.name !== "非香港节点");
-
-  // ================= 后处理：新增「javdb」select 组（包含每一个地区的节点组） =================
-  // javdb 专用手动选择组，proxies = 全部地区组（含香港节点）；幂等：已存在只更新 proxies
-  if (regionGroups.length > 0) {
-    const javdbIdx = groups.findIndex(g => g.name === "javdb");
-    if (javdbIdx >= 0) {
-      groups[javdbIdx].proxies = regionGroups;
-    } else {
-      groups.push({ name: "javdb", type: "select", proxies: regionGroups });
-    }
-  }
+  // 已删除「非香港节点」组：清理旧配置残留（幂等）
+  config["proxy-groups"] = groups = groups.filter(g => g.name !== "非香港节点");
 
   // ================= 后处理：AI服务摘除引用并转 fallback；谷歌服务前插AI服务 =================
   if (aiGroup) {
