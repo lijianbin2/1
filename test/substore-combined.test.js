@@ -308,6 +308,7 @@ test("不再生成 javdb 分流：分组与规则都不存在", async () => {
   assert.equal(config.rules.some((rule) => rule.includes("javdb")), false);
   // 其余自定义分流规则保留
   assert.equal(config.rules.filter((rule) => rule === "DOMAIN-SUFFIX,opencode.ai,AI服务").length, 1);
+  assert.equal(config.rules.filter((rule) => rule === "DOMAIN-SUFFIX,war.gov,AI服务").length, 1);
   assert.equal(config.rules.filter((rule) => rule === "DOMAIN,cpa.wisdamsatan.de,DIRECT").length, 1);
 });
 
