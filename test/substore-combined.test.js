@@ -292,6 +292,16 @@ test("后处理保持幂等", async () => {
     assert.equal(config.rules.filter((rule) => rule === "DOMAIN-KEYWORD,javdb,javdb").length, 0);
     assert.equal(findGroup(config, "谷歌服务").proxies.filter((name) => name === "AI服务").length, 1);
     assert.equal(findGroup(config, "AI服务").type, "fallback");
+    // 自定义规则二次运行后仍恰好出现一次
+    for (const rule of [
+      "DOMAIN,cpa.wisdamsatan.de,DIRECT",
+      "DOMAIN-SUFFIX,bingosoft.net,DIRECT",
+      "DOMAIN-SUFFIX,opencode.ai,AI服务",
+      "DOMAIN-SUFFIX,war.gov,AI服务",
+      "PROCESS-NAME,DownloadSDKServer.exe,DIRECT",
+    ]) {
+      assert.equal(config.rules.filter((r) => r === rule).length, 1);
+    }
   }
 });
 

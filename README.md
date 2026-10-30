@@ -145,11 +145,13 @@ const customRules = [
   "DOMAIN-SUFFIX,bingosoft.net,DIRECT",
   "DOMAIN-SUFFIX,opencode.ai,AI服务",               // opencode.ai 走 AI 服务
   "DOMAIN-SUFFIX,war.gov,AI服务",                      // war.gov 走 AI 服务
-  "PROCESS-NAME,DownloadSDKServer.exe,DIRECT",                  // 迅雷下载引擎走直连
+  "PROCESS-NAME,DownloadSDKServer.exe,DIRECT",         // 迅雷下载引擎走直连
 ];
 const customRuleSet = new Set(customRules); // O(1) 去重，原 includes 版为 O(n*m)
 config.rules = customRules.concat(oldRules.filter(r => !customRuleSet.has(r)));
 ```
+
+> ⚠️ `PROCESS-NAME` 类规则仅在客户端开启 **TUN 模式**时生效；未开启 TUN 时只有域名/规则集类规则起作用。`DownloadSDKServer.exe` 是迅雷下载引擎进程，覆盖 P2P 与直连 IP 流量。
 
 > javdb 分流已移除：不再创建 `javdb` 代理组，也不再写入 `DOMAIN-KEYWORD,javdb` 规则，
 > 相关域名按上游规则集正常分流。
@@ -206,4 +208,4 @@ npm test
 
 ---
 
-*README 重写于 2026-09-13；2026-09-24 完成缓存、超时、异常回退、DNS/Hosts、测试体系与版本说明审查优化；2026-10-21 移除 javdb 分流并改为缓存已编译工厂（命中缓存省去重复编译）· 内置回退快照 2026-08-26 · 仓库推送 `lijianbin2/1@main`*
+*README 重写于 2026-09-13；2026-09-24 完成缓存、超时、异常回退、DNS/Hosts、测试体系与版本说明审查优化；2026-10-21 移除 javdb 分流并改为缓存已编译工厂（命中缓存省去重复编译）；2026-10-30 新增 war.gov 走 AI 服务、迅雷下载引擎进程走直连（需 TUN）· 内置回退快照 2026-08-26 · 仓库推送 `lijianbin2/1@main`*
