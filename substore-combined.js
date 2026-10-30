@@ -22,8 +22,7 @@ const __CUSTOM_RULES = [
   "DOMAIN-SUFFIX,bingosoft.net,DIRECT",
   "DOMAIN-SUFFIX,opencode.ai,AI服务", // opencode.ai 走 AI服务组
   "DOMAIN-SUFFIX,war.gov,AI服务", // war.gov 走 AI服务组
-  "PROCESS-NAME,Thunder.exe,DIRECT", // 迅雷客户端(Windows)走直连
-  "PROCESS-NAME,Thunder,DIRECT" // 迅雷客户端(macOS)走直连
+  "PROCESS-NAME,DownloadSDKServer.exe,DIRECT" // 迅雷下载引擎走直连
 ];
 const __CUSTOM_RULE_SET = new Set(__CUSTOM_RULES);
 
