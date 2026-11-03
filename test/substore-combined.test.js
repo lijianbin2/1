@@ -296,7 +296,6 @@ test("后处理保持幂等", async () => {
     for (const rule of [
       "DOMAIN,cpa.wisdamsatan.de,DIRECT",
       "DOMAIN-SUFFIX,bingosoft.net,DIRECT",
-      "DOMAIN-SUFFIX,opencode.ai,AI服务",
       "DOMAIN-SUFFIX,war.gov,AI服务",
       "PROCESS-NAME,DownloadSDKServer.exe,DIRECT",
     ]) {
@@ -317,7 +316,6 @@ test("不再生成 javdb 分流：分组与规则都不存在", async () => {
   assert.equal(findGroup(config, "javdb手动选择"), undefined);
   assert.equal(config.rules.some((rule) => rule.includes("javdb")), false);
   // 其余自定义分流规则保留
-  assert.equal(config.rules.filter((rule) => rule === "DOMAIN-SUFFIX,opencode.ai,AI服务").length, 1);
   assert.equal(config.rules.filter((rule) => rule === "DOMAIN-SUFFIX,war.gov,AI服务").length, 1);
   assert.equal(config.rules.filter((rule) => rule === "PROCESS-NAME,DownloadSDKServer.exe,DIRECT").length, 1);
 

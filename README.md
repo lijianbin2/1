@@ -143,7 +143,6 @@ config["proxy-groups"] = config["proxy-groups"].filter(g => g.name !== "非香�
 const customRules = [
   "DOMAIN,cpa.wisdamsatan.de,DIRECT",
   "DOMAIN-SUFFIX,bingosoft.net,DIRECT",
-  "DOMAIN-SUFFIX,opencode.ai,AI服务",               // opencode.ai 走 AI 服务
   "DOMAIN-SUFFIX,war.gov,AI服务",                      // war.gov 走 AI 服务
   "PROCESS-NAME,DownloadSDKServer.exe,DIRECT",         // 迅雷下载引擎走直连
 ];
