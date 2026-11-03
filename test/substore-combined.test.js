@@ -297,7 +297,6 @@ test("后处理保持幂等", async () => {
       "DOMAIN,cpa.wisdamsatan.de,DIRECT",
       "DOMAIN-SUFFIX,bingosoft.net,DIRECT",
       "DOMAIN-SUFFIX,war.gov,AI服务",
-      "PROCESS-NAME,DownloadSDKServer.exe,DIRECT",
     ]) {
       assert.equal(config.rules.filter((r) => r === rule).length, 1);
     }
@@ -317,9 +316,18 @@ test("不再生成 javdb 分流：分组与规则都不存在", async () => {
   assert.equal(config.rules.some((rule) => rule.includes("javdb")), false);
   // 其余自定义分流规则保留
   assert.equal(config.rules.filter((rule) => rule === "DOMAIN-SUFFIX,war.gov,AI服务").length, 1);
-  assert.equal(config.rules.filter((rule) => rule === "PROCESS-NAME,DownloadSDKServer.exe,DIRECT").length, 1);
-
   assert.equal(config.rules.filter((rule) => rule === "DOMAIN,cpa.wisdamsatan.de,DIRECT").length, 1);
+});
+
+test("不再生成迅雷下载引擎进程分流", async () => {
+  const runtime = createRuntime({
+    fetch: async () => ({ ok: true, text: async () => runtime.__test.snapshot })
+  });
+  runtime.$arguments = { threshold: 0 };
+
+  const config = await runtime.__test.main(makeConfig());
+
+  assert.equal(config.rules.some((rule) => rule.includes("DownloadSDKServer")), false);
 });
 
 test("threshold 未显式传入时采用文档约定的 0", async () => {

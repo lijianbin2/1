@@ -20,8 +20,7 @@ const __FALLBACK_URL = "https://www.gstatic.com/generate_204";
 const __CUSTOM_RULES = [
   "DOMAIN,cpa.wisdamsatan.de,DIRECT",
   "DOMAIN-SUFFIX,bingosoft.net,DIRECT",
-  "DOMAIN-SUFFIX,war.gov,AI服务", // war.gov 走 AI服务组
-  "PROCESS-NAME,DownloadSDKServer.exe,DIRECT" // 迅雷下载引擎走直连
+  "DOMAIN-SUFFIX,war.gov,AI服务" // war.gov 走 AI服务组
 ];
 const __CUSTOM_RULE_SET = new Set(__CUSTOM_RULES);
 
