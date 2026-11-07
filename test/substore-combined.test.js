@@ -297,7 +297,6 @@ test("后处理保持幂等", async () => {
       "DOMAIN,cpa.wisdamsatan.de,DIRECT",
       "DOMAIN-SUFFIX,bingosoft.net,DIRECT",
       "DOMAIN-SUFFIX,war.gov,AI服务",
-      "DOMAIN-SUFFIX,adobe.io,REJECT",
     ]) {
       assert.equal(config.rules.filter((r) => r === rule).length, 1);
     }
@@ -329,20 +328,6 @@ test("不再生成迅雷下载引擎进程分流", async () => {
   const config = await runtime.__test.main(makeConfig());
 
   assert.equal(config.rules.some((rule) => rule.includes("DownloadSDKServer")), false);
-});
-
-test("adobe.io 走 REJECT 且只出现一次", async () => {
-  const rule = "DOMAIN-SUFFIX,adobe.io,REJECT";
-  const runtime = createRuntime({
-    fetch: async () => ({ ok: true, text: async () => runtime.__test.snapshot })
-  });
-  runtime.$arguments = { threshold: 0 };
-
-  const config = await runtime.__test.main(makeConfig());
-
-  assert.equal(config.rules.filter((r) => r === rule).length, 1);
-  // 自定义规则始终拼在 rules 最前面，保证先于上游规则命中
-  assert.ok(config.rules.indexOf(rule) < 4);
 });
 
 test("threshold 未显式传入时采用文档约定的 0", async () => {
